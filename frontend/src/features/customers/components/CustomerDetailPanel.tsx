@@ -1,10 +1,9 @@
-import type { AgentTraceResponse, ContactResponse, CustomerDetail, OpportunityResponse } from "../../../types";
+import type { ContactResponse, CustomerDetail, OpportunityResponse } from "../../../types";
 import { riskLabel, formatMoney, formatDate } from "../../../lib/format";
 import { AiBadge } from "../../../components/common/AiBadge";
 import { Timeline } from "./Timeline";
 import { OpportunityBoard } from "./OpportunityBoard";
 import { ContactsPanel } from "./ContactsPanel";
-import { TracePanel } from "../../agent-trace/TracePanel";
 
 /**
  * 客戶詳情、聯絡人、商機、互動、AI 與 Trace 的主內容。
@@ -14,10 +13,10 @@ import { TracePanel } from "../../agent-trace/TracePanel";
 export function CustomerDetailPanel({
   detail,
   loading,
-  trace,
   onStageChange,
   onOpenChat,
   onAssess,
+  onOpenAiHistory,
   onEditCustomer,
   onDeleteCustomer,
   onAddContact,
@@ -31,10 +30,10 @@ export function CustomerDetailPanel({
 }: {
   detail: CustomerDetail | null;
   loading: boolean;
-  trace: AgentTraceResponse | null;
   onStageChange: (opportunityId: number, newStage: string) => void;
   onOpenChat: () => void;
   onAssess: () => void;
+  onOpenAiHistory: () => void;
   onEditCustomer: () => void;
   onDeleteCustomer: () => void;
   onAddContact: () => void;
@@ -63,6 +62,7 @@ export function CustomerDetailPanel({
           <span className={`risk-badge ${detail.customer.riskLevel.toLowerCase()}`}>{riskLabel(detail.customer.riskLevel)}</span>
           <button type="button" className="btn-primary" onClick={onAssess}>🩺 整體評估<AiBadge onDark /></button>
           <button type="button" className="btn-primary" onClick={onOpenChat}>💬 詢問 AI 助理<AiBadge onDark /></button>
+          <button type="button" className="btn-secondary" onClick={onOpenAiHistory}>🧭 AI 歷程</button>
           <button type="button" className="btn-secondary" onClick={onEditCustomer}>✏️ 編輯客戶</button>
           {userRole === "ADMIN" ? <button type="button" className="btn-danger" onClick={onDeleteCustomer}>刪除客戶</button> : null}
         </div>
@@ -96,9 +96,6 @@ export function CustomerDetailPanel({
       <div className="detail-grid">
         <Timeline interactions={detail.interactions} onEdit={onEditInteraction} onDelete={onDeleteInteraction} />
         <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
-      </div>
-      <div className="detail-grid">
-        <TracePanel trace={trace} />
       </div>
     </section>
   );

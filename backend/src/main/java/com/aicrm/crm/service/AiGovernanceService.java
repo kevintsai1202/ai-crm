@@ -86,4 +86,18 @@ public class AiGovernanceService {
                 feedbackRepository.countByDecision(FeedbackDecision.ADOPTED),
                 feedbackRepository.countByDecision(FeedbackDecision.REJECTED));
     }
+
+    /**
+     * 列出某客戶的歷次 AI 呼叫紀錄（新到舊），供前端「AI 歷程」Modal 呈現。
+     *
+     * @param customerId 客戶 ID
+     * @return AI 呼叫歷史清單
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<Dtos.AiCallHistoryItem> customerCallHistory(Long customerId) {
+        return callLogRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
+                .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                        c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+                .toList();
+    }
 }

@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   AdminUser,
   AgentTraceResponse,
+  AiCallHistoryItem,
   ChatResponse,
   ContactResponse,
   CustomerDetail,
@@ -475,6 +476,14 @@ export async function createOpportunity(payload: {
  */
 export async function fetchAgentTrace(customerId: number) {
   const { data } = await apiClient.get<AgentTraceResponse>(`/agent/customers/${customerId}/trace`);
+  return data;
+}
+
+/**
+ * 查詢某客戶的歷次 AI 呼叫紀錄（新到舊），供「AI 歷程」Modal 呈現。
+ */
+export async function fetchCustomerAiCalls(customerId: number) {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>(`/ai/customers/${customerId}/calls`);
   return data;
 }
 

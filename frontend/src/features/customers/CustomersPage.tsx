@@ -2,12 +2,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   addInteraction, createContact, createCustomer, createOpportunity, deleteContact, deleteCustomer,
-  deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAssessmentStream,
+  deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAiCalls, fetchCustomerAssessmentStream,
   fetchCustomerDetail, fetchCustomerOptions, fetchCustomers, updateContact, updateCustomer,
   updateInteraction, updateOpportunity
 } from "../../api";
 import type {
-  AgentTraceResponse, ContactResponse, CustomerDetail, CustomerSummary, DrilldownSource,
+  AgentTraceResponse, AiCallHistoryItem, ContactResponse, CustomerDetail, CustomerSummary, DrilldownSource,
   InteractionResponse, OpportunityResponse, OwnerOption
 } from "../../types";
 import { Breadcrumb } from "../../components/common/Breadcrumb";
@@ -24,6 +24,7 @@ import { EditCustomerModal } from "./components/EditCustomerModal";
 import { ContactModal } from "./components/ContactModal";
 import { EditOpportunityModal } from "./components/EditOpportunityModal";
 import { EditInteractionModal } from "./components/EditInteractionModal";
+import { AiHistoryModal } from "./components/AiHistoryModal";
 import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
 import { ChatWindow } from "../ai-assistant/components/ChatWindow";
 
@@ -64,6 +65,8 @@ export function CustomersPage() {
   // 編輯互動對象（null 表示未開啟）
   const [editingInteraction, setEditingInteraction] = useState<InteractionResponse | null>(null);
   const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
+  // AI 歷程 Modal：open 控制開關、loading 載入中、calls 為該客戶歷次 AI 呼叫
+  const [aiHistory, setAiHistory] = useState<{ open: boolean; loading: boolean; calls: AiCallHistoryItem[] } | null>(null);
 
   const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat } = useAiChat();
 
@@ -301,6 +304,19 @@ export function CustomersPage() {
     setChatOpen(true);
   }
 
+  /** 開啟 AI 歷程 Modal：載入該客戶歷次 AI 呼叫紀錄（Agent Trace 用既有 trace state）。 */
+  async function openAiHistory() {
+    if (!selected) return;
+    setAiHistory({ open: true, loading: true, calls: [] });
+    try {
+      const calls = await fetchCustomerAiCalls(selected.customer.id);
+      setAiHistory({ open: true, loading: false, calls });
+    } catch (e) {
+      console.error("載入 AI 歷程失敗:", e);
+      setAiHistory({ open: true, loading: false, calls: [] });
+    }
+  }
+
   return (
     <>
       {source?.from === "dashboard" ? (
@@ -349,10 +365,10 @@ export function CustomersPage() {
         <CustomerDetailPanel
           detail={selected}
           loading={loading}
-          trace={trace}
           onStageChange={handleStageChange}
           onOpenChat={openChat}
           onAssess={openCustomerAssessment}
+          onOpenAiHistory={openAiHistory}
           onEditCustomer={() => setShowEditCustomer(true)}
           onDeleteCustomer={handleDeleteCustomer}
           onAddContact={() => setContactModal({ open: true, editing: null })}
@@ -377,6 +393,7 @@ export function CustomersPage() {
         />
       ) : null}
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
+      {aiHistory?.open && selected ? <AiHistoryModal customerName={selected.customer.name} calls={aiHistory.calls} trace={trace} loading={aiHistory.loading} onClose={() => setAiHistory(null)} /> : null}
       {showAddCustomer ? <AddCustomerModal currentUserId={user?.id ?? 0} onSubmit={handleCreateCustomer} onClose={() => setShowAddCustomer(false)} /> : null}
       {showAddInteraction && selected ? <AddInteractionModal customerName={selected.customer.name} onSubmit={handleAddInteraction} onClose={() => setShowAddInteraction(false)} /> : null}
       {showAddOpportunity && selected ? <AddOpportunityModal customerName={selected.customer.name} onSubmit={handleAddOpportunity} onClose={() => setShowAddOpportunity(false)} /> : null}

@@ -40,7 +40,12 @@ test("未登入導向登入頁、登入後可在儀表板與客戶頁間切換�
   await page.locator(".customer-row").first().click();
   await expect(page).toHaveURL(/\/customers\/\d+/);
   await expect(page.locator(".customer-hero")).toBeVisible();
-  await expect(page.locator(".trace-panel")).toBeVisible();
+  // Agent 歷程改為按鈕開啟 Modal（不再固定佔版面）：點開應顯示 AI 呼叫歷史與 Agent 決策歷程，關閉後續測
+  await page.locator('.hero-actions >> text=AI 歷程').click();
+  await expect(page.locator(".modal-content")).toBeVisible();
+  await expect(page.getByText("Agent 決策歷程")).toBeVisible();
+  await page.locator(".report-footer button").click();
+  await expect(page.locator(".modal-overlay")).toHaveCount(0);
 
   // 6. 開 AI 聊天視窗
   await page.locator(".hero-actions >> text=詢問 AI 助理").click();

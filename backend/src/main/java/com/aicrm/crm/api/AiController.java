@@ -131,6 +131,17 @@ public class AiController {
     }
 
     /**
+     * 列出指定客戶的歷次 AI 呼叫紀錄（新到舊），供前端「AI 歷程」Modal 呈現。
+     *
+     * @param id 客戶 ID
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/customers/{id}/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> customerCalls(@PathVariable Long id) {
+        return aiGovernanceService.customerCallHistory(id);
+    }
+
+    /**
      * 從認證主體解析回饋者帳號；principal 為 {@link JwtService.AuthPrincipal}。
      *
      * @param authentication 認證資訊（可為 null）

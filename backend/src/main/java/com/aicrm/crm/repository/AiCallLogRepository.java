@@ -1,6 +1,7 @@
 package com.aicrm.crm.repository;
 
 import com.aicrm.crm.domain.AiCallLog;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -8,6 +9,15 @@ import org.springframework.data.jpa.repository.Query;
  * AI 呼叫紀錄資料存取介面，附用量彙總查詢。
  */
 public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
+
+    /**
+     * 查某客戶的所有 AI 呼叫紀錄，新到舊排序（供「AI 歷程」Modal）。
+     * customer_id 已有索引（V6 idx_ai_call_log_customer）。
+     *
+     * @param customerId 客戶 ID
+     * @return 該客戶歷次 AI 呼叫紀錄
+     */
+    List<AiCallLog> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 
     /**
      * 加總所有呼叫的 total_tokens。

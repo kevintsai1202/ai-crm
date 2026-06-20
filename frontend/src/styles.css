@@ -988,6 +988,55 @@ button {
     grid-template-columns: 1fr;
   }
 
+  /* 儀表板:手機放棄 react-grid-layout 的絕對定位,強制單欄堆疊、每張卡滿版自然高度,
+     讓圖表可讀(原本 RGL 依容器寬度等比縮放,390px 下卡片過窄、圖表糊成一團)。 */
+  .dashboard-grid {
+    height: auto !important;
+  }
+  .dashboard-grid > .react-grid-item {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 0 12px !important;
+  }
+  /* 手機觸控少用拖拉/縮放,且絕對定位把手在 static 流中會錯位,直接隱藏 */
+  .dashboard-grid .react-resizable-handle {
+    display: none;
+  }
+  /* 清單型卡片(RFM/排行/活動/情緒清單)改 auto 高後會把上百列全攤開使頁面爆長,
+     故在手機給上限並讓清單內部捲動;純圖表卡片不含這些清單,維持 auto 高不受影響。 */
+  .dashboard-grid > .react-grid-item .bar-list,
+  .dashboard-grid > .react-grid-item .leaderboard,
+  .dashboard-grid > .react-grid-item .activity-report,
+  .dashboard-grid > .react-grid-item .sr-intent-list,
+  .dashboard-grid > .react-grid-item .rfm-table,
+  .dashboard-grid > .react-grid-item .sr-list {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  /* 客戶列表欄:手機取消 sticky 與高度上限,讓內容隨頁面自然流動(避免頁中又有內部捲動小框) */
+  .customer-col {
+    position: static;
+    max-height: none;
+  }
+  .customer-col .customer-list {
+    overflow-y: visible;
+  }
+
+  /* 側邊欄:手機壓低高度,品牌圖縮小、導覽改橫向,減少佔用頂部空間 */
+  .brand-block img {
+    width: 40px;
+    height: 40px;
+  }
+  .side-nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
   .report-card.wide,
   .activity-report {
     grid-column: auto;
@@ -1207,6 +1256,53 @@ button {
 @keyframes blink {
   0%, 100% { opacity: .2; }
   50% { opacity: 1; }
+}
+
+/* ===== AI 歷程 Modal：呼叫歷史清單 ===== */
+.ai-history-section {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  color: #0f5f57;
+}
+.ai-history-section:first-child { margin-top: 0; }
+.ai-history-list {
+  display: grid;
+  gap: 8px;
+}
+.ai-history-item {
+  border: 1px solid #dde7e3;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.ai-history-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f6faf8;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.ai-history-type { font-weight: 700; color: #122232; }
+.ai-history-time { color: #5e7280; }
+/* 模型/fallback 標記:真實呼叫綠、樣板灰 */
+.ai-history-mode {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ai-history-mode.real { background: #e8f8f4; color: #0f766e; }
+.ai-history-mode.fallback { background: #eef1f3; color: #5e7280; }
+.ai-history-toggle { color: #5e7280; font-size: 11px; }
+.ai-history-answer {
+  padding: 10px 12px;
+  border-top: 1px solid #eef2f0;
 }
 
 /* Markdown 渲染樣式 */

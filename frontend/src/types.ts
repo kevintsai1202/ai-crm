@@ -292,6 +292,17 @@ export interface AgentTraceResponse {
   steps: AgentStepResponse[];
 }
 
+/** 單一客戶的 AI 呼叫歷史項目（對應後端 Dtos.AiCallHistoryItem）。 */
+export interface AiCallHistoryItem {
+  id: number;
+  callType: string;
+  model: string | null;
+  aiEnabled: boolean;
+  totalTokens: number;
+  answer: string;
+  createdAt: string;
+}
+
 /** 下鑽來源（由儀表板 navigate 帶入 location state），供客戶頁麵包屑與返回定位使用（SP7）。 */
 export interface DrilldownSource {
   from: "dashboard";

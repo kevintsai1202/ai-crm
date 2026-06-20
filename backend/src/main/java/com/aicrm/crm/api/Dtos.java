@@ -245,6 +245,20 @@ public final class Dtos {
 
     public record UsageSummaryResponse(long totalCalls, long totalTokens, long realCalls, long fallbackCalls, long adopted, long rejected) {}
 
+    /**
+     * 單一客戶的 AI 呼叫歷史項目（供「AI 歷程」Modal 列出歷次呼叫）。
+     *
+     * @param id 呼叫紀錄 id
+     * @param callType 呼叫類型（CHAT / ASSESSMENT / PORTFOLIO）
+     * @param model 模型名稱（fallback 時為 null）
+     * @param aiEnabled 是否真實呼叫 LLM（false 為 deterministic fallback）
+     * @param totalTokens 總 token 數
+     * @param answer 回答內容
+     * @param createdAt 呼叫時間
+     */
+    public record AiCallHistoryItem(Long id, String callType, String model, boolean aiEnabled,
+                                    int totalTokens, String answer, Instant createdAt) {}
+
     public record PortfolioAssessmentResponse(
             String assessment,
             int customerCount,
