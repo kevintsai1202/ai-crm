@@ -57,7 +57,7 @@ export function CustomersPage() {
         industry: overrides?.industry ?? industry,
         owner: overrides?.owner ?? owner,
         page: overrides?.page ?? page,
-        size: 10
+        size: 20
       });
       setCustomers(list.items);
       setTotalPages(list.totalPages);

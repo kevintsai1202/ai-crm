@@ -490,7 +490,7 @@ button {
 
 .customer-list {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .customer-row {
@@ -501,7 +501,7 @@ button {
   gap: 12px;
   border: 1px solid #d7e2de;
   border-radius: 8px;
-  padding: 12px;
+  padding: 8px 10px;
   color: #122232;
   text-align: left;
   background: #fff;
@@ -574,6 +574,42 @@ button {
   gap: 18px;
 }
 
+/* KPI 摘要卡：四欄橫向排列，凸顯客戶關鍵指標 */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid #dde7e3;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+/* KPI 小標：次要色、置於數值上方 */
+.kpi-card .kpi-label {
+  color: #5e7280;
+  font-size: 12px;
+}
+
+/* KPI 數值：放大、深色、加粗 */
+.kpi-card .kpi-value {
+  color: #122232;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+/* 商機金額以主色強調 */
+.kpi-card .kpi-value-accent {
+  color: #0f766e;
+}
+
 .timeline,
 .trace-list,
 .citation-list {
@@ -597,6 +633,35 @@ button {
 .citation-list p,
 .trace-step p {
   margin: 8px 0 0;
+}
+
+/* Agent Trace 用途說明框：淺底、圓角、次要色小字 */
+.trace-intro {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #eef6f4;
+  border-radius: 8px;
+  color: #5e7280;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Trace 無資料時的友善引導文字 */
+.trace-empty {
+  color: #5e7280;
+  font-size: 13px;
+}
+
+/* Trace 步驟層次：action 為主標（深色加粗）、meta 為輔助小字 */
+.trace-step .trace-action {
+  color: #122232;
+  font-size: 14px;
+}
+
+.trace-step .trace-meta {
+  margin-top: 2px;
+  color: #8295a1;
+  font-size: 12px;
 }
 
 .ai-input {
@@ -884,7 +949,8 @@ button {
 
   .metric-grid,
   .report-grid,
-  .detail-grid {
+  .detail-grid,
+  .kpi-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -904,7 +970,8 @@ button {
   .metric-grid,
   .report-grid,
   .detail-grid,
-  .kanban {
+  .kanban,
+  .kpi-row {
     grid-template-columns: 1fr;
   }
 
