@@ -33,6 +33,14 @@ export const apiClient = axios.create({
   timeout: 10000
 });
 
+/**
+ * AI 端點專用逾時（毫秒）。
+ * 一般 CRUD 用全域 10 秒即可,但 AI 評估/對話需做 embedding + 產生長報告,
+ * 動輒數十秒,沿用 10 秒會在後端還在跑時就被 axios abort,前端誤判「失敗」。
+ * 故 AI 同步端點 per-request 放寬到 120 秒(串流對話走原生 fetch 不受此限)。
+ */
+const AI_TIMEOUT = 120000;
+
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
   if (token) {
@@ -130,7 +138,7 @@ export async function fetchCustomerDetail(id: number) {
  * 呼叫 AI 助理分析客戶。
  */
 export async function askAssistant(customerId: number, message: string) {
-  const { data } = await apiClient.post<ChatResponse>("/ai/chat", { customerId, message });
+  const { data } = await apiClient.post<ChatResponse>("/ai/chat", { customerId, message }, { timeout: AI_TIMEOUT });
   return data;
 }
 
@@ -431,7 +439,7 @@ export async function fetchAgentTrace(customerId: number) {
  * @returns 含評估報告（Markdown）、引用與風險
  */
 export async function fetchCustomerAssessment(customerId: number) {
-  const { data } = await apiClient.get<ChatResponse>(`/ai/customers/${customerId}/assessment`);
+  const { data } = await apiClient.get<ChatResponse>(`/ai/customers/${customerId}/assessment`, { timeout: AI_TIMEOUT });
   return data;
 }
 
@@ -441,7 +449,7 @@ export async function fetchCustomerAssessment(customerId: number) {
  * @returns 含評估報告（Markdown）與彙總統計
  */
 export async function fetchPortfolioAssessment() {
-  const { data } = await apiClient.get<PortfolioAssessment>("/ai/portfolio/assessment");
+  const { data } = await apiClient.get<PortfolioAssessment>("/ai/portfolio/assessment", { timeout: AI_TIMEOUT });
   return data;
 }
 
