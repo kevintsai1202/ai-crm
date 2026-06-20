@@ -57,15 +57,20 @@ test("未登入導向登入頁、登入後可在儀表板與客戶頁間切換�
   await expect(page.locator(".ai-feedback.done")).toBeVisible();
   await page.locator(".chat-close").click();
 
-  // 7. 新增互動：填寫送出後應存下並出現在時間線（迴歸「新增互動沒存下」bug）
+  // 7. 新增互動：填寫送出後應存下（迴歸「新增互動沒存下」bug）。時間線改橫向軸後內容需點選才顯示,
+  //    故改用「未來 2 天」的互動驗證:它會出現在「本週待跟進」區塊(該區塊直接顯示內容文字),
+  //    同時驗證新增有存下 + 待跟進功能。日期相對 now 計算,避免硬編日期過期。
+  const future = new Date();
+  future.setDate(future.getDate() + 2);
+  const occurredAt = future.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm(datetime-local 格式)
   await page.locator("text=+ 新增互動").click();
   await expect(page.locator(".modal-content")).toBeVisible();
-  await page.locator('select[name="type"]').selectOption("PHONE");
-  await page.fill('input[name="occurredAt"]', "2026-06-19T10:00");
+  await page.locator('select[name="type"]').selectOption("MEETING");
+  await page.fill('input[name="occurredAt"]', occurredAt);
   await page.fill('textarea[name="content"]', "E2E 新增互動驗證");
   await page.locator('.modal-actions button[type="submit"]').click();
   await expect(page.locator(".modal-content")).toHaveCount(0);
-  await expect(page.locator(".timeline").getByText("E2E 新增互動驗證").first()).toBeVisible();
+  await expect(page.locator(".upcoming-panel").getByText("E2E 新增互動驗證")).toBeVisible();
 
   // 8. 登出 → /login
   await page.locator(".user-card button").click();

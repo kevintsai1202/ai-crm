@@ -122,13 +122,26 @@ export function DashboardPage() {
 
   const riskCounts = useMemo<Record<string, number>>(() => ({}), []);
 
+  // 下鑽請求序號:每次開啟/關閉都遞增,await 回來時若序號已變則丟棄該回應,
+  // 避免「載入中關閉後,晚到的 fetch 回應又把 Modal 重新打開」的競態(關不掉的成因)。
+  const drilldownReqRef = useRef(0);
+
+  /** 關閉下鑽 Modal:遞增序號使進行中的請求回應失效,確保不會被重新打開。 */
+  function closeDrilldown() {
+    drilldownReqRef.current++;
+    setDrilldown(null);
+  }
+
   /** 開啟圖表下鑽明細 Modal。 */
   async function openDrilldown(type: string, key: string, title: string) {
+    const reqId = ++drilldownReqRef.current;
     setDrilldown({ open: true, loading: true, title, data: null });
     try {
       const data = await fetchDrilldown(type, key);
+      if (drilldownReqRef.current !== reqId) return; // 已關閉或有更新的請求 → 丟棄此回應
       setDrilldown({ open: true, loading: false, title, data });
     } catch (e) {
+      if (drilldownReqRef.current !== reqId) return;
       console.error("下鑽明細載入失敗:", e);
       setDrilldown({ open: true, loading: false, title, data: null });
     }
@@ -136,7 +149,7 @@ export function DashboardPage() {
 
   /** 從下鑽/區塊跳到操作頁指定客戶，帶上來源區塊供麵包屑與返回定位。 */
   function jumpToCustomer(id: number, source: DrilldownSource) {
-    setDrilldown(null);
+    closeDrilldown();
     navigate(`/customers/${id}`, { state: source });
   }
 
@@ -307,7 +320,7 @@ export function DashboardPage() {
       </GridLayout>
 
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
-      {drilldown?.open ? <DrilldownModal state={drilldown} onSelectCustomer={(id) => jumpToCustomer(id, { from: "dashboard", section: drilldown.title, blockId: "reports" })} onClose={() => setDrilldown(null)} /> : null}
+      {drilldown?.open ? <DrilldownModal state={drilldown} onSelectCustomer={(id) => jumpToCustomer(id, { from: "dashboard", section: drilldown.title, blockId: "reports" })} onClose={closeDrilldown} /> : null}
       {drawerOpen ? (
         <LayoutDrawer hiddenBlocks={hiddenBlocks.map((b) => ({ id: b.id, title: b.title }))} onAdd={addBlock} onReset={resetLayout} onClose={() => setDrawerOpen(false)} />
       ) : null}

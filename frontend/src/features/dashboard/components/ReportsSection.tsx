@@ -31,31 +31,40 @@ export function reportBlocks(
   ];
 }
 
+/** 漏斗呈現的階段順序(由上而下):早期機會在上、實際成交在最底。 */
+const FUNNEL_STAGE_ORDER = ["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "CLOSED_WON"];
+
 /**
  * 銷售漏斗圖，以商機階段呈現 pipeline 金額與筆數。
- * 函式級註解：將商機各階段數據轉化為對稱置中、上寬下窄的梯形疊加漏斗圖，並透過動態漸層百分比來直觀填充金額比例。
+ * 函式級註解：漏斗代表「商機推進」的轉化路徑,故上寬下窄、上方為早期機會(資格評估)、
+ * 最底為實際成交(已成交)。「已流失」是掉出漏斗、非更深階段,故不納入漏斗(可在商機看板查看)。
+ * 各層寬度由 CSS 階梯固定(funnel-layer-N),金額大小以橫向漸層填充比例直觀呈現。
  */
 function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByStage"]; onDrill: DrillFn }) {
-  // 取得所有階段中的最大金額以作為比例計算基準，最小設為 1 避免除以零
-  const max = Math.max(...data.map((item) => item.amount), 1);
+  // 僅保留漏斗階段並依「資格評估→提案→議價→已成交」由上而下排序(排除已流失)
+  const funnelData = FUNNEL_STAGE_ORDER
+    .map((stage) => data.find((item) => item.stage === stage))
+    .filter((item): item is DashboardReports["pipelineByStage"][number] => Boolean(item));
 
-  // 定義各個階段填充的亮色與底色漸層配置，增加重要變數註解
+  // 取得漏斗各階段中的最大金額以作為比例計算基準，最小設為 1 避免除以零
+  const max = Math.max(...funnelData.map((item) => item.amount), 1);
+
+  // 各階段填充色(由早期到成交,綠色漸深;不含已流失)
   const colorConfigs = [
     { fill: "#14b8a6", bg: "rgba(15, 118, 110, 0.08)" }, // 資格評估：薄荷綠
     { fill: "#2dd4bf", bg: "rgba(13, 148, 136, 0.08)" }, // 提案：亮薄荷綠
     { fill: "#5eead4", bg: "rgba(13, 148, 136, 0.08)" }, // 議價：粉薄荷綠
-    { fill: "#34d399", bg: "rgba(16, 185, 129, 0.08)" }, // 已成交：翡翠綠
-    { fill: "#f87171", bg: "rgba(239, 68, 68, 0.08)" }   // 已流失：淡紅色
+    { fill: "#34d399", bg: "rgba(16, 185, 129, 0.08)" }  // 已成交：翡翠綠(漏斗最底=實際成交)
   ];
 
   return (
     <article className="panel report-card wide" data-promo-chart="pipeline">
       <div className="panel-title">
         <h3>銷售漏斗 Pipeline</h3>
-        <span>階段金額 / 筆數</span>
+        <span>機會(上)→ 成交(下)</span>
       </div>
       <div className="funnel-container">
-        {data.map((item, index) => {
+        {funnelData.map((item, index) => {
           // 計算當前階段的金額比例，底限設為 6% 確保即使零元也有一點點點綴，上限 100%
           const amountPercent = Math.min(100, Math.max(6, (item.amount / max) * 100));
 
