@@ -1,5 +1,5 @@
 import type { AgentTraceResponse, ContactResponse, CustomerDetail, OpportunityResponse } from "../../../types";
-import { riskLabel, formatMoney, formatDateTime } from "../../../lib/format";
+import { riskLabel, formatMoney, formatDate } from "../../../lib/format";
 import { AiBadge } from "../../../components/common/AiBadge";
 import { Timeline } from "./Timeline";
 import { OpportunityBoard } from "./OpportunityBoard";
@@ -76,11 +76,11 @@ export function CustomerDetailPanel({
         </div>
         <div className="kpi-card">
           <span className="kpi-label">合約到期</span>
-          <span className="kpi-value">{formatDateTime(detail.customer.renewalDueDate)}</span>
+          <span className="kpi-value">{formatDate(detail.customer.renewalDueDate)}</span>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">最近互動</span>
-          <span className="kpi-value">{formatDateTime(detail.customer.lastInteractionAt)}</span>
+          <span className="kpi-value">{formatDate(detail.customer.lastInteractionAt)}</span>
         </div>
         <div className="kpi-card">
           <span className="kpi-label">客戶狀態</span>

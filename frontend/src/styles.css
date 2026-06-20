@@ -54,10 +54,18 @@ button {
 }
 
 .brand-block img {
-  width: 86px;
-  height: 64px;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
   object-fit: cover;
   border-radius: 8px;
+}
+
+/* 品牌標題：明確字級並禁止斷字，避免窄側欄把「智慧業務助理」拆成多行 */
+.brand-block h1 {
+  font-size: 20px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .brand-block span,
@@ -597,12 +605,15 @@ button {
   font-size: 12px;
 }
 
-/* KPI 數值：放大、深色、加粗 */
+/* KPI 數值：放大、深色、加粗；不折行並在極窄時以省略號收尾，避免日期/金額斷成兩行 */
 .kpi-card .kpi-value {
   color: #122232;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 商機金額以主色強調 */
@@ -836,6 +847,8 @@ button {
 .hero-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1391,6 +1404,14 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* 動作按鈕一律不斷字：寧可整顆按鈕被 flex-wrap 換到下一行，也不要按鈕內文字被拆行 */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-assess {
+  white-space: nowrap;
 }
 
 /* ===== 整體評估按鈕與報告 Modal ===== */

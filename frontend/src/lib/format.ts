@@ -21,6 +21,14 @@ export function formatDateTime(value: string | null) {
 }
 
 /**
+ * 將日期轉為只到「日」的精簡格式（不含時間），供 KPI 卡等空間有限處使用，避免折行。
+ */
+export function formatDate(value: string | null) {
+  if (!value) return "尚無資料";
+  return new Intl.DateTimeFormat("zh-TW", { dateStyle: "medium" }).format(new Date(value));
+}
+
+/**
  * 將風險等級轉成中文標籤。
  */
 export function riskLabel(level: string) {
