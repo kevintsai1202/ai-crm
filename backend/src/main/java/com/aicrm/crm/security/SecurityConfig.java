@@ -1,6 +1,7 @@
 package com.aicrm.crm.security;
 
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +25,14 @@ public class SecurityConfig {
 
     /** JWT 認證過濾器。 */
     private final JwtAuthenticationFilter jwtFilter;
+
+    /**
+     * 允許的 CORS 來源樣式（逗號分隔）。
+     * 預設僅放行本機開發來源；正式部署時以環境變數 APP_CORS_ALLOWED_ORIGINS 覆蓋，
+     * 例如 https://ai-crm-frontend.zeabur.app。支援 setAllowedOriginPatterns 的萬用字元（如 *）。
+     */
+    @Value("${app.cors.allowed-origins:http://127.0.0.1:*,http://localhost:*}")
+    private List<String> corsAllowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtFilter) {
         this.jwtFilter = jwtFilter;
@@ -81,7 +90,8 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://127.0.0.1:*", "http://localhost:*"));
+        // 來源樣式由設定注入（app.cors.allowed-origins / 環境變數 APP_CORS_ALLOWED_ORIGINS）
+        config.setAllowedOriginPatterns(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         var source = new UrlBasedCorsConfigurationSource();
