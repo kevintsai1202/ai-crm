@@ -5,6 +5,7 @@ import { AdminRoute } from "./app/AdminRoute";
 import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { CustomersPage } from "./features/customers/CustomersPage";
+import { MyWorkspacePage } from "./features/my-workspace/MyWorkspacePage";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
 
 /**
@@ -18,6 +19,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/my-work" element={<MyWorkspacePage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomersPage />} />
           <Route element={<AdminRoute />}>

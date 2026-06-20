@@ -1942,6 +1942,9 @@ button.renewal-bar.clickable:hover {
 .paginated-list .sr-list { flex: 1; overflow-y: auto; }
 .paginated-list .pagination { flex: none; padding-top: 8px; }
 
+/* 我的工作台:KPI 下方的列表區(plain 容器,不套用 customer-col 的 sticky/限高) */
+.mywork-list { display: grid; gap: 10px; }
+
 /* 客戶列表欄：sticky 跟隨捲動停在頂部，並用近滿版高度，讓每頁 20 筆盡量一次顯示、減少捲動；
    捲動右側詳情時列表也不會消失。原本 calc(100vh - 220px) 緩衝過大，矮螢幕只擠得下 6 列。 */
 .customer-col {
