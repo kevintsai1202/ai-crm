@@ -4,6 +4,7 @@ import { AiBadge } from "../../../components/common/AiBadge";
 import { Timeline } from "./Timeline";
 import { OpportunityBoard } from "./OpportunityBoard";
 import { ContactsPanel } from "./ContactsPanel";
+import { UpcomingPanel } from "./UpcomingPanel";
 
 /**
  * 客戶詳情、聯絡人、商機、互動、AI 與 Trace 的主內容。
@@ -87,16 +88,17 @@ export function CustomerDetailPanel({
           <span className="kpi-value">{statusLabels[detail.customer.status] ?? detail.customer.status}</span>
         </div>
       </div>
+      {/* 本週待跟進:未來 7 天的即將互動 / 續約到期 / 商機成交,置於上方提醒主動跟進 */}
+      <UpcomingPanel detail={detail} />
       <ContactsPanel
         contacts={detail.contacts}
         onAdd={onAddContact}
         onEdit={onEditContact}
         onDelete={onDeleteContact}
       />
-      <div className="detail-grid">
-        <Timeline interactions={detail.interactions} onEdit={onEditInteraction} onDelete={onDeleteInteraction} />
-        <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
-      </div>
+      {/* 時間線改橫向 banner、商機看板含 5 欄,皆改整列全寬呈現(原本半寬欄會擠) */}
+      <Timeline interactions={detail.interactions} onEdit={onEditInteraction} onDelete={onDeleteInteraction} />
+      <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
     </section>
   );
 }

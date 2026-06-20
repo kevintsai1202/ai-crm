@@ -1828,6 +1828,89 @@ button.renewal-bar.clickable:hover {
   display: flex; align-items: center; gap: 6px; color: inherit;
 }
 
+/* ===== 互動時間線(橫向時間軸) ===== */
+.tl-axis {
+  position: relative;
+  height: 64px;
+  margin: 18px 6px 6px;
+}
+/* 水平時間線(置於容器垂直中線) */
+.tl-line {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: #d7e2de;
+}
+/* 月份刻度標籤(置於軸下方) */
+.tl-tick {
+  position: absolute;
+  top: calc(50% + 10px);
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #8aa0ab;
+  white-space: nowrap;
+}
+.tl-tick::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: -12px;
+  width: 1px; height: 8px;
+  background: #e2eae7;
+}
+/* 互動色點(依日期定位於軸上,情緒上色) */
+.tl-dot {
+  position: absolute;
+  top: 50%;
+  width: 13px; height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #94a3b8;
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  cursor: pointer;
+  padding: 0;
+  transition: transform .1s;
+}
+.tl-dot:hover { transform: scale(1.25); }
+.tl-dot.pos { background: #34d399; }
+.tl-dot.neu { background: #94a3b8; }
+.tl-dot.neg { background: #f87171; }
+.tl-dot.sel { transform: scale(1.45); box-shadow: 0 0 0 3px rgba(15,118,110,.35); }
+/* 選取後的互動詳情卡 */
+.tl-detail {
+  border: 1px solid #dde7e3;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfa;
+}
+.tl-hint { color: #8aa0ab; font-size: 13px; padding: 4px 2px; }
+
+/* ===== 本週待跟進區塊 ===== */
+.upcoming-list { display: grid; gap: 8px; }
+.upcoming-item {
+  display: grid;
+  grid-template-columns: 84px 92px 1fr;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e3ebe8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+.upcoming-item p { margin: 0; font-size: 13px; color: #33454f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.upcoming-item strong { font-size: 13px; color: #122232; }
+/* 種類標籤配色:互動藍、續約橘、商機綠 */
+.upcoming-kind {
+  font-size: 12px;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.upcoming-kind.k-interaction { background: rgba(59,130,246,.16); color: #2563eb; }
+.upcoming-kind.k-renewal { background: rgba(234,135,40,.16); color: #c2610c; }
+.upcoming-kind.k-opportunity { background: #e8f8f4; color: #0f766e; }
+
 /* ===== SP7 固定高度系統 ===== */
 /* 數據卡統一高度，四張齊高 */
 .metric-card { min-height: 104px; }
