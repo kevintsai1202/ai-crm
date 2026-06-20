@@ -44,9 +44,13 @@ public class CustomerController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String industry,
-            @RequestParam(required = false) String owner
+            @RequestParam(required = false) String owner,
+            @RequestParam(required = false) com.aicrm.crm.domain.CustomerStatus status,
+            @RequestParam(required = false) String riskLevel,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate renewalFrom,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate renewalTo
     ) {
-        return customerService.search(page, size, keyword, industry, owner);
+        return customerService.search(page, size, keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
     }
 
     /**

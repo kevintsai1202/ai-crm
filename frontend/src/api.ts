@@ -120,10 +120,20 @@ export async function fetchDashboardReports() {
  * @param params 查詢參數
  * @returns 分頁客戶摘要
  */
-export async function fetchCustomers(params: { keyword?: string; industry?: string; owner?: string; page?: number; size?: number }) {
-  const { data } = await apiClient.get<PageResponse<CustomerSummary>>("/customers", {
-    params: { page: params.page ?? 0, size: params.size ?? 10, keyword: params.keyword, industry: params.industry, owner: params.owner }
-  });
+export async function fetchCustomers(params: {
+  keyword?: string; industry?: string; owner?: string; page?: number; size?: number;
+  status?: string; riskLevel?: string; renewalFrom?: string; renewalTo?: string;
+}) {
+  // 僅帶有值的條件(空字串視為未填,不送出),配合後端動態 Specification 組條件
+  const query: Record<string, string | number> = { page: params.page ?? 0, size: params.size ?? 10 };
+  if (params.keyword) query.keyword = params.keyword;
+  if (params.industry) query.industry = params.industry;
+  if (params.owner) query.owner = params.owner;
+  if (params.status) query.status = params.status;
+  if (params.riskLevel) query.riskLevel = params.riskLevel;
+  if (params.renewalFrom) query.renewalFrom = params.renewalFrom;
+  if (params.renewalTo) query.renewalTo = params.renewalTo;
+  const { data } = await apiClient.get<PageResponse<CustomerSummary>>("/customers", { params: query });
   return data;
 }
 

@@ -47,6 +47,11 @@ export function CustomersPage() {
   const [keyword, setKeyword] = useState("");
   const [industry, setIndustry] = useState("");
   const [owner, setOwner] = useState("");
+  // 進階篩選:客戶狀態、風險等級、續約到期日區間(皆空字串表示未篩選)
+  const [status, setStatus] = useState("");
+  const [riskLevel, setRiskLevel] = useState("");
+  const [renewalFrom, setRenewalFrom] = useState("");
+  const [renewalTo, setRenewalTo] = useState("");
   // 篩選下拉選項：所有產業 + 所有可指派業務（SALES 帳號），與當前頁客戶無關
   const [filterOptions, setFilterOptions] = useState<{ industries: string[]; owners: OwnerOption[] }>({ industries: [], owners: [] });
   const [page, setPage] = useState(0);
@@ -70,14 +75,18 @@ export function CustomersPage() {
 
   const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat } = useAiChat();
 
-  /** 載入客戶列表（支援篩選與分頁）。 */
-  async function loadCustomers(overrides?: { keyword?: string; industry?: string; owner?: string; page?: number }) {
+  /** 載入客戶列表（支援多條件篩選與分頁）。 */
+  async function loadCustomers(overrides?: { keyword?: string; industry?: string; owner?: string; page?: number; status?: string; riskLevel?: string; renewalFrom?: string; renewalTo?: string }) {
     setLoading(true);
     try {
       const list = await fetchCustomers({
         keyword: overrides?.keyword ?? keyword,
         industry: overrides?.industry ?? industry,
         owner: overrides?.owner ?? owner,
+        status: overrides?.status ?? status,
+        riskLevel: overrides?.riskLevel ?? riskLevel,
+        renewalFrom: overrides?.renewalFrom ?? renewalFrom,
+        renewalTo: overrides?.renewalTo ?? renewalTo,
         page: overrides?.page ?? page,
         size: 20
       });
@@ -142,7 +151,13 @@ export function CustomersPage() {
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPage(0);
-    await loadCustomers({ keyword, industry, owner, page: 0 });
+    await loadCustomers({ keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo, page: 0 });
+  }
+
+  /** 清除所有篩選條件並重新載入。 */
+  async function handleResetFilters() {
+    setKeyword(""); setIndustry(""); setOwner(""); setStatus(""); setRiskLevel(""); setRenewalFrom(""); setRenewalTo(""); setPage(0);
+    await loadCustomers({ keyword: "", industry: "", owner: "", status: "", riskLevel: "", renewalFrom: "", renewalTo: "", page: 0 });
   }
 
   /** 選取客戶（改 URL）。 */
@@ -334,7 +349,7 @@ export function CustomersPage() {
           <h2>客戶工作台</h2>
         </div>
         <form className="search-box" onSubmit={handleSearch}>
-          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜尋客戶名稱" />
+          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="名稱 / Email / 電話 / 統編" />
           <select value={industry} onChange={(e) => setIndustry(e.target.value)}>
             <option value="">全部產業</option>
             {filterOptions.industries.map((it) => (
@@ -347,7 +362,23 @@ export function CustomersPage() {
               <option key={o.id} value={o.displayName}>{o.displayName}</option>
             ))}
           </select>
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">全部狀態</option>
+            <option value="ACTIVE">使用中</option>
+            <option value="INACTIVE">停用</option>
+            <option value="LEVERAGED">重點客戶</option>
+          </select>
+          <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
+            <option value="">全部風險</option>
+            <option value="HIGH">高風險</option>
+            <option value="MEDIUM">中風險</option>
+            <option value="LOW">低風險</option>
+          </select>
+          {/* 續約到期日區間 */}
+          <input type="date" value={renewalFrom} onChange={(e) => setRenewalFrom(e.target.value)} title="續約到期日(起)" />
+          <input type="date" value={renewalTo} onChange={(e) => setRenewalTo(e.target.value)} title="續約到期日(迄)" />
           <button type="submit">搜尋</button>
+          <button type="button" className="btn-secondary" onClick={handleResetFilters}>清除</button>
         </form>
       </section>
 

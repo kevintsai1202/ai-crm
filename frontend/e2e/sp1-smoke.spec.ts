@@ -70,7 +70,7 @@ test("未登入導向登入頁、登入後可在儀表板與客戶頁間切換�
   await page.fill('textarea[name="content"]', "E2E 新增互動驗證");
   await page.locator('.modal-actions button[type="submit"]').click();
   await expect(page.locator(".modal-content")).toHaveCount(0);
-  await expect(page.locator(".upcoming-panel").getByText("E2E 新增互動驗證")).toBeVisible();
+  await expect(page.locator(".upcoming-panel").getByText("E2E 新增互動驗證").first()).toBeVisible();
 
   // 8. 登出 → /login
   await page.locator(".user-card button").click();
