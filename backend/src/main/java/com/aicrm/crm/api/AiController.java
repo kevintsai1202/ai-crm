@@ -68,9 +68,20 @@ public class AiController {
      * @param id 客戶 ID
      * @return 含評估報告、引用與風險的回應
      */
-    @GetMapping("/customers/{id}/assessment")
+    @GetMapping(value = "/customers/{id}/assessment", produces = MediaType.APPLICATION_JSON_VALUE)
     public Dtos.ChatResponse customerAssessment(@PathVariable Long id) {
         return insightService.customerAssessment(id);
+    }
+
+    /**
+     * 產生指定客戶的 360 度整體評估報告（SSE 串流版）：邊產生邊送，避免長報告撞前端/閘道逾時。
+     *
+     * @param id 客戶 ID
+     * @return SseEmitter 串流發送器
+     */
+    @GetMapping(value = "/customers/{id}/assessment", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCustomerAssessment(@PathVariable Long id) {
+        return insightService.streamCustomerAssessment(id);
     }
 
     /**

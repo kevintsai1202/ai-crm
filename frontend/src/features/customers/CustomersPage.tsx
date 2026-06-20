@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   addInteraction, createContact, createCustomer, createOpportunity, deleteContact, deleteCustomer,
-  deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAssessment,
+  deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAssessmentStream,
   fetchCustomerDetail, fetchCustomerOptions, fetchCustomers, updateContact, updateCustomer,
   updateInteraction, updateOpportunity
 } from "../../api";
@@ -264,25 +264,35 @@ export function CustomersPage() {
     });
   }
 
-  /** 開啟目前客戶 360° 整體評估。 */
-  async function openCustomerAssessment() {
+  /**
+   * 開啟目前客戶 360° 整體評估（SSE 串流：邊產生邊渲染，避免長報告逾時）。
+   * 函式級註解：content 區段持續累加進 markdown；risk/callId 區段補上 meta 與回饋 id；
+   * 首個 content 到達即關閉 loading。錯誤時若已累積部分內容則保留，否則顯示失敗提示。
+   */
+  function openCustomerAssessment() {
     if (!selected) return;
     const name = selected.customer.name;
-    setReport({ open: true, title: `整體評估 — ${name}`, loading: true, markdown: "" });
-    try {
-      const result = await fetchCustomerAssessment(selected.customer.id);
-      setReport({
-        open: true,
-        title: `整體評估 — ${name}`,
-        loading: false,
-        markdown: result.answer,
-        meta: `流失風險 ${result.risk.churnRisk} · 續約延遲 ${result.risk.renewalDelayRisk}`,
-        callId: result.callId
-      });
-    } catch (e) {
-      console.error("客戶整體評估失敗:", e);
-      setReport({ open: true, title: `整體評估 — ${name}`, loading: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
-    }
+    const title = `整體評估 — ${name}`;
+    setReport({ open: true, title, loading: true, markdown: "" });
+    let acc = ""; // 累積的報告 Markdown
+    fetchCustomerAssessmentStream(
+      selected.customer.id,
+      (chunk) => {
+        if (chunk.type === "content" && chunk.delta) {
+          acc += chunk.delta;
+          setReport((r) => (r ? { ...r, loading: false, markdown: acc } : r));
+        } else if (chunk.type === "risk" && chunk.risk) {
+          setReport((r) => (r ? { ...r, meta: `流失風險 ${chunk.risk.churnRisk} · 續約延遲 ${chunk.risk.renewalDelayRisk}` } : r));
+        } else if (chunk.type === "callId") {
+          setReport((r) => (r ? { ...r, callId: chunk.callId } : r));
+        }
+      },
+      () => setReport((r) => (r ? { ...r, loading: false } : r)),
+      (e) => {
+        console.error("客戶整體評估失敗:", e);
+        setReport((r) => (r ? { ...r, loading: false, markdown: acc || "⚠️ 產生評估失敗，請稍後再試。" } : r));
+      }
+    );
   }
 
   /** 開啟 AI 聊天（需先選客戶）。 */

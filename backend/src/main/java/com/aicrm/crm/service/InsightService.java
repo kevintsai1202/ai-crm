@@ -51,6 +51,20 @@ public class InsightService {
             不得自行編造價格、折扣或任何未經確認的承諾。回答需簡潔、條理清楚、可執行，並使用繁體中文。
             若資料不足，請明確指出需要補齊哪些資訊，而非臆測。""";
 
+    /**
+     * 客戶 360 度整體評估的任務指令（接在 grounding context 之後）。
+     * 抽成常數供同步 {@link #customerAssessment} 與串流 {@link #streamCustomerAssessment} 共用，避免兩邊走鐘。
+     */
+    private static final String ASSESSMENT_INSTRUCTION = """
+
+            # 任務
+            請對此客戶產出「360 度整體評估報告」（Markdown 格式），務必涵蓋：
+            1. **客戶健康度總評**（一句話定性 + 依據）
+            2. **商機 / Pipeline 分析**（金額、階段分布、最該推進的商機）
+            3. **風險與預警**（解讀流失與續約延遲分數、互動訊號）
+            4. **下一步建議行動**（具體、可執行，依知識庫條款，勿編造價格）
+            """;
+
     /** 客戶查詢服務。 */
     private final CustomerService customers;
 
@@ -151,24 +165,76 @@ public class InsightService {
         var memory = chatMemory.recall(customerId, userMessage);
         // 在交易內先把 deterministic fallback 文字算好（會讀 customer LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
-
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        var prompt = buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+
+        // 對話：最終答案出爐後才存「本輪 user + assistant」對話記憶（延後到串流完成，保持首字延遲低）
+        streamAnswer(emitter, AiCallType.CHAT, customerId, chatModel, prompt, citations, risk, fallbackAnswer,
+                answer -> {
+                    chatMemory.save(customerId, ChatRole.USER, userMessage);
+                    chatMemory.save(customerId, ChatRole.ASSISTANT, answer);
+                });
+        return emitter;
+    }
+
+    /**
+     * 以 SSE 真串流推送客戶 360 度整體評估報告。與 {@link #streamChat} 共用串流核心，
+     * 差別僅在 prompt 為評估指令、類型為 ASSESSMENT、且不寫對話記憶。
+     *
+     * <p>函式級註解：同步版 {@link #customerAssessment} 走 axios JSON、整份產生完才回傳，
+     * 報告偏長時容易撞前端/閘道逾時；串流版邊產生邊送，連線持續有資料、首字 1~2 秒即到，結構上免疫逾時。</p>
+     *
+     * @param customerId 客戶 ID
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamCustomerAssessment(Long customerId) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        var customer = customers.findDetail(customerId);
+        var risk = calculateOpportunityRisk(customer);
+        var citations = loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
+        // 在交易內先算好 fallback 文字（讀 LAZY 關聯），供 callback 執行緒安全使用
+        final String fallbackAnswer = deterministicAnswer(customer, risk);
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        var prompt = buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION;
+
+        // 評估非對話，不寫對話記憶 → onFinalAnswer 傳 null
+        streamAnswer(emitter, AiCallType.ASSESSMENT, customerId, chatModel, prompt, citations, risk, fallbackAnswer, null);
+        return emitter;
+    }
+
+    /**
+     * 串流核心：訂閱 Spring AI {@code ChatClient.stream()}，逐塊 token 即時送 SSE；完成後寫 ai_call_log、
+     * 補送 citations/risk/callId/[DONE]。無金鑰、串流失敗或回空白皆 fallback 至 deterministic 完整答案。
+     *
+     * <p><b>執行緒/交易注意</b>：所有 callback 在另一執行緒、本方法呼叫端的 readOnly 交易結束後才執行，
+     * 故僅可使用傳入的純值（String / record DTO / Long）；fallbackAnswer 須由呼叫端在交易內預先算好。
+     * {@code aiGovernance.record} 與 {@code onFinalAnswer} 內的 {@code chatMemory.save} 皆 REQUIRES_NEW，
+     * 於 callback 執行緒呼叫安全。</p>
+     *
+     * @param emitter SSE 發送器
+     * @param type AI 呼叫類型（CHAT / ASSESSMENT）
+     * @param customerId 客戶 ID（寫 ai_call_log 用）
+     * @param chatModel ChatModel（null 表示無金鑰，直接走 fallback）
+     * @param userPrompt 完整使用者提示詞（已含 grounding context）
+     * @param citations RAG 引用（串流尾段送出）
+     * @param risk 風險評分（串流尾段送出）
+     * @param fallbackAnswer 預先算好的 deterministic 保底答案
+     * @param onFinalAnswer 取得最終答案後的回呼（chat 用來存對話記憶；assessment 傳 null）
+     */
+    private void streamAnswer(SseEmitter emitter, AiCallType type, Long customerId, ChatModel chatModel,
+                             String userPrompt, List<Dtos.CitationResponse> citations, Dtos.RiskResponse risk,
+                             String fallbackAnswer, java.util.function.Consumer<String> onFinalAnswer) {
+        // 無金鑰：直接 deterministic fallback，一次送出完整回答後結束
         if (chatModel == null) {
-            // 無金鑰：deterministic fallback，一次送出完整回答後結束
-            var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
-            chatMemory.save(customerId, ChatRole.USER, userMessage);
-            chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
-            sendContent(emitter, fallbackAnswer);
-            sendTailAndComplete(emitter, citations, risk, saved.getId());
-            return emitter;
+            finalizeFallback(emitter, type, customerId, citations, risk, fallbackAnswer, onFinalAnswer);
+            return;
         }
 
-        var prompt = buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
         var fullAnswer = new StringBuilder();
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
 
-        // 真串流：逐塊 token 邊到邊送
-        ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt).stream().chatResponse()
+        ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt).stream().chatResponse()
                 .subscribe(
                         chatResponse -> {
                             lastResponse.set(chatResponse);
@@ -180,24 +246,21 @@ public class InsightService {
                             }
                         },
                         error -> {
-                            // 串流中途失敗（金鑰無效、額度、網路）→ 改用 deterministic fallback 保底，仍回傳完整答案
-                            log.warn("OpenAI 串流呼叫失敗，customerId={}，改用 deterministic fallback：{}", customerId, error.getMessage());
-                            var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
-                            chatMemory.save(customerId, ChatRole.USER, userMessage);
-                            chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
-                            sendContent(emitter, fallbackAnswer);
-                            sendTailAndComplete(emitter, citations, risk, saved.getId());
+                            var partial = fullAnswer.toString().strip();
+                            log.warn("OpenAI 串流呼叫失敗，type={}，customerId={}，改用 fallback：{}", type, customerId, error.getMessage());
+                            if (partial.isBlank()) {
+                                // 尚未送出任何內容 → 送完整 deterministic fallback
+                                finalizeFallback(emitter, type, customerId, citations, risk, fallbackAnswer, onFinalAnswer);
+                            } else {
+                                // 已串流部分內容後才中斷 → 用已收到內容收尾，避免再疊一份 fallback 造成重複
+                                finalizeStreamed(emitter, type, customerId, citations, risk, partial, null, 0, 0, 0, onFinalAnswer);
+                            }
                         },
                         () -> {
-                            // 串流完成：寫 ai_call_log、存記憶、補送 citations/risk/callId/[DONE]
                             var answer = fullAnswer.toString().strip();
                             if (answer.isBlank()) {
-                                // 串流回空白：fallback 內容已未送出，補送完整 fallback 後收尾
-                                var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
-                                chatMemory.save(customerId, ChatRole.USER, userMessage);
-                                chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
-                                sendContent(emitter, fallbackAnswer);
-                                sendTailAndComplete(emitter, citations, risk, saved.getId());
+                                // 串流回空白 → 補送完整 fallback
+                                finalizeFallback(emitter, type, customerId, citations, risk, fallbackAnswer, onFinalAnswer);
                                 return;
                             }
                             var metadata = lastResponse.get() == null ? null : lastResponse.get().getMetadata();
@@ -206,14 +269,41 @@ public class InsightService {
                             Integer pt = usage == null ? null : usage.getPromptTokens();
                             Integer ct = usage == null ? null : usage.getCompletionTokens();
                             Integer tt = usage == null ? null : usage.getTotalTokens();
-                            var saved = aiGovernance.record(AiCallType.CHAT, customerId, model, pt, ct, tt, true, true, answer);
-                            chatMemory.save(customerId, ChatRole.USER, userMessage);
-                            chatMemory.save(customerId, ChatRole.ASSISTANT, answer);
-                            sendTailAndComplete(emitter, citations, risk, saved.getId());
+                            finalizeStreamed(emitter, type, customerId, citations, risk, answer, model, pt, ct, tt, onFinalAnswer);
                         }
                 );
+    }
 
-        return emitter;
+    /**
+     * 收尾「已串流」的答案：內容已逐塊送出，這裡只寫 ai_call_log、跑最終答案回呼、補送尾段。
+     *
+     * @param onFinalAnswer 最終答案回呼（可為 null）
+     */
+    private void finalizeStreamed(SseEmitter emitter, AiCallType type, Long customerId,
+                                  List<Dtos.CitationResponse> citations, Dtos.RiskResponse risk, String answer,
+                                  String model, Integer pt, Integer ct, Integer tt,
+                                  java.util.function.Consumer<String> onFinalAnswer) {
+        var saved = aiGovernance.record(type, customerId, model, pt, ct, tt, true, true, answer);
+        if (onFinalAnswer != null) {
+            onFinalAnswer.accept(answer);
+        }
+        sendTailAndComplete(emitter, citations, risk, saved.getId());
+    }
+
+    /**
+     * 收尾「fallback」答案：尚未送出任何內容，這裡一次送出完整 deterministic 答案、寫 ai_call_log、補送尾段。
+     *
+     * @param onFinalAnswer 最終答案回呼（可為 null）
+     */
+    private void finalizeFallback(SseEmitter emitter, AiCallType type, Long customerId,
+                                  List<Dtos.CitationResponse> citations, Dtos.RiskResponse risk, String fallbackAnswer,
+                                  java.util.function.Consumer<String> onFinalAnswer) {
+        var saved = aiGovernance.record(type, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
+        if (onFinalAnswer != null) {
+            onFinalAnswer.accept(fallbackAnswer);
+        }
+        sendContent(emitter, fallbackAnswer);
+        sendTailAndComplete(emitter, citations, risk, saved.getId());
     }
 
     /**
@@ -284,16 +374,7 @@ public class InsightService {
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
         var citations = loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
-        var instruction = """
-
-                # 任務
-                請對此客戶產出「360 度整體評估報告」（Markdown 格式），務必涵蓋：
-                1. **客戶健康度總評**（一句話定性 + 依據）
-                2. **商機 / Pipeline 分析**（金額、階段分布、最該推進的商機）
-                3. **風險與預警**（解讀流失與續約延遲分數、互動訊號）
-                4. **下一步建議行動**（具體、可執行，依知識庫條款，勿編造價格）
-                """;
-        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, buildGroundingContext(customer, risk, citations, "") + instruction);
+        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION);
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
     }
 

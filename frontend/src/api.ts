@@ -142,10 +142,65 @@ export async function askAssistant(customerId: number, message: string) {
   return data;
 }
 
+/** SSE 串流資料區段：content（內容 delta）、citations（引用）、risk（風險）、callId（呼叫紀錄 id）。 */
+export type SseChunk = { type: "content" | "citations" | "risk" | "callId"; delta?: string; citations?: any[]; risk?: any; callId?: number };
+
+/**
+ * 共用：讀取一個 SSE (text/event-stream) Response 並逐塊回呼。
+ * 函式級註解：解析後端每行 `data: <json>`，遇 `[DONE]` 結束；JSON 解析失敗只記 log 不中斷整體串流。
+ * 對話與整體評估共用此讀取器，避免重複維護解析邏輯。
+ *
+ * @param response fetch 取得的串流 Response（呼叫端須已確認 response.ok）
+ * @param onChunk 收到每一個資料區段時的回呼
+ * @param onDone 串流完成時的回呼
+ */
+async function readSseStream(response: Response, onChunk: (chunk: SseChunk) => void, onDone: () => void) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("回應的主體 (response body) 為空或無法讀取");
+  }
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const dataContent = trimmed.substring(5).trim();
+      if (dataContent === "[DONE]") {
+        onDone();
+        return;
+      }
+      try {
+        onChunk(JSON.parse(dataContent));
+      } catch (e) {
+        console.error("解析 SSE JSON 片段失敗：", dataContent, e);
+      }
+    }
+  }
+  onDone();
+}
+
+/**
+ * 共用：401 時清除 token 並廣播登出事件。
+ *
+ * @param response fetch 回應
+ */
+function handleStreamUnauthorized(response: Response) {
+  if (response.status === 401) {
+    clearToken();
+    window.dispatchEvent(new Event("auth:logout"));
+  }
+}
+
 /**
  * 呼叫 AI 助理分析客戶 (SSE 串流版)。
- * 函式級註解：透過 fetch 與 ReadableStream 實現對後端 SSE 串流的讀取，逐步解碼 JSON 並回傳給 UI 做打字機渲染。
- * 
+ * 函式級註解：透過 fetch + ReadableStream 讀取後端 SSE 串流，逐步解碼 JSON 回呼 UI 做打字機渲染。
+ *
  * @param customerId 客戶 ID
  * @param message 聊天訊息
  * @param onChunk 收到每一個資料區段時的回呼函式
@@ -155,13 +210,12 @@ export async function askAssistant(customerId: number, message: string) {
 export async function askAssistantStream(
   customerId: number,
   message: string,
-  onChunk: (chunk: { type: "content" | "citations" | "risk" | "callId"; delta?: string; citations?: any[]; risk?: any; callId?: number }) => void,
+  onChunk: (chunk: SseChunk) => void,
   onDone: () => void,
   onError: (err: any) => void
 ) {
   const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
-  
   try {
     const response = await fetch(`${baseUrl}/ai/chat`, {
       method: "POST",
@@ -172,54 +226,46 @@ export async function askAssistantStream(
       },
       body: JSON.stringify({ customerId, message })
     });
-
     if (!response.ok) {
-      if (response.status === 401) {
-        clearToken();
-        window.dispatchEvent(new Event("auth:logout"));
-      }
+      handleStreamUnauthorized(response);
       throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
     }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("回應的主體 (response body) 為空或無法讀取");
-    }
-
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) {
-        break;
+/**
+ * 取得客戶 360 度整體評估報告 (SSE 串流版)：邊產生邊渲染，避免長報告撞前端/閘道逾時。
+ * 函式級註解：GET + Accept: text/event-stream 命中後端串流端點，與對話共用 readSseStream。
+ *
+ * @param customerId 客戶 ID
+ * @param onChunk 收到每一個資料區段時的回呼函式
+ * @param onDone 串流發送完成時的回呼函式
+ * @param onError 發生錯誤時的回呼函式
+ */
+export async function fetchCustomerAssessmentStream(
+  customerId: number,
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/ai/customers/${customerId}/assessment`, {
+      method: "GET",
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       }
-      buffer += decoder.decode(value, { stream: true });
-      
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        
-        if (trimmed.startsWith("data:")) {
-          const dataContent = trimmed.substring(5).trim();
-          if (dataContent === "[DONE]") {
-            onDone();
-            return;
-          }
-          try {
-            const parsed = JSON.parse(dataContent);
-            onChunk(parsed);
-          } catch (e) {
-            console.error("解析 SSE JSON 片段失敗：", dataContent, e);
-          }
-        }
-      }
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
     }
-    
-    onDone();
+    await readSseStream(response, onChunk, onDone);
   } catch (error) {
     onError(error);
   }
