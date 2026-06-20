@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  addInteraction, createCustomer, fetchAgentTrace, fetchCustomerAssessment,
+  addInteraction, createCustomer, createOpportunity, fetchAgentTrace, fetchCustomerAssessment,
   fetchCustomerDetail, fetchCustomerOptions, fetchCustomers
 } from "../../api";
 import type { AgentTraceResponse, CustomerDetail, CustomerSummary, DrilldownSource, OwnerOption } from "../../types";
@@ -14,6 +14,7 @@ import { Pagination } from "./components/Pagination";
 import { CustomerDetailPanel } from "./components/CustomerDetailPanel";
 import { AddCustomerModal } from "./components/AddCustomerModal";
 import { AddInteractionModal } from "./components/AddInteractionModal";
+import { AddOpportunityModal } from "./components/AddOpportunityModal";
 import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
 import { ChatWindow } from "../ai-assistant/components/ChatWindow";
 
@@ -44,6 +45,7 @@ export function CustomersPage() {
   const [loading, setLoading] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showAddInteraction, setShowAddInteraction] = useState(false);
+  const [showAddOpportunity, setShowAddOpportunity] = useState(false);
   const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
 
   const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat } = useAiChat();
@@ -145,6 +147,16 @@ export function CustomersPage() {
     setSelected(detail);
   }
 
+  /** 新增商機後重載詳情。 */
+  async function handleAddOpportunity(data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string }) {
+    if (!selected) return;
+    await createOpportunity({ customerId: selected.customer.id, ...data });
+    setShowAddOpportunity(false);
+    // 重新載入目前客戶詳情，讓新商機出現在看板
+    const detail = await fetchCustomerDetail(selected.customer.id);
+    setSelected(detail);
+  }
+
   /** 商機階段變更（樂觀更新本地）。 */
   function handleStageChange(opportunityId: number, newStage: string) {
     setSelected((prev) => {
@@ -222,6 +234,7 @@ export function CustomersPage() {
       <div className="action-bar">
         <button type="button" onClick={() => setShowAddCustomer(true)}>+ 新增客戶</button>
         {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>+ 新增互動</button> : null}
+        {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
       </div>
 
       <div className="workspace-grid">
@@ -245,6 +258,7 @@ export function CustomersPage() {
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
       {showAddCustomer ? <AddCustomerModal currentUserId={user?.id ?? 0} onSubmit={handleCreateCustomer} onClose={() => setShowAddCustomer(false)} /> : null}
       {showAddInteraction && selected ? <AddInteractionModal customerName={selected.customer.name} onSubmit={handleAddInteraction} onClose={() => setShowAddInteraction(false)} /> : null}
+      {showAddOpportunity && selected ? <AddOpportunityModal customerName={selected.customer.name} onSubmit={handleAddOpportunity} onClose={() => setShowAddOpportunity(false)} /> : null}
     </>
   );
 }

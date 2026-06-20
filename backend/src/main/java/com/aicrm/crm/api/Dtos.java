@@ -181,6 +181,25 @@ public final class Dtos {
 
     public record UpdateStageRequest(@NotNull OpportunityStage stage) {}
 
+    /**
+     * 新增商機請求。
+     *
+     * @param customerId 所屬客戶 ID
+     * @param name 商機名稱
+     * @param stage 商機階段
+     * @param amount 商機金額（非負）
+     * @param expectedCloseDate 預計成交日（可空）
+     * @param type 商機類型
+     */
+    public record CreateOpportunityRequest(
+            @NotNull Long customerId,
+            @NotBlank String name,
+            @NotNull OpportunityStage stage,
+            @NotNull @PositiveOrZero BigDecimal amount,
+            LocalDate expectedCloseDate,
+            @NotNull OpportunityType type
+    ) {}
+
     public record AgentTraceResponse(Long customerId, String route, String finalRecommendation, List<AgentStepResponse> steps) {}
 
     public record AgentStepResponse(int order, String action, String status, long durationMs, String input, String output) {}

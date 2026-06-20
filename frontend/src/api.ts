@@ -283,6 +283,24 @@ export async function updateOpportunityStage(id: number, stage: string) {
 }
 
 /**
+ * 新增商機（掛在指定客戶下）。
+ *
+ * @param payload 新增商機資料（customerId / 名稱 / 階段 / 金額 / 預計成交日 / 類型）
+ * @returns 新增後的商機資料
+ */
+export async function createOpportunity(payload: {
+  customerId: number;
+  name: string;
+  stage: string;
+  amount: number;
+  expectedCloseDate: string | null;
+  type: string;
+}) {
+  const { data } = await apiClient.post<OpportunityResponse>(`/opportunities`, payload);
+  return data;
+}
+
+/**
  * 查詢 Agent Trace。
  */
 export async function fetchAgentTrace(customerId: number) {
