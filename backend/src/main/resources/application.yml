@@ -25,6 +25,9 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        # 批次載入 LAZY 關聯：存取一個集合時，順帶以 IN 子句一次撈回最多 N 個實體的同關聯，
+        # 把儀表板聚合「每客戶逐筆載入互動/商機」的 N+1（數百條查詢）收斂成個位數查詢。
+        default_batch_fetch_size: 100
   web:
     cors:
       allowed-origins: http://127.0.0.1:*,http://localhost:*

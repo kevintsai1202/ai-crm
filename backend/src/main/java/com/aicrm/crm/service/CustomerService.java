@@ -83,8 +83,9 @@ public class CustomerService {
     public Dtos.PageResponse<Dtos.CustomerSummaryResponse> search(int page, int size, String keyword, String industry, String owner) {
         var pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50), Sort.by("id").ascending());
         var result = customers.findAll(buildSpec(keyword, industry, owner), pageable);
+        // toSummary 存取的互動/商機 LAZY 關聯由 default_batch_fetch_size 批次載入；
+        // 原本逐筆 findDetailById 未 fetch 關聯、純屬冗餘，已移除。
         var items = result.getContent().stream()
-                .map(customer -> customers.findDetailById(customer.getId()).orElse(customer))
                 .map(mapper::toSummary)
                 .toList();
         return new Dtos.PageResponse<>(items, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
@@ -273,8 +274,8 @@ public class CustomerService {
      * @return 含關聯資料的客戶清單
      */
     private java.util.List<Customer> allCustomersWithDetail() {
-        return customers.findAll().stream()
-                .map(customer -> customers.findDetailById(customer.getId()).orElse(customer))
-                .toList();
+        // findAll 已載入全部客戶；互動/商機等 LAZY 關聯於聚合時存取，由 default_batch_fetch_size 批次載入。
+        // （原本逐客戶再 findDetailById 只是重撈同一實體、未 fetch 關聯，純屬冗餘的 N+1。）
+        return customers.findAll();
     }
 }

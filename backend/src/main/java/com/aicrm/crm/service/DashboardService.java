@@ -279,8 +279,8 @@ public class DashboardService {
      * @return 含關聯資料的客戶清單
      */
     private java.util.List<Customer> allCustomersWithDetail() {
-        return customers.findAll().stream()
-                .map(customer -> customers.findDetailById(customer.getId()).orElse(customer))
-                .toList();
+        // findAll 已載入全部客戶；互動/商機等 LAZY 關聯於聚合時存取，由 default_batch_fetch_size 批次載入。
+        // （原本逐客戶再 findDetailById 只是重撈同一實體、未 fetch 關聯，純屬冗餘的 N+1。）
+        return customers.findAll();
     }
 }
