@@ -27,11 +27,21 @@ public class JwtService {
     /** JSON 序列化工具（Spring Boot 4 自動配置的 Jackson 3 ObjectMapper）。 */
     private final ObjectMapper objectMapper;
 
+    /** 歷史公開預設密鑰，曾外洩於版控，嚴禁再用於簽章。 */
+    private static final String LEAKED_DEFAULT_SECRET = "ai-crm-teaching-secret-change-me";
+
     public JwtService(
             @Value("${app.security.jwt-secret}") String secret,
             @Value("${app.security.token-ttl-seconds}") long ttlSeconds,
             ObjectMapper objectMapper
     ) {
+        // 啟動 fail-fast：密鑰必須由環境變數提供、長度足夠、且不得為已外洩的公開預設值，
+        // 否則拒絕啟動，避免任何人用已知密鑰偽造 JWT 造成認證繞過。
+        if (secret == null || secret.isBlank() || secret.length() < 32
+                || LEAKED_DEFAULT_SECRET.equals(secret)) {
+            throw new IllegalStateException(
+                    "app.security.jwt-secret 未設定或不安全：請以環境變數 APP_SECURITY_JWT_SECRET 提供至少 32 字元的高強度隨機值。");
+        }
         this.secret = secret;
         this.ttlSeconds = ttlSeconds;
         this.objectMapper = objectMapper;
@@ -73,7 +83,10 @@ public class JwtService {
     public AuthPrincipal parse(String token) {
         try {
             var parts = token.split("\\.");
-            if (parts.length != 3 || !sign(parts[0] + "." + parts[1]).equals(parts[2])) {
+            // 以常數時間比對簽章，避免時間旁路攻擊逐位元猜測簽章。
+            var expected = sign(parts[0] + "." + parts[1]).getBytes(StandardCharsets.UTF_8);
+            var actual = parts.length == 3 ? parts[2].getBytes(StandardCharsets.UTF_8) : new byte[0];
+            if (parts.length != 3 || !java.security.MessageDigest.isEqual(expected, actual)) {
                 throw new IllegalArgumentException("JWT 簽章不正確");
             }
             @SuppressWarnings("unchecked")
