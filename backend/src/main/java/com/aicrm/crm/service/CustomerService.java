@@ -5,7 +5,9 @@ import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.InteractionInsight;
 import com.aicrm.crm.domain.Role;
+import com.aicrm.crm.domain.Contact;
 import com.aicrm.crm.repository.AppUserRepository;
+import com.aicrm.crm.repository.ContactRepository;
 import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.repository.InteractionInsightRepository;
 import com.aicrm.crm.repository.InteractionRepository;
@@ -47,6 +49,9 @@ public class CustomerService {
     /** 使用者存取：建立客戶解析負責業務帳號、提供負責業務下拉選項。 */
     private final AppUserRepository users;
 
+    /** 聯絡人存取：新增客戶聯絡人時持久化。 */
+    private final ContactRepository contacts;
+
     /** Entity/DTO 轉換工具。 */
     private final CustomerMapper mapper = new CustomerMapper();
 
@@ -54,12 +59,14 @@ public class CustomerService {
                            SentimentIntentService sentimentIntentService,
                            InteractionInsightRepository interactionInsights,
                            InteractionRepository interactionRepository,
-                           AppUserRepository users) {
+                           AppUserRepository users,
+                           ContactRepository contacts) {
         this.customers = customers;
         this.sentimentIntentService = sentimentIntentService;
         this.interactionInsights = interactionInsights;
         this.interactionRepository = interactionRepository;
         this.users = users;
+        this.contacts = contacts;
     }
 
     /**
@@ -129,6 +136,37 @@ public class CustomerService {
     }
 
     /**
+     * 完整編輯客戶（基本欄位、負責業務與合約日期）。
+     *
+     * @param id 客戶 ID
+     * @param request 完整編輯請求
+     * @return 更新後客戶摘要
+     */
+    public Dtos.CustomerSummaryResponse update(Long id, Dtos.UpdateCustomerRequest request) {
+        var customer = findDetail(id);
+        // 解析負責業務帳號（正規關聯），找不到則回 404
+        var owner = users.findById(request.ownerId())
+                .orElseThrow(() -> new EntityNotFoundException("負責業務帳號不存在：" + request.ownerId()));
+        customer.updateBasicInfo(request.name(), request.email(), request.phone(), request.taxId(), request.industry());
+        customer.assignOwner(owner); // 同步設定 owner_id 與 owner_name
+        customer.updateContractDates(request.contractStartDate(), request.contractEndDate(), request.renewalDueDate());
+        return mapper.toSummary(customers.save(customer));
+    }
+
+    /**
+     * 刪除客戶（連同其子實體：聯絡人、互動、商機）。
+     *
+     * <p>因 interaction_insights.interaction_id 外鍵無 ON DELETE CASCADE，須先刪掉該客戶所有分析列，
+     * 再刪客戶（子實體靠 JPA cascade 一併刪除）。</p>
+     *
+     * @param id 客戶 ID
+     */
+    public void delete(Long id) {
+        interactionInsights.deleteByCustomerId(id);
+        customers.deleteById(id);
+    }
+
+    /**
      * 更新客戶狀態。
      *
      * @param id 客戶 ID
@@ -139,6 +177,20 @@ public class CustomerService {
         var customer = findDetail(id);
         customer.updateStatus(request.status());
         return mapper.toSummary(customer);
+    }
+
+    /**
+     * 新增指定客戶的聯絡人。
+     *
+     * @param id 客戶 ID
+     * @param request 新增聯絡人請求
+     * @return 新增後的聯絡人 DTO
+     */
+    public Dtos.ContactResponse addContact(Long id, Dtos.CreateContactRequest request) {
+        var customer = findDetail(id);
+        var contact = new Contact(customer, request.name(), request.title(), request.email());
+        contacts.save(contact);
+        return new Dtos.ContactResponse(contact.getId(), contact.getName(), contact.getTitle(), contact.getEmail());
     }
 
     /**

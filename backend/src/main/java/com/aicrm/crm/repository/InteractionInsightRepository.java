@@ -4,7 +4,9 @@ import com.aicrm.crm.domain.InteractionInsight;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 互動情緒意圖分析結果資料存取介面，附 upsert 查詢、批次補算來源與雷達聚合查詢。
@@ -98,4 +100,26 @@ public interface InteractionInsightRepository extends JpaRepository<InteractionI
             + "or count(*) filter (where ins.intent = 'COMPLAINT') > 0",
             nativeQuery = true)
     List<Object[]> aggregateCustomerRisk();
+
+    /**
+     * 刪除指定互動的分析結果。
+     *
+     * <p>因 interaction_insights.interaction_id 外鍵無 ON DELETE CASCADE，刪除互動前須先呼叫此方法清掉對應分析列。</p>
+     *
+     * @param interactionId 互動 ID
+     */
+    @Modifying
+    @Transactional
+    void deleteByInteractionId(Long interactionId);
+
+    /**
+     * 刪除指定客戶的所有分析結果。
+     *
+     * <p>因 interaction_insights.interaction_id 外鍵無 ON DELETE CASCADE，刪除客戶（會級聯刪其互動）前須先呼叫此方法清掉該客戶所有分析列。</p>
+     *
+     * @param customerId 客戶 ID
+     */
+    @Modifying
+    @Transactional
+    void deleteByCustomerId(Long customerId);
 }

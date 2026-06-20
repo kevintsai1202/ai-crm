@@ -3,6 +3,7 @@ package com.aicrm.crm.api;
 import com.aicrm.crm.service.CustomerService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -79,6 +80,42 @@ public class CustomerController {
     @ResponseStatus(HttpStatus.CREATED)
     public Dtos.CustomerSummaryResponse create(@Valid @RequestBody Dtos.CreateCustomerRequest request) {
         return customerService.create(request);
+    }
+
+    /**
+     * 完整編輯客戶。
+     *
+     * @param id 客戶 ID
+     * @param request 完整編輯請求
+     * @return 更新後客戶摘要
+     */
+    @PutMapping("/{id}")
+    public Dtos.CustomerSummaryResponse update(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateCustomerRequest request) {
+        return customerService.update(id, request);
+    }
+
+    /**
+     * 刪除客戶（連同其聯絡人、互動、商機）。
+     *
+     * @param id 客戶 ID
+     */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        customerService.delete(id);
+    }
+
+    /**
+     * 新增客戶聯絡人。
+     *
+     * @param id 客戶 ID
+     * @param request 新增聯絡人請求
+     * @return 新增後聯絡人
+     */
+    @PostMapping("/{id}/contacts")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Dtos.ContactResponse addContact(@PathVariable Long id, @Valid @RequestBody Dtos.CreateContactRequest request) {
+        return customerService.addContact(id, request);
     }
 
     /**

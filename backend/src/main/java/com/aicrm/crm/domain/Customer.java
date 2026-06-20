@@ -110,6 +110,23 @@ public class Customer extends AuditableEntity {
     }
 
     /**
+     * 更新客戶五個基本欄位（完整編輯用）。
+     *
+     * @param name 客戶名稱
+     * @param email 電子郵件
+     * @param phone 電話
+     * @param taxId 統一編號
+     * @param industry 產業別
+     */
+    public void updateBasicInfo(String name, String email, String phone, String taxId, String industry) {
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.taxId = taxId;
+        this.industry = industry;
+    }
+
+    /**
      * 更新合約日期欄位。
      *
      * @param contractStartDate 合約起始日

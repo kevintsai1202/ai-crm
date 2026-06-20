@@ -1,14 +1,51 @@
-import type { AgentTraceResponse, CustomerDetail } from "../../../types";
+import type { AgentTraceResponse, ContactResponse, CustomerDetail, OpportunityResponse } from "../../../types";
 import { riskLabel, formatMoney, formatDateTime } from "../../../lib/format";
 import { AiBadge } from "../../../components/common/AiBadge";
 import { Timeline } from "./Timeline";
 import { OpportunityBoard } from "./OpportunityBoard";
+import { ContactsPanel } from "./ContactsPanel";
 import { TracePanel } from "../../agent-trace/TracePanel";
 
 /**
- * 客戶詳情、商機、AI 與 Trace 的主內容。
+ * 客戶詳情、聯絡人、商機、互動、AI 與 Trace 的主內容。
+ * 函式級註解：所有 CRUD 操作的入口（編輯 / 刪除客戶、聯絡人、商機、互動）皆在此鋪設，
+ * 實際邏輯與重載集中於上層 CustomersPage，透過 props 傳入。
  */
-export function CustomerDetailPanel({ detail, loading, trace, onStageChange, onOpenChat, onAssess, userRole }: { detail: CustomerDetail | null; loading: boolean; trace: AgentTraceResponse | null; onStageChange: (opportunityId: number, newStage: string) => void; onOpenChat: () => void; onAssess: () => void; userRole?: string }) {
+export function CustomerDetailPanel({
+  detail,
+  loading,
+  trace,
+  onStageChange,
+  onOpenChat,
+  onAssess,
+  onEditCustomer,
+  onDeleteCustomer,
+  onAddContact,
+  onEditContact,
+  onDeleteContact,
+  onEditOpportunity,
+  onDeleteOpportunity,
+  onEditInteraction,
+  onDeleteInteraction,
+  userRole
+}: {
+  detail: CustomerDetail | null;
+  loading: boolean;
+  trace: AgentTraceResponse | null;
+  onStageChange: (opportunityId: number, newStage: string) => void;
+  onOpenChat: () => void;
+  onAssess: () => void;
+  onEditCustomer: () => void;
+  onDeleteCustomer: () => void;
+  onAddContact: () => void;
+  onEditContact: (contact: ContactResponse) => void;
+  onDeleteContact: (contact: ContactResponse) => void;
+  onEditOpportunity: (opportunity: OpportunityResponse) => void;
+  onDeleteOpportunity: (opportunity: OpportunityResponse) => void;
+  onEditInteraction: (interaction: CustomerDetail["interactions"][number]) => void;
+  onDeleteInteraction: (interaction: CustomerDetail["interactions"][number]) => void;
+  userRole?: string;
+}) {
   if (!detail) {
     return <section className="panel empty-state">尚未選取客戶</section>;
   }
@@ -26,8 +63,8 @@ export function CustomerDetailPanel({ detail, loading, trace, onStageChange, onO
           <span className={`risk-badge ${detail.customer.riskLevel.toLowerCase()}`}>{riskLabel(detail.customer.riskLevel)}</span>
           <button type="button" className="btn-primary" onClick={onAssess}>🩺 整體評估<AiBadge onDark /></button>
           <button type="button" className="btn-primary" onClick={onOpenChat}>💬 詢問 AI 助理<AiBadge onDark /></button>
-          {userRole === "ADMIN" ? <button type="button" className="btn-danger">刪除客戶</button> : null}
-          {userRole === "MANAGER" || userRole === "ADMIN" ? <button type="button" className="btn-secondary">審核建議</button> : null}
+          <button type="button" className="btn-secondary" onClick={onEditCustomer}>✏️ 編輯客戶</button>
+          {userRole === "ADMIN" ? <button type="button" className="btn-danger" onClick={onDeleteCustomer}>刪除客戶</button> : null}
         </div>
       </div>
       {loading ? <div className="loading-line">資料更新中...</div> : null}
@@ -50,9 +87,15 @@ export function CustomerDetailPanel({ detail, loading, trace, onStageChange, onO
           <span className="kpi-value">{statusLabels[detail.customer.status] ?? detail.customer.status}</span>
         </div>
       </div>
+      <ContactsPanel
+        contacts={detail.contacts}
+        onAdd={onAddContact}
+        onEdit={onEditContact}
+        onDelete={onDeleteContact}
+      />
       <div className="detail-grid">
-        <Timeline interactions={detail.interactions} />
-        <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} />
+        <Timeline interactions={detail.interactions} onEdit={onEditInteraction} onDelete={onDeleteInteraction} />
+        <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
       </div>
       <div className="detail-grid">
         <TracePanel trace={trace} />

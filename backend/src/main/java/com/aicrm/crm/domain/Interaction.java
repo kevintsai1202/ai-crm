@@ -60,6 +60,19 @@ public class Interaction extends AuditableEntity {
     }
 
     /**
+     * 更新互動資訊（編輯用）。
+     *
+     * @param type 互動類型
+     * @param occurredAt 發生時間
+     * @param content 內容
+     */
+    public void updateInfo(InteractionType type, LocalDateTime occurredAt, String content) {
+        this.type = type;
+        this.occurredAt = occurredAt;
+        this.content = content;
+    }
+
+    /**
      * 綁定客戶關聯。
      *
      * @param customer 所屬客戶
@@ -69,6 +82,7 @@ public class Interaction extends AuditableEntity {
     }
 
     public Long getId() { return id; }
+    public Customer getCustomer() { return customer; }
     public InteractionType getType() { return type; }
     public LocalDateTime getOccurredAt() { return occurredAt; }
     public String getContent() { return content; }

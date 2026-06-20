@@ -10,9 +10,21 @@ function sentimentClass(sentiment: string | null | undefined) {
 }
 
 /**
- * 互動時間線：每則互動顯示類型、時間、情緒色點（SP6）與意圖中文標籤。
+ * 互動時間線：每則互動顯示類型、時間、情緒色點（SP6）與意圖中文標籤，並提供編輯 / 刪除入口。
+ *
+ * @param interactions 互動清單
+ * @param onEdit 點擊編輯某互動 callback
+ * @param onDelete 點擊刪除某互動 callback
  */
-export function Timeline({ interactions }: { interactions: CustomerDetail["interactions"] }) {
+export function Timeline({
+  interactions,
+  onEdit,
+  onDelete
+}: {
+  interactions: CustomerDetail["interactions"];
+  onEdit: (interaction: CustomerDetail["interactions"][number]) => void;
+  onDelete: (interaction: CustomerDetail["interactions"][number]) => void;
+}) {
   return (
     <section className="panel">
       <div className="panel-title"><h3>互動時間線</h3></div>
@@ -30,6 +42,10 @@ export function Timeline({ interactions }: { interactions: CustomerDetail["inter
               </span>
               <strong>{formatDateTime(item.occurredAt)}</strong>
               <p>{item.content}</p>
+              <div className="row-actions">
+                <button type="button" className="row-btn" onClick={() => onEdit(item)}>編輯</button>
+                <button type="button" className="row-btn row-btn-danger" onClick={() => onDelete(item)}>刪除</button>
+              </div>
             </article>
           );
         })}

@@ -1,10 +1,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  addInteraction, createCustomer, createOpportunity, fetchAgentTrace, fetchCustomerAssessment,
-  fetchCustomerDetail, fetchCustomerOptions, fetchCustomers
+  addInteraction, createContact, createCustomer, createOpportunity, deleteContact, deleteCustomer,
+  deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAssessment,
+  fetchCustomerDetail, fetchCustomerOptions, fetchCustomers, updateContact, updateCustomer,
+  updateInteraction, updateOpportunity
 } from "../../api";
-import type { AgentTraceResponse, CustomerDetail, CustomerSummary, DrilldownSource, OwnerOption } from "../../types";
+import type {
+  AgentTraceResponse, ContactResponse, CustomerDetail, CustomerSummary, DrilldownSource,
+  InteractionResponse, OpportunityResponse, OwnerOption
+} from "../../types";
 import { Breadcrumb } from "../../components/common/Breadcrumb";
 import { useAuth } from "../../context/AuthContext";
 import { useAiChat } from "../ai-assistant/useAiChat";
@@ -15,6 +20,10 @@ import { CustomerDetailPanel } from "./components/CustomerDetailPanel";
 import { AddCustomerModal } from "./components/AddCustomerModal";
 import { AddInteractionModal } from "./components/AddInteractionModal";
 import { AddOpportunityModal } from "./components/AddOpportunityModal";
+import { EditCustomerModal } from "./components/EditCustomerModal";
+import { ContactModal } from "./components/ContactModal";
+import { EditOpportunityModal } from "./components/EditOpportunityModal";
+import { EditInteractionModal } from "./components/EditInteractionModal";
 import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
 import { ChatWindow } from "../ai-assistant/components/ChatWindow";
 
@@ -46,6 +55,14 @@ export function CustomersPage() {
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showAddInteraction, setShowAddInteraction] = useState(false);
   const [showAddOpportunity, setShowAddOpportunity] = useState(false);
+  // 編輯客戶 Modal 開關
+  const [showEditCustomer, setShowEditCustomer] = useState(false);
+  // 聯絡人 Modal：open 控制開關，editing 為編輯對象（null 表示新增）
+  const [contactModal, setContactModal] = useState<{ open: boolean; editing: ContactResponse | null }>({ open: false, editing: null });
+  // 編輯商機對象（null 表示未開啟）
+  const [editingOpportunity, setEditingOpportunity] = useState<OpportunityResponse | null>(null);
+  // 編輯互動對象（null 表示未開啟）
+  const [editingInteraction, setEditingInteraction] = useState<InteractionResponse | null>(null);
   const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
 
   const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat } = useAiChat();
@@ -157,6 +174,83 @@ export function CustomersPage() {
     setSelected(detail);
   }
 
+  /** 重載目前選取客戶的詳情（CRUD 成功後沿用）。 */
+  async function reloadSelectedDetail() {
+    if (!selected) return;
+    const detail = await fetchCustomerDetail(selected.customer.id);
+    setSelected(detail);
+  }
+
+  /** 編輯客戶後重載詳情與列表。 */
+  async function handleUpdateCustomer(data: {
+    name: string; email: string; phone: string; taxId: string; industry: string; ownerId: number;
+    contractStartDate: string | null; contractEndDate: string | null; renewalDueDate: string | null;
+  }) {
+    if (!selected) return;
+    await updateCustomer(selected.customer.id, data);
+    setShowEditCustomer(false);
+    await reloadSelectedDetail();
+    await loadCustomers();
+  }
+
+  /** 刪除客戶：確認後刪除，成功導回列表並重載。 */
+  async function handleDeleteCustomer() {
+    if (!selected) return;
+    if (!window.confirm("確定刪除此客戶?此動作無法復原。")) return;
+    await deleteCustomer(selected.customer.id);
+    navigate("/customers");
+    await loadCustomers();
+  }
+
+  /** 送出聯絡人 Modal：依是否有編輯對象決定新增或更新，成功後重載詳情。 */
+  async function handleSubmitContact(data: { name: string; title: string; email: string }) {
+    if (!selected) return;
+    if (contactModal.editing) {
+      await updateContact(contactModal.editing.id, data);
+    } else {
+      await createContact(selected.customer.id, data);
+    }
+    setContactModal({ open: false, editing: null });
+    await reloadSelectedDetail();
+  }
+
+  /** 刪除聯絡人：確認後刪除，成功後重載詳情。 */
+  async function handleDeleteContact(contact: ContactResponse) {
+    if (!window.confirm(`確定刪除聯絡人「${contact.name}」?此動作無法復原。`)) return;
+    await deleteContact(contact.id);
+    await reloadSelectedDetail();
+  }
+
+  /** 編輯商機後重載詳情。 */
+  async function handleUpdateOpportunity(data: { name: string; amount: number; expectedCloseDate: string | null; type: string }) {
+    if (!editingOpportunity) return;
+    await updateOpportunity(editingOpportunity.id, data);
+    setEditingOpportunity(null);
+    await reloadSelectedDetail();
+  }
+
+  /** 刪除商機：確認後刪除，成功後重載詳情。 */
+  async function handleDeleteOpportunity(opportunity: OpportunityResponse) {
+    if (!window.confirm(`確定刪除商機「${opportunity.name}」?此動作無法復原。`)) return;
+    await deleteOpportunity(opportunity.id);
+    await reloadSelectedDetail();
+  }
+
+  /** 編輯互動後重載詳情。 */
+  async function handleUpdateInteraction(data: { type: string; occurredAt: string; content: string }) {
+    if (!editingInteraction) return;
+    await updateInteraction(editingInteraction.id, data);
+    setEditingInteraction(null);
+    await reloadSelectedDetail();
+  }
+
+  /** 刪除互動:確認後刪除,成功後重載詳情。 */
+  async function handleDeleteInteraction(interaction: InteractionResponse) {
+    if (!window.confirm("確定刪除此互動紀錄?此動作無法復原。")) return;
+    await deleteInteraction(interaction.id);
+    await reloadSelectedDetail();
+  }
+
   /** 商機階段變更（樂觀更新本地）。 */
   function handleStageChange(opportunityId: number, newStage: string) {
     setSelected((prev) => {
@@ -242,7 +336,24 @@ export function CustomersPage() {
           <CustomerList customers={customers} selectedId={selectedId} onSelect={selectCustomer} loading={loading} />
           <Pagination page={page} totalPages={totalPages} totalElements={totalElements} onPageChange={(p) => { setPage(p); void loadCustomers({ page: p }); }} />
         </div>
-        <CustomerDetailPanel detail={selected} loading={loading} trace={trace} onStageChange={handleStageChange} onOpenChat={openChat} onAssess={openCustomerAssessment} userRole={user?.role} />
+        <CustomerDetailPanel
+          detail={selected}
+          loading={loading}
+          trace={trace}
+          onStageChange={handleStageChange}
+          onOpenChat={openChat}
+          onAssess={openCustomerAssessment}
+          onEditCustomer={() => setShowEditCustomer(true)}
+          onDeleteCustomer={handleDeleteCustomer}
+          onAddContact={() => setContactModal({ open: true, editing: null })}
+          onEditContact={(contact) => setContactModal({ open: true, editing: contact })}
+          onDeleteContact={handleDeleteContact}
+          onEditOpportunity={(opportunity) => setEditingOpportunity(opportunity)}
+          onDeleteOpportunity={handleDeleteOpportunity}
+          onEditInteraction={(interaction) => setEditingInteraction(interaction)}
+          onDeleteInteraction={handleDeleteInteraction}
+          userRole={user?.role}
+        />
       </div>
 
       <ChatLauncher open={chatOpen} unread={messages.length} customerName={selected?.customer.name} onOpen={openChat} />
@@ -259,6 +370,10 @@ export function CustomersPage() {
       {showAddCustomer ? <AddCustomerModal currentUserId={user?.id ?? 0} onSubmit={handleCreateCustomer} onClose={() => setShowAddCustomer(false)} /> : null}
       {showAddInteraction && selected ? <AddInteractionModal customerName={selected.customer.name} onSubmit={handleAddInteraction} onClose={() => setShowAddInteraction(false)} /> : null}
       {showAddOpportunity && selected ? <AddOpportunityModal customerName={selected.customer.name} onSubmit={handleAddOpportunity} onClose={() => setShowAddOpportunity(false)} /> : null}
+      {showEditCustomer && selected ? <EditCustomerModal customer={selected.customer} owners={filterOptions.owners} onSubmit={handleUpdateCustomer} onClose={() => setShowEditCustomer(false)} /> : null}
+      {contactModal.open && selected ? <ContactModal contact={contactModal.editing} onSubmit={handleSubmitContact} onClose={() => setContactModal({ open: false, editing: null })} /> : null}
+      {editingOpportunity ? <EditOpportunityModal opportunity={editingOpportunity} onSubmit={handleUpdateOpportunity} onClose={() => setEditingOpportunity(null)} /> : null}
+      {editingInteraction ? <EditInteractionModal interaction={editingInteraction} onSubmit={handleUpdateInteraction} onClose={() => setEditingInteraction(null)} /> : null}
     </>
   );
 }

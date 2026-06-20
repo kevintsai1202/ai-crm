@@ -6,6 +6,7 @@ import com.aicrm.crm.repository.OpportunityRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -57,6 +58,42 @@ public class OpportunityController {
                 opportunity.getExpectedCloseDate(),
                 opportunity.getType()
         );
+    }
+
+    /**
+     * 編輯商機明細（name/amount/expectedCloseDate/type；不含階段）。
+     *
+     * @param id 商機 ID
+     * @param request 商機編輯請求
+     * @return 更新後的商機 DTO
+     */
+    @PutMapping("/{id}")
+    @Transactional
+    public Dtos.OpportunityResponse update(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateOpportunityRequest request) {
+        var opportunity = opportunityRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + id));
+        opportunity.updateDetails(request.name(), request.amount(), request.expectedCloseDate(), request.type());
+        opportunityRepository.save(opportunity);
+        return new Dtos.OpportunityResponse(
+                opportunity.getId(),
+                opportunity.getName(),
+                opportunity.getStage(),
+                opportunity.getAmount(),
+                opportunity.getExpectedCloseDate(),
+                opportunity.getType()
+        );
+    }
+
+    /**
+     * 刪除商機。
+     *
+     * @param id 商機 ID
+     */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
+    public void delete(@PathVariable Long id) {
+        opportunityRepository.deleteById(id);
     }
 
     /**

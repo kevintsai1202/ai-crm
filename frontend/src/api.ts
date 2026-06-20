@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AgentTraceResponse,
   ChatResponse,
+  ContactResponse,
   CustomerDetail,
   CustomerOptionsResponse,
   CustomerSummary,
@@ -230,6 +231,121 @@ export async function fetchCustomerOptions() {
 export async function createCustomer(data: { name: string; email: string; phone: string; taxId: string; industry: string; ownerId: number }) {
   const { data: result } = await apiClient.post<CustomerSummary>("/customers", data);
   return result;
+}
+
+/**
+ * 更新客戶完整資料（PUT /customers/{id}）。
+ * 函式級註解：日期欄位（合約起始 / 到期 / 續約）空值請傳 null，後端不接受空字串。
+ *
+ * @param id 客戶 ID
+ * @param data 客戶完整欄位（含選填日期）
+ * @returns 更新後的客戶摘要
+ */
+export async function updateCustomer(
+  id: number,
+  data: {
+    name: string;
+    email: string;
+    phone: string;
+    taxId: string;
+    industry: string;
+    ownerId: number;
+    contractStartDate?: string | null;
+    contractEndDate?: string | null;
+    renewalDueDate?: string | null;
+  }
+) {
+  const { data: result } = await apiClient.put<CustomerSummary>(`/customers/${id}`, data);
+  return result;
+}
+
+/**
+ * 刪除客戶（DELETE /customers/{id}，回 204）。
+ *
+ * @param id 客戶 ID
+ */
+export async function deleteCustomer(id: number) {
+  await apiClient.delete(`/customers/${id}`);
+}
+
+/**
+ * 為指定客戶新增聯絡人（POST /customers/{id}/contacts）。
+ *
+ * @param customerId 客戶 ID
+ * @param data 聯絡人資料（姓名 / 職稱 / Email）
+ * @returns 新增後的聯絡人
+ */
+export async function createContact(customerId: number, data: { name: string; title: string; email: string }) {
+  const { data: result } = await apiClient.post<ContactResponse>(`/customers/${customerId}/contacts`, data);
+  return result;
+}
+
+/**
+ * 更新聯絡人（PUT /contacts/{id}）。
+ *
+ * @param id 聯絡人 ID
+ * @param data 聯絡人資料（姓名 / 職稱 / Email）
+ * @returns 更新後的聯絡人
+ */
+export async function updateContact(id: number, data: { name: string; title: string; email: string }) {
+  const { data: result } = await apiClient.put<ContactResponse>(`/contacts/${id}`, data);
+  return result;
+}
+
+/**
+ * 刪除聯絡人（DELETE /contacts/{id}，回 204）。
+ *
+ * @param id 聯絡人 ID
+ */
+export async function deleteContact(id: number) {
+  await apiClient.delete(`/contacts/${id}`);
+}
+
+/**
+ * 更新商機（PUT /opportunities/{id}）；階段不在此更新。
+ * 函式級註解：預計成交日空值請傳 null，避免後端解析空字串失敗。
+ *
+ * @param id 商機 ID
+ * @param data 商機欄位（名稱 / 金額 / 預計成交日 / 類型）
+ * @returns 更新後的商機
+ */
+export async function updateOpportunity(
+  id: number,
+  data: { name: string; amount: number; expectedCloseDate: string | null; type: string }
+) {
+  const { data: result } = await apiClient.put<OpportunityResponse>(`/opportunities/${id}`, data);
+  return result;
+}
+
+/**
+ * 刪除商機（DELETE /opportunities/{id}，回 204）。
+ *
+ * @param id 商機 ID
+ */
+export async function deleteOpportunity(id: number) {
+  await apiClient.delete(`/opportunities/${id}`);
+}
+
+/**
+ * 更新互動紀錄（PUT /interactions/{id}）。
+ * 函式級註解：occurredAt 直接送 datetime-local 值（yyyy-MM-ddTHH:mm），不要轉 ISO/UTC。
+ *
+ * @param id 互動 ID
+ * @param data 互動欄位（類型 / 發生時間 / 內容）
+ * @returns 更新後的互動
+ */
+export async function updateInteraction(id: number, data: { type: string; occurredAt: string; content: string }) {
+  const { data: result } = await apiClient.put<InteractionResponse>(`/interactions/${id}`, data);
+  return result;
+}
+
+/**
+ * 刪除互動紀錄（DELETE /interactions/{id}，回 204）。
+ *
+ * @param id 互動 ID
+ */
+export async function deleteInteraction(id: number) {
+  await apiClient.delete(`/interactions/${id}`);
 }
 
 /** 管理員：列出所有帳號。 */

@@ -1819,3 +1819,62 @@ button.renewal-bar.clickable:hover {
 .admin-user-actions .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 表單錯誤訊息 */
 .form-error { color: #b91c1c; font-size: 13px; margin: 4px 0 0; }
+
+/* === CRUD 操作入口樣式（編輯/刪除小按鈕、聯絡人區塊、商機卡片圖示） === */
+
+/* 列內小操作按鈕（互動時間線、聯絡人列共用） */
+.row-actions { display: flex; gap: 8px; margin-top: 10px; }
+.contact-actions { display: flex; gap: 8px; }
+.row-btn {
+  border: 1px solid #c7d7d3;
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: #f0faf6;
+  color: #0f5f57;
+  font-size: 12px;
+  cursor: pointer;
+}
+.row-btn:hover { background: #e0f5ee; }
+.row-btn-danger {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b42318;
+}
+.row-btn-danger:hover { background: #fde4e4; }
+
+/* 聯絡人區塊：每筆橫向排列資訊與操作 */
+.contact-empty { color: #5e7280; font-size: 13px; margin: 4px 0 0; }
+.contact-list { display: grid; gap: 10px; }
+.contact-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #dde7e3;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.contact-info { display: flex; flex-direction: column; gap: 2px; }
+.contact-info .contact-title { color: #5e7280; font-size: 12px; }
+.contact-info small { color: #5e7280; }
+
+/* 商機卡片右上的編輯/刪除圖示按鈕（不影響 @dnd-kit 拖拽） */
+.opportunity-card { position: relative; }
+.card-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+.card-icon-btn {
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.card-icon-btn:hover { opacity: 1; }

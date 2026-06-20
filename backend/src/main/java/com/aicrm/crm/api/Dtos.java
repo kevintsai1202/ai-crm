@@ -72,6 +72,31 @@ public final class Dtos {
             LocalDate renewalDueDate
     ) {}
 
+    /**
+     * 完整編輯客戶請求。name/email/phone/taxId/industry/ownerId 必填，合約日期可空。
+     *
+     * @param name 客戶名稱
+     * @param email 電子郵件
+     * @param phone 電話
+     * @param taxId 統一編號
+     * @param industry 產業別
+     * @param ownerId 負責業務帳號 ID
+     * @param contractStartDate 合約起始日（可空）
+     * @param contractEndDate 合約到期日（可空）
+     * @param renewalDueDate 預計續約日（可空）
+     */
+    public record UpdateCustomerRequest(
+            @NotBlank String name,
+            @NotBlank @Email String email,
+            @NotBlank @Pattern(regexp = "^09\\d{8}$", message = "phone 必須為台灣手機格式，例如 0912345678") String phone,
+            @NotBlank @Pattern(regexp = "^\\d{8}$", message = "taxId 必須為 8 位數字") String taxId,
+            @NotBlank String industry,
+            @NotNull Long ownerId,
+            LocalDate contractStartDate,
+            LocalDate contractEndDate,
+            LocalDate renewalDueDate
+    ) {}
+
     /** 可指派的負責業務選項（帳號 id + 顯示名稱）。 */
     public record OwnerOption(Long id, String displayName) {}
 
@@ -110,7 +135,46 @@ public final class Dtos {
 
     public record ContactResponse(Long id, String name, String title, String email) {}
 
+    /**
+     * 新增聯絡人請求。
+     *
+     * @param name 聯絡人姓名
+     * @param title 聯絡人職稱
+     * @param email 聯絡人 email
+     */
+    public record CreateContactRequest(
+            @NotBlank String name,
+            @NotBlank String title,
+            @NotBlank @Email String email
+    ) {}
+
+    /**
+     * 編輯聯絡人請求。
+     *
+     * @param name 聯絡人姓名
+     * @param title 聯絡人職稱
+     * @param email 聯絡人 email
+     */
+    public record UpdateContactRequest(
+            @NotBlank String name,
+            @NotBlank String title,
+            @NotBlank @Email String email
+    ) {}
+
     public record InteractionResponse(Long id, InteractionType type, LocalDateTime occurredAt, String content, String sentiment, String intent) {}
+
+    /**
+     * 編輯互動請求。
+     *
+     * @param type 互動類型
+     * @param occurredAt 發生時間
+     * @param content 內容
+     */
+    public record UpdateInteractionRequest(
+            @NotNull InteractionType type,
+            @NotNull LocalDateTime occurredAt,
+            @NotBlank String content
+    ) {}
 
     public record OpportunityResponse(
             Long id,
@@ -119,6 +183,21 @@ public final class Dtos {
             BigDecimal amount,
             LocalDate expectedCloseDate,
             OpportunityType type
+    ) {}
+
+    /**
+     * 編輯商機請求（不含階段；階段由 /{id}/stage 專屬端點處理）。
+     *
+     * @param name 商機名稱
+     * @param amount 商機金額（非負）
+     * @param expectedCloseDate 預計成交日（可空）
+     * @param type 商機類型
+     */
+    public record UpdateOpportunityRequest(
+            @NotBlank String name,
+            @NotNull @PositiveOrZero BigDecimal amount,
+            LocalDate expectedCloseDate,
+            @NotNull OpportunityType type
     ) {}
 
     public record DashboardSummary(long customerCount, long activeOpportunityCount, BigDecimal opportunityAmount, long highRiskCount) {}

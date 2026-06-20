@@ -42,6 +42,34 @@ public class Contact extends AuditableEntity {
     protected Contact() {
     }
 
+    /**
+     * 建立聯絡人並綁定所屬客戶。
+     *
+     * @param customer 所屬客戶
+     * @param name 聯絡人姓名
+     * @param title 聯絡人職稱
+     * @param email 聯絡人 email
+     */
+    public Contact(Customer customer, String name, String title, String email) {
+        this.customer = customer;
+        this.name = name;
+        this.title = title;
+        this.email = email;
+    }
+
+    /**
+     * 更新聯絡人資訊（編輯用）。
+     *
+     * @param name 聯絡人姓名
+     * @param title 聯絡人職稱
+     * @param email 聯絡人 email
+     */
+    public void updateInfo(String name, String title, String email) {
+        this.name = name;
+        this.title = title;
+        this.email = email;
+    }
+
     public Long getId() { return id; }
     public String getName() { return name; }
     public String getTitle() { return title; }

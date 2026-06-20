@@ -92,5 +92,20 @@ public class Opportunity extends AuditableEntity {
     public void updateStage(OpportunityStage stage) {
         this.stage = stage;
     }
+
+    /**
+     * 更新商機明細（編輯用，不含階段）。
+     *
+     * @param name 商機名稱
+     * @param amount 商機金額
+     * @param expectedCloseDate 預計成交日
+     * @param type 商機類型
+     */
+    public void updateDetails(String name, BigDecimal amount, LocalDate expectedCloseDate, OpportunityType type) {
+        this.name = name;
+        this.amount = amount;
+        this.expectedCloseDate = expectedCloseDate;
+        this.type = type;
+    }
 }
 
