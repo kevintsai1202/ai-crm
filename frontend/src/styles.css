@@ -1859,7 +1859,7 @@ button.renewal-bar.clickable:hover {
 .contact-info .contact-title { color: #5e7280; font-size: 12px; }
 .contact-info small { color: #5e7280; }
 
-/* 商機卡片右上的編輯/刪除圖示按鈕（不影響 @dnd-kit 拖拽） */
+/* 商機卡片右上的編輯/刪除圖示按鈕 */
 .opportunity-card { position: relative; }
 .card-actions {
   position: absolute;
@@ -1878,3 +1878,24 @@ button.renewal-bar.clickable:hover {
   opacity: 0.6;
 }
 .card-icon-btn:hover { opacity: 1; }
+
+/* 商機卡片階段下拉:取代拖拽改階段 */
+.stage-select {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid #c7d7d3;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: #122232;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* 看板欄位標題的筆數徽章 */
+.kanban-count {
+  margin-left: 6px;
+  font-size: 11px;
+  color: #5e7280;
+  font-weight: 500;
+}
