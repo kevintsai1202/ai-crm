@@ -1,0 +1,67 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: ai-crm-backend
+  # 匯入專案根目錄的 .env 作為設定來源（OPENAI_API_KEY、MODEL 等）。
+  # optional 表示檔案不存在也不報錯；[.properties] 提示以 KEY=VALUE 格式解析。
+  # 同時嘗試 backend 工作目錄與其上層（repo 根），相容不同啟動位置。
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:15432/aicrm
+    username: aicrm
+    password: aicrm
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  web:
+    cors:
+      allowed-origins: http://127.0.0.1:*,http://localhost:*
+  # Spring AI OpenAI 設定：api-key 取自 .env / 環境變數 OPENAI_API_KEY，未設定時為空字串，
+  # 此時 InsightService 以金鑰是否設定判斷，未設定則 fallback 至 deterministic 流程。
+  # model 取自 .env / 環境變數 OPENAI_CHAT_MODEL，未設定時預設 gpt-4o-mini。
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      # base-url 取自 .env 的 BASE_URL，可指向 OpenAI 相容的第三方閘道（如 Zeabur AI Hub）；
+      # 未設定時用 OpenAI 官方端點。Spring AI 會在其後接 /v1/chat/completions。
+      base-url: ${BASE_URL:https://api.openai.com}
+      chat:
+        model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+        temperature: 0.3
+
+app:
+  security:
+    jwt-secret: "ai-crm-teaching-secret-change-me"
+    token-ttl-seconds: 28800
+  # Voyage 向量嵌入設定：api-key 取自 .env / 環境變數 VOYAGE_API_KEY，未設定時為空字串，
+  # 此時 VoyageEmbeddingClient 走 deterministic fallback。model/url/dimension 對應 Voyage embeddings API。
+  voyage:
+    api-key: ${VOYAGE_API_KEY:}
+    model: ${VOYAGE_MODEL:voyage-4-lite}
+    url: ${VOYAGE_URL:https://api.voyageai.com/v1/embeddings}
+    dimension: 1024
+
+---
+spring:
+  config:
+    activate:
+      on-profile: h2
+  datasource:
+    url: jdbc:h2:file:./data/ai-crm;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true

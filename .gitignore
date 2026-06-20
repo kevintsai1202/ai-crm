@@ -1,0 +1,28 @@
+# === 環境變數與機密（含 OpenAI / Voyage 金鑰），嚴禁提交 ===
+.env
+.env.*
+!.env.example
+
+# === 日誌檔（可能夾帶機密設定值）===
+*.log
+
+# === 後端 Maven 建置產物 ===
+target/
+backend/target/
+
+# === 前端 Node / Vite 建置產物 ===
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
+
+# === IDE / 編輯器 ===
+.idea/
+.run/
+*.iml
+.vscode/
+
+# === 作業系統 ===
+Thumbs.db
+.DS_Store

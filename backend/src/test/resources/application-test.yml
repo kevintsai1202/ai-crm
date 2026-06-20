@@ -1,0 +1,16 @@
+# SP3 測試 profile：DB 由 Testcontainers Postgres(@ServiceConnection) 注入；空金鑰強制 fallback
+spring:
+  main:
+    # 允許測試以同名 bean 覆寫（RagRelevanceTest 用 fake EmbeddingClient 覆寫 voyageEmbeddingClient）
+    allow-bean-definition-overriding: true
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  ai:
+    openai:
+      api-key: ""
+app:
+  voyage:
+    api-key: ""

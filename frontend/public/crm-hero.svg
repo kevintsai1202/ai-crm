@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-label="AI CRM 工作台插圖">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#16324f"/>
+      <stop offset="1" stop-color="#0b6b5d"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" x2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#d7f7ef" stop-opacity=".88"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <rect x="90" y="72" width="780" height="396" rx="22" fill="#ecfbf8" opacity=".14"/>
+  <rect x="126" y="108" width="250" height="312" rx="18" fill="url(#card)"/>
+  <rect x="410" y="108" width="424" height="142" rx="18" fill="url(#card)"/>
+  <rect x="410" y="278" width="190" height="142" rx="18" fill="url(#card)"/>
+  <rect x="630" y="278" width="204" height="142" rx="18" fill="url(#card)"/>
+  <circle cx="174" cy="154" r="22" fill="#12b981"/>
+  <rect x="212" y="140" width="112" height="12" rx="6" fill="#0f2337" opacity=".86"/>
+  <rect x="212" y="164" width="86" height="10" rx="5" fill="#0f2337" opacity=".42"/>
+  <path d="M158 226h180M158 270h160M158 314h185M158 358h124" stroke="#0f2337" stroke-width="14" stroke-linecap="round" opacity=".28"/>
+  <path d="M454 152h190M454 190h318" stroke="#0f2337" stroke-width="16" stroke-linecap="round" opacity=".32"/>
+  <path d="M462 354c36-42 62-34 92-70 34-42 75 16 23 66-28 27-74 42-115 4z" fill="#12b981" opacity=".72"/>
+  <path d="M676 372l38-76 36 52 28-30 22 54" fill="none" stroke="#0f2337" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" opacity=".42"/>
+  <circle cx="780" cy="144" r="20" fill="#f7b955"/>
+  <circle cx="740" cy="144" r="20" fill="#12b981"/>
+  <circle cx="700" cy="144" r="20" fill="#ef5b5b"/>
+</svg>
+

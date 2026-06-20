@@ -1,0 +1,307 @@
+export type Role = "SALES" | "MANAGER" | "ADMIN";
+export type CustomerStatus = "ACTIVE" | "INACTIVE" | "LEVERAGED";
+export type InteractionType = "PHONE" | "MEETING" | "EMAIL" | "SUPPORT_TICKET";
+export type OpportunityStage = "QUALIFICATION" | "PROPOSAL" | "NEGOTIATION" | "CLOSED_WON" | "CLOSED_LOST";
+
+export interface UserResponse {
+  id: number;
+  username: string;
+  displayName: string;
+  role: Role;
+}
+
+/** 可指派的負責業務選項（帳號 id + 顯示名稱）。 */
+export interface OwnerOption {
+  id: number;
+  displayName: string;
+}
+
+/** 新增客戶表單下拉選項：現有的不重複產業與可指派的負責業務（SALES 帳號）清單。 */
+export interface CustomerOptionsResponse {
+  industries: string[];
+  owners: OwnerOption[];
+}
+
+/** 管理員視角的帳號資料（含啟用狀態與建立時間）。 */
+export interface AdminUser {
+  id: number;
+  username: string;
+  displayName: string;
+  role: Role;
+  enabled: boolean;
+  createdAt: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: UserResponse;
+}
+
+export interface HealthResponse {
+  status: "UP" | string;
+  timestamp: string;
+  features: Record<string, string>;
+}
+
+export interface PageResponse<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface CustomerSummary {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  taxId: string;
+  industry: string;
+  ownerName: string;
+  status: CustomerStatus;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  renewalDueDate: string | null;
+  lastInteractionAt: string | null;
+  opportunityAmount: number;
+}
+
+export interface ContactResponse {
+  id: number;
+  name: string;
+  title: string;
+  email: string;
+}
+
+export interface InteractionResponse {
+  id: number;
+  type: InteractionType;
+  occurredAt: string;
+  content: string;
+  /** 情緒分析結果：POSITIVE / NEUTRAL / NEGATIVE（SP6），未分析時為 null。 */
+  sentiment?: string | null;
+  /** 意圖分類結果（SP6 intent enum），未分析或無意圖時為 null。 */
+  intent?: string | null;
+}
+
+export interface OpportunityResponse {
+  id: number;
+  name: string;
+  stage: OpportunityStage;
+  amount: number;
+  expectedCloseDate: string | null;
+  type: string;
+}
+
+export interface CustomerDetail {
+  customer: CustomerSummary;
+  contacts: ContactResponse[];
+  interactions: InteractionResponse[];
+  opportunities: OpportunityResponse[];
+}
+
+export interface DashboardSummary {
+  customerCount: number;
+  activeOpportunityCount: number;
+  opportunityAmount: number;
+  highRiskCount: number;
+}
+
+export interface StageReport {
+  stage: OpportunityStage;
+  count: number;
+  amount: number;
+}
+
+export interface MoneyChartPoint {
+  label: string;
+  amount: number;
+  count: number;
+}
+
+export interface ChartPoint {
+  label: string;
+  value: number;
+}
+
+export interface OwnerReport {
+  ownerName: string;
+  customerCount: number;
+  opportunityAmount: number;
+  highRiskCount: number;
+}
+
+export interface ActivityReport {
+  customerId: number;
+  customerName: string;
+  type: InteractionType;
+  occurredAt: string;
+  content: string;
+}
+
+export interface DrilldownItem {
+  customerId: number;
+  customerName: string;
+  industry: string;
+  ownerName: string;
+  riskLevel: string | null;
+  title: string | null;
+  stage: string | null;
+  amount: number;
+  date: string | null;
+  status: string | null;
+}
+
+export interface DrilldownResponse {
+  type: string;
+  key: string;
+  label: string;
+  totalAmount: number;
+  count: number;
+  items: DrilldownItem[];
+}
+
+export interface DashboardReports {
+  pipelineByStage: StageReport[];
+  monthlyForecast: MoneyChartPoint[];
+  industryBreakdown: MoneyChartPoint[];
+  riskBreakdown: ChartPoint[];
+  ownerLeaderboard: OwnerReport[];
+  renewalForecast: MoneyChartPoint[];
+  recentActivities: ActivityReport[];
+}
+
+/** RFM 客戶分群單筆：R/F/M 原始值、各維 1-5 分與分群標籤。 */
+export interface RfmResponse {
+  customerId: number;
+  name: string;
+  recencyDays: number;
+  frequency: number;
+  monetary: number;
+  rScore: number;
+  fScore: number;
+  mScore: number;
+  segment: string;
+}
+
+/** 意圖分布單筆（SP6）：意圖名稱與筆數。 */
+export interface IntentCount {
+  intent: string;
+  count: number;
+}
+
+/** 月情緒趨勢單點（SP6）：月份 yyyy-MM 與三種情緒筆數。 */
+export interface SentimentTrendPoint {
+  month: string;
+  positive: number;
+  neutral: number;
+  negative: number;
+}
+
+/** 高風險互動單筆（SP6）：NEGATIVE 且意圖為流失 / 客訴。 */
+export interface HighRiskInteraction {
+  customerId: number;
+  customerName: string;
+  occurredAt: string;
+  type: string;
+  intent: string;
+  sentiment: string;
+  content: string;
+}
+
+/** 流失雷達單筆（SP6）：負面 / 流失訊號 / 客訴計數與加權分數。 */
+export interface ChurnRadarItem {
+  customerId: number;
+  name: string;
+  negativeCount: number;
+  churnSignalCount: number;
+  complaintCount: number;
+  score: number;
+}
+
+/** 優先關懷單筆（SP6）：客戶與中文關懷理由。 */
+export interface PriorityCareItem {
+  customerId: number;
+  name: string;
+  reason: string;
+}
+
+/** 情緒意圖雷達聚合結果（SP6），含 5 區塊。 */
+export interface SentimentRadarResponse {
+  intentDistribution: IntentCount[];
+  sentimentTrend: SentimentTrendPoint[];
+  highRiskInteractions: HighRiskInteraction[];
+  churnRadar: ChurnRadarItem[];
+  priorityCare: PriorityCareItem[];
+}
+
+export interface CitationResponse {
+  title: string;
+  docType: string;
+  content: string;
+  similarity: number;
+}
+
+export interface RiskResponse {
+  churnRisk: number;
+  renewalDelayRisk: number;
+  reasons: string[];
+}
+
+export interface ChatResponse {
+  answer: string;
+  citations: CitationResponse[];
+  risk: RiskResponse;
+  /** AI 呼叫紀錄 id，供採納/拒絕回饋使用（SP4）。 */
+  callId?: number | null;
+}
+
+export interface PortfolioAssessment {
+  assessment: string;
+  customerCount: number;
+  highRiskCount: number;
+  totalPipeline: number;
+  activeOpportunityCount: number;
+  /** AI 呼叫紀錄 id，供採納/拒絕回饋使用（SP4）。 */
+  callId?: number | null;
+}
+
+/** AI 用量彙總（SP4，MANAGER/ADMIN 可見）。 */
+export interface UsageSummaryResponse {
+  totalCalls: number;
+  totalTokens: number;
+  realCalls: number;
+  fallbackCalls: number;
+  adopted: number;
+  rejected: number;
+}
+
+export interface AgentStepResponse {
+  order: number;
+  action: string;
+  status: string;
+  durationMs: number;
+  input: string;
+  output: string;
+}
+
+export interface AgentTraceResponse {
+  customerId: number;
+  route: string;
+  finalRecommendation: string;
+  steps: AgentStepResponse[];
+}
+
+/** 下鑽來源（由儀表板 navigate 帶入 location state），供客戶頁麵包屑與返回定位使用（SP7）。 */
+export interface DrilldownSource {
+  from: "dashboard";
+  /** 來源區塊中文名，如「流失雷達」 */
+  section: string;
+  /** 來源區塊 id，返回時用於捲動定位（對應 DashboardPage 區塊容器 id="block-{blockId}"） */
+  blockId: string;
+}
+
+/** 儀表板版面回應（SP7）：可見區塊有序 id 陣列；尚未設定時 visibleOrder 為 null。 */
+export interface DashboardLayoutResponse {
+  visibleOrder: string[] | null;
+}
