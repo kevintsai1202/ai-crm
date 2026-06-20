@@ -123,60 +123,134 @@ public class InsightService {
     }
 
     /**
-     * 以 SSE 串流推送 AI 聊天回答（打字機效果），answer 先產生再逐字送出。
+     * 以 SSE 真串流推送 AI 聊天回答：直接把 LLM 逐塊產生的 token 轉送前端，不再「先全產生再逐字慢吐」。
+     *
+     * <p>函式級註解：舊版用固定 60 秒 emitter + 每字 {@code sleep(40ms)} 的假打字機，回答一旦超過約 1500 字
+     * 就會在吐到一半時逾時失敗。改為 Spring AI {@code ChatClient.stream()} 真串流後，token 邊產生邊送，
+     * 回答越長反而越快吐完，徹底消除逾時。</p>
+     *
+     * <p><b>執行緒/交易注意</b>：Reactor 的 subscribe callback 會在另一條執行緒、且本方法的 readOnly 交易
+     * 結束後才執行，故所有需要存取 entity LAZY 關聯的計算（grounding context、deterministic fallback 文字）
+     * 都必須在 subscribe「之前」就在交易內算成純字串；callback 內只使用 String / record DTO / Long，
+     * 避免 {@code LazyInitializationException}。{@link AiGovernanceService#record} 與
+     * {@link ChatMemoryService#save} 皆為 {@code REQUIRES_NEW}，於 callback 執行緒呼叫安全。</p>
      *
      * @param request 聊天請求
      * @return SseEmitter 串流發送器
      */
     public SseEmitter streamChat(Dtos.ChatRequest request) {
-        SseEmitter emitter = new SseEmitter(60000L);
+        // 設 5 分鐘逾時作為「卡住保險絲」：真串流下 token 持續流動，正常回答遠在此之前完成
+        SseEmitter emitter = new SseEmitter(300_000L);
 
-        var customer = customers.findDetail(request.customerId());
+        final Long customerId = request.customerId();
+        final String userMessage = request.message();
+        var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
-        var citations = loadCitations(request.message());
+        var citations = loadCitations(userMessage);
         // 順序：先 recall（不含本則）→ 產生 answer → 再 save 本輪，避免把本則當記憶
-        var memory = chatMemory.recall(request.customerId(), request.message());
-        // 先完整產生回答（真 LLM 或 fallback），再以既有打字機機制推送，保持 SSE 協定不變
-        // buildAnswer 內部已透過 callLlm 寫一次 ai_call_log（含 fallback），故串流不再重複記錄
-        var result = buildAnswer(AiCallType.CHAT, customer, risk, citations, memory, request.message());
-        var answer = result.answer();
-        chatMemory.save(request.customerId(), ChatRole.USER, request.message());
-        chatMemory.save(request.customerId(), ChatRole.ASSISTANT, answer);
+        var memory = chatMemory.recall(customerId, userMessage);
+        // 在交易內先把 deterministic fallback 文字算好（會讀 customer LAZY 關聯），供 callback 執行緒安全使用
+        final String fallbackAnswer = deterministicAnswer(customer, risk);
 
-        // 啟動非同步執行緒進行打字機效果推送
-        new Thread(() -> {
-            try {
-                // 1. 推送 answer (逐字發送)
-                for (int i = 0; i < answer.length(); i++) {
-                    String delta = String.valueOf(answer.charAt(i));
-                    emitter.send(SseEmitter.event().data(Map.of("type", "content", "delta", delta)));
-                    Thread.sleep(40);
-                }
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        if (chatModel == null) {
+            // 無金鑰：deterministic fallback，一次送出完整回答後結束
+            var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
+            chatMemory.save(customerId, ChatRole.USER, userMessage);
+            chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
+            sendContent(emitter, fallbackAnswer);
+            sendTailAndComplete(emitter, citations, risk, saved.getId());
+            return emitter;
+        }
 
-                // 2. 推送 citations 引用
-                emitter.send(SseEmitter.event().data(Map.of("type", "citations", "citations", citations)));
-                Thread.sleep(100);
+        var prompt = buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+        var fullAnswer = new StringBuilder();
+        var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
 
-                // 3. 推送 risk 風險分析
-                emitter.send(SseEmitter.event().data(Map.of("type", "risk", "risk", risk)));
-                Thread.sleep(100);
-
-                // 4. 推送 callId（供前端對此筆 AI 回答送出採納/拒絕回饋）
-                if (result.callId() != null) {
-                    emitter.send(SseEmitter.event().data(Map.of("type", "callId", "callId", result.callId())));
-                    Thread.sleep(50);
-                }
-
-                // 5. 發送完成標記 [DONE]
-                emitter.send(SseEmitter.event().data("[DONE]"));
-
-                emitter.complete();
-            } catch (Exception e) {
-                emitter.completeWithError(e);
-            }
-        }).start();
+        // 真串流：逐塊 token 邊到邊送
+        ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt).stream().chatResponse()
+                .subscribe(
+                        chatResponse -> {
+                            lastResponse.set(chatResponse);
+                            var result = chatResponse.getResult();
+                            var text = result == null ? null : result.getOutput().getText();
+                            if (text != null && !text.isEmpty()) {
+                                fullAnswer.append(text);
+                                sendContent(emitter, text);
+                            }
+                        },
+                        error -> {
+                            // 串流中途失敗（金鑰無效、額度、網路）→ 改用 deterministic fallback 保底，仍回傳完整答案
+                            log.warn("OpenAI 串流呼叫失敗，customerId={}，改用 deterministic fallback：{}", customerId, error.getMessage());
+                            var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
+                            chatMemory.save(customerId, ChatRole.USER, userMessage);
+                            chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
+                            sendContent(emitter, fallbackAnswer);
+                            sendTailAndComplete(emitter, citations, risk, saved.getId());
+                        },
+                        () -> {
+                            // 串流完成：寫 ai_call_log、存記憶、補送 citations/risk/callId/[DONE]
+                            var answer = fullAnswer.toString().strip();
+                            if (answer.isBlank()) {
+                                // 串流回空白：fallback 內容已未送出，補送完整 fallback 後收尾
+                                var saved = aiGovernance.record(AiCallType.CHAT, customerId, null, 0, 0, 0, false, true, fallbackAnswer);
+                                chatMemory.save(customerId, ChatRole.USER, userMessage);
+                                chatMemory.save(customerId, ChatRole.ASSISTANT, fallbackAnswer);
+                                sendContent(emitter, fallbackAnswer);
+                                sendTailAndComplete(emitter, citations, risk, saved.getId());
+                                return;
+                            }
+                            var metadata = lastResponse.get() == null ? null : lastResponse.get().getMetadata();
+                            var usage = metadata == null ? null : metadata.getUsage();
+                            var model = metadata == null ? null : metadata.getModel();
+                            Integer pt = usage == null ? null : usage.getPromptTokens();
+                            Integer ct = usage == null ? null : usage.getCompletionTokens();
+                            Integer tt = usage == null ? null : usage.getTotalTokens();
+                            var saved = aiGovernance.record(AiCallType.CHAT, customerId, model, pt, ct, tt, true, true, answer);
+                            chatMemory.save(customerId, ChatRole.USER, userMessage);
+                            chatMemory.save(customerId, ChatRole.ASSISTANT, answer);
+                            sendTailAndComplete(emitter, citations, risk, saved.getId());
+                        }
+                );
 
         return emitter;
+    }
+
+    /**
+     * 推送一段內容 delta（以 Map 送出，JSON 序列化會自動轉義換行，不破壞 SSE 協定）。
+     * 傳送失敗（多半是 client 已斷線）即結束串流。
+     *
+     * @param emitter SSE 發送器
+     * @param delta 內容片段
+     */
+    private void sendContent(SseEmitter emitter, String delta) {
+        try {
+            emitter.send(SseEmitter.event().data(Map.of("type", "content", "delta", delta)));
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    /**
+     * 補送串流尾段：引用、風險、callId，最後送 [DONE] 並關閉串流。
+     *
+     * @param emitter SSE 發送器
+     * @param citations RAG 引用
+     * @param risk 風險評分
+     * @param callId AI 呼叫紀錄 id（供前端送採納/拒絕回饋；可為 null）
+     */
+    private void sendTailAndComplete(SseEmitter emitter, List<Dtos.CitationResponse> citations, Dtos.RiskResponse risk, Long callId) {
+        try {
+            emitter.send(SseEmitter.event().data(Map.of("type", "citations", "citations", citations)));
+            emitter.send(SseEmitter.event().data(Map.of("type", "risk", "risk", risk)));
+            if (callId != null) {
+                emitter.send(SseEmitter.event().data(Map.of("type", "callId", "callId", callId)));
+            }
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
     }
 
     /**
