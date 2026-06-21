@@ -16,7 +16,7 @@ class JwtServiceTest {
 
     /** 以固定密鑰與 Jackson 3 ObjectMapper 建立受測服務。 */
     private JwtService newService(long ttlSeconds) {
-        return new JwtService("test-secret-please-change", ttlSeconds, new ObjectMapper());
+        return new JwtService("test-secret-please-change-0123456789", ttlSeconds, new ObjectMapper());
     }
 
     /** 建立帶 id 的測試使用者（id 以反射設定，避免 issue() 的 Map.of NPE）。 */
