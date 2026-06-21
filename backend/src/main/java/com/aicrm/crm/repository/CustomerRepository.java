@@ -36,4 +36,12 @@ public interface CustomerRepository extends JpaRepository<Customer, Long>, JpaSp
      */
     @Query("select distinct c.ownerName from Customer c where c.ownerName <> '' order by c.ownerName")
     List<String> findDistinctOwners();
+
+    /**
+     * 取得尚未回填風險等級的客戶 ID（供啟動補算）。
+     *
+     * @return risk_level 為 null 的客戶 ID 清單
+     */
+    @Query("select c.id from Customer c where c.riskLevel is null")
+    List<Long> findIdsByRiskLevelIsNull();
 }
