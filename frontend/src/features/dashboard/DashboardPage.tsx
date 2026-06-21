@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchAiUsage, fetchDashboard, fetchDashboardLayout, fetchDashboardReports, fetchDrilldown, fetchPortfolioAssessment, fetchRfm, fetchSentimentRadar, generateDemoData, saveDashboardLayout } from "../../api";
-import type { DashboardReports, DashboardSummary, DrilldownResponse, DrilldownSource, RfmResponse, SentimentRadarResponse, UsageSummaryResponse } from "../../types";
+import { fetchAiUsage, fetchDashboard, fetchDashboardLayout, fetchDashboardReports, fetchDrilldown, fetchPortfolioAssessment, fetchPortfolioCalls, fetchRfm, fetchSentimentRadar, generateDemoData, saveDashboardLayout } from "../../api";
+import type { AiCallHistoryItem, DashboardReports, DashboardSummary, DrilldownResponse, DrilldownSource, RfmResponse, SentimentRadarResponse, UsageSummaryResponse } from "../../types";
 import { formatMoney } from "../../lib/format";
 import { useAuth } from "../../context/AuthContext";
 import { AiBadge } from "../../components/common/AiBadge";
+import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { DrilldownModal } from "../../components/common/DrilldownModal";
 import { kpiBlocks } from "./components/DashboardCards";
@@ -38,6 +39,10 @@ export function DashboardPage() {
   const [usage, setUsage] = useState<UsageSummaryResponse | null>(null);
   // 產生示範資料的進行中旗標（僅 ADMIN 使用），用於禁用按鈕與顯示「產生中…」
   const [generatingDemo, setGeneratingDemo] = useState(false);
+  // 全公司評估 AI 歷程彈窗
+  const [portfolioHistoryOpen, setPortfolioHistoryOpen] = useState(false);
+  const [portfolioCalls, setPortfolioCalls] = useState<AiCallHistoryItem[]>([]);
+  const [portfolioCallsLoading, setPortfolioCallsLoading] = useState(false);
   const { user } = useAuth();
   // AI 用量治理僅 MANAGER / ADMIN 可見（後端亦以 RBAC 限制，前端避免發出註定 403 的請求）
   const canSeeUsage = user?.role === "MANAGER" || user?.role === "ADMIN";
@@ -172,6 +177,20 @@ export function DashboardPage() {
     }
   }
 
+  /** 開啟全公司評估的 AI 歷程。 */
+  async function openPortfolioHistory() {
+    setPortfolioHistoryOpen(true);
+    setPortfolioCallsLoading(true);
+    try {
+      setPortfolioCalls(await fetchPortfolioCalls());
+    } catch (e) {
+      console.error("讀取全公司評估 AI 歷程失敗:", e);
+      setPortfolioCalls([]);
+    } finally {
+      setPortfolioCallsLoading(false);
+    }
+  }
+
   /** 產生示範資料（ADMIN）：生成 200 位客戶樣本後重新載入儀表板資料。 */
   async function handleGenerateDemo() {
     setGeneratingDemo(true);
@@ -284,6 +303,7 @@ export function DashboardPage() {
             </button>
           ) : null}
           <button type="button" className="btn-assess topbar-assess" onClick={openPortfolioAssessment}>📊 整體評估（全公司）<AiBadge onDark /></button>
+          <button type="button" className="btn-secondary" onClick={openPortfolioHistory}>🕘 AI 歷程</button>
         </div>
       </section>
 
@@ -320,6 +340,14 @@ export function DashboardPage() {
       </GridLayout>
 
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
+      {portfolioHistoryOpen ? (
+        <AiCallHistoryModal
+          title="全公司評估 AI 歷程"
+          calls={portfolioCalls}
+          loading={portfolioCallsLoading}
+          onClose={() => setPortfolioHistoryOpen(false)}
+        />
+      ) : null}
       {drilldown?.open ? <DrilldownModal state={drilldown} onSelectCustomer={(id) => jumpToCustomer(id, { from: "dashboard", section: drilldown.title, blockId: "reports" })} onClose={closeDrilldown} /> : null}
       {drawerOpen ? (
         <LayoutDrawer hiddenBlocks={hiddenBlocks.map((b) => ({ id: b.id, title: b.title }))} onAdd={addBlock} onReset={resetLayout} onClose={() => setDrawerOpen(false)} />
