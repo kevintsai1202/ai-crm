@@ -109,7 +109,7 @@ public class ManagerInsightService {
         var data = analytics.analytics();
         var prompt = buildTeamPrompt(data);
         var fallback = deterministicTeam(data);
-        var result = callLlm(AiCallType.TEAM_ANALYSIS, prompt, fallback);
+        var result = callLlm(AiCallType.TEAM_ANALYSIS, null, prompt, fallback);
         var saved = upsert("TEAM", null, result.answer(), result.model());
         return toResponse(saved);
     }
@@ -130,7 +130,7 @@ public class ManagerInsightService {
         }
         var prompt = buildOwnerPrompt(owner, ownerCustomers);
         var fallback = deterministicOwner(owner, ownerCustomers);
-        var result = callLlm(AiCallType.OWNER_COACHING, prompt, fallback);
+        var result = callLlm(AiCallType.OWNER_COACHING, owner, prompt, fallback);
         var saved = upsert("OWNER", owner, result.answer(), result.model());
         return toResponse(saved);
     }
@@ -145,14 +145,15 @@ public class ManagerInsightService {
      * 呼叫 LLM；無金鑰、回空白或例外皆 fallback。每次（含 fallback）寫 ai_call_log（customerId 為 null）。
      *
      * @param type 呼叫類型
+     * @param subject 分群鍵（OWNER_COACHING 存 ownerName；TEAM_ANALYSIS 傳 null）
      * @param userPrompt 使用者提示詞（已含 grounding context）
      * @param fallbackAnswer deterministic 保底答案
      * @return 答案與模型名
      */
-    private LlmResult callLlm(AiCallType type, String userPrompt, String fallbackAnswer) {
+    private LlmResult callLlm(AiCallType type, String subject, String userPrompt, String fallbackAnswer) {
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
         if (chatModel == null) {
-            aiGovernance.record(type, null, null, 0, 0, 0, false, true, fallbackAnswer);
+            aiGovernance.record(type, null, subject, null, 0, 0, 0, false, true, fallbackAnswer);
             return new LlmResult(fallbackAnswer, null);
         }
         try {
@@ -161,7 +162,7 @@ public class ManagerInsightService {
             var content = chatResponse == null ? null : chatResponse.getResult().getOutput().getText();
             if (content == null || content.isBlank()) {
                 log.warn("OpenAI {} 回傳空白，改用 fallback", type);
-                aiGovernance.record(type, null, null, 0, 0, 0, false, true, fallbackAnswer);
+                aiGovernance.record(type, null, subject, null, 0, 0, 0, false, true, fallbackAnswer);
                 return new LlmResult(fallbackAnswer, null);
             }
             var metadata = chatResponse.getMetadata();
@@ -171,11 +172,11 @@ public class ManagerInsightService {
             Integer ct = usage == null ? null : usage.getCompletionTokens();
             Integer tt = usage == null ? null : usage.getTotalTokens();
             var answer = content.strip();
-            aiGovernance.record(type, null, model, pt, ct, tt, true, true, answer);
+            aiGovernance.record(type, null, subject, model, pt, ct, tt, true, true, answer);
             return new LlmResult(answer, model);
         } catch (Exception e) {
             log.warn("OpenAI {} 呼叫失敗，改用 fallback：{}", type, e.getMessage());
-            aiGovernance.record(type, null, null, 0, 0, 0, false, true, fallbackAnswer);
+            aiGovernance.record(type, null, subject, null, 0, 0, 0, false, true, fallbackAnswer);
             return new LlmResult(fallbackAnswer, null);
         }
     }

@@ -122,4 +122,32 @@ public class AiGovernanceService {
                         c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
                 .toList();
     }
+
+    /**
+     * 依類型列出無客戶、無 subject 的 AI 呼叫歷程（TEAM_ANALYSIS / PORTFOLIO）。
+     *
+     * @param type 呼叫類型
+     * @return AI 呼叫歷史清單（新到舊）
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<Dtos.AiCallHistoryItem> historyByType(AiCallType type) {
+        return callLogRepository.findByCallTypeAndCustomerIdIsNullAndSubjectIsNullOrderByCreatedAtDesc(type).stream()
+                .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                        c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+                .toList();
+    }
+
+    /**
+     * 列出指定業務的 OWNER_COACHING AI 呼叫歷程。
+     *
+     * @param ownerName 業務顯示名稱（subject）
+     * @return AI 呼叫歷史清單（新到舊）
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<Dtos.AiCallHistoryItem> historyByOwner(String ownerName) {
+        return callLogRepository.findByCallTypeAndSubjectOrderByCreatedAtDesc(AiCallType.OWNER_COACHING, ownerName).stream()
+                .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                        c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+                .toList();
+    }
 }
