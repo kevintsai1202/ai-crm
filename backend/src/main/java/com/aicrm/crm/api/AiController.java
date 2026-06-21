@@ -95,6 +95,16 @@ public class AiController {
     }
 
     /**
+     * 列出全公司 Portfolio 評估的 AI 歷程（PORTFOLIO）。
+     *
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/portfolio/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> portfolioCalls() {
+        return aiGovernanceService.historyByType(com.aicrm.crm.domain.AiCallType.PORTFOLIO);
+    }
+
+    /**
      * 重建知識庫向量索引（限 ADMIN）。
      *
      * @return 重建筆數

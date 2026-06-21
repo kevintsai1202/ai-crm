@@ -1,5 +1,6 @@
 package com.aicrm.crm.api;
 
+import com.aicrm.crm.service.AiGovernanceService;
 import com.aicrm.crm.service.ManagerInsightService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,8 +21,12 @@ public class ManagerInsightController {
     /** AI 分析服務。 */
     private final ManagerInsightService service;
 
-    public ManagerInsightController(ManagerInsightService service) {
+    /** AI 治理服務：查詢 AI 呼叫歷程。 */
+    private final AiGovernanceService governance;
+
+    public ManagerInsightController(ManagerInsightService service, AiGovernanceService governance) {
         this.service = service;
+        this.governance = governance;
     }
 
     /**
@@ -66,5 +71,26 @@ public class ManagerInsightController {
     @PostMapping("/owner")
     public Dtos.ManagerInsightResponse generateOwner(@RequestParam String owner) {
         return service.generateOwnerInsight(owner);
+    }
+
+    /**
+     * 列出團隊診斷的 AI 歷程（TEAM_ANALYSIS）。
+     *
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/team/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> teamCalls() {
+        return governance.historyByType(com.aicrm.crm.domain.AiCallType.TEAM_ANALYSIS);
+    }
+
+    /**
+     * 列出指定業務的 coaching AI 歷程（OWNER_COACHING）。
+     *
+     * @param owner 業務顯示名稱
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/owner/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> ownerCalls(@RequestParam String owner) {
+        return governance.historyByOwner(owner);
     }
 }

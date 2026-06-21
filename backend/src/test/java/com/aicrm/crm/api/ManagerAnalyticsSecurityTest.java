@@ -68,4 +68,18 @@ class ManagerAnalyticsSecurityTest extends PostgresTestBase {
         mockMvc().perform(get("/api/manager/insights/team").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void sales_isForbidden_onTeamCalls() throws Exception {
+        var token = login("sales@aurora.local");
+        mockMvc().perform(get("/api/manager/insights/team/calls").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void manager_canAccessTeamCalls() throws Exception {
+        var token = login("manager@aurora.local");
+        mockMvc().perform(get("/api/manager/insights/team/calls").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
 }
