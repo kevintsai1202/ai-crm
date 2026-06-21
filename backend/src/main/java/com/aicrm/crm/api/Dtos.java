@@ -220,6 +220,78 @@ public final class Dtos {
 
     public record OwnerReport(String ownerName, long customerCount, BigDecimal opportunityAmount, long highRiskCount) {}
 
+    /**
+     * 單一業務的績效統計（模組 B）。
+     *
+     * @param ownerId 業務帳號 id（舊資料可能為 null）
+     * @param ownerName 業務顯示名稱（分組鍵）
+     * @param customerCount 負責客戶數
+     * @param highRiskCount 高風險客戶數
+     * @param pipelineAmount 進行中商機金額（非 CLOSED_WON/CLOSED_LOST）
+     * @param activeOpportunityCount 進行中商機數
+     * @param wonAmount 已成交金額（CLOSED_WON）
+     * @param wonCount 已成交件數
+     * @param winRate 成交率 = won /（won + lost），無已關閉商機時為 0
+     * @param avgDaysSinceInteraction 客戶最後互動距今天數平均（無互動客戶不計；全無則 null）
+     * @param avgSentimentScore 客戶情緒分數平均（無分析則 null）
+     * @param renewalsThisMonth 本月續約到期客戶數
+     * @param renewalsThisQuarter 本季續約到期客戶數
+     */
+    public record OwnerStats(
+            Long ownerId,
+            String ownerName,
+            long customerCount,
+            long highRiskCount,
+            BigDecimal pipelineAmount,
+            long activeOpportunityCount,
+            BigDecimal wonAmount,
+            long wonCount,
+            double winRate,
+            Double avgDaysSinceInteraction,
+            Double avgSentimentScore,
+            long renewalsThisMonth,
+            long renewalsThisQuarter
+    ) {}
+
+    /**
+     * 團隊總覽（模組 B），供統計頁頂部 KPI 列。
+     *
+     * @param totalCustomers 全部客戶數
+     * @param totalWonAmount 全團隊成交金額
+     * @param totalPipeline 全團隊進行中商機金額
+     * @param totalHighRisk 全團隊高風險客戶數
+     * @param avgWinRate 各業務成交率的平均
+     * @param ownerCount 業務人數
+     */
+    public record TeamSummary(
+            long totalCustomers,
+            BigDecimal totalWonAmount,
+            BigDecimal totalPipeline,
+            long totalHighRisk,
+            double avgWinRate,
+            int ownerCount
+    ) {}
+
+    /** Manager 業務分析回應：團隊總覽 + 各業務統計（依成交金額降序）。 */
+    public record ManagerAnalyticsResponse(TeamSummary team, List<OwnerStats> owners) {}
+
+    /**
+     * Manager AI 分析回應（模組 C）：團隊診斷或個別業務 coaching 的快取/生成結果。
+     *
+     * @param scope 範圍（TEAM / OWNER）
+     * @param ownerName 業務名（TEAM 時為 null）
+     * @param content Markdown 報告內容
+     * @param model 產出模型名（deterministic fallback 時為 null）
+     * @param generatedAt 產出時間
+     */
+    public record ManagerInsightResponse(
+            String scope,
+            String ownerName,
+            String content,
+            String model,
+            Instant generatedAt
+    ) {}
+
     public record ActivityReport(Long customerId, String customerName, InteractionType type, LocalDateTime occurredAt, String content) {}
 
     public record DrilldownItem(

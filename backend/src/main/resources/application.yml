@@ -57,6 +57,11 @@ app:
     model: ${VOYAGE_MODEL:voyage-4-lite}
     url: ${VOYAGE_URL:https://api.voyageai.com/v1/embeddings}
     dimension: 1024
+  # 風險等級每日重算排程：預設啟用；風險等級依賴當天日期，不每日更新會失準。
+  # 以環境變數 APP_RISK_DAILY_RECOMPUTE_ENABLED=false 可關閉。
+  risk:
+    daily-recompute:
+      enabled: ${APP_RISK_DAILY_RECOMPUTE_ENABLED:true}
 
 ---
 spring:

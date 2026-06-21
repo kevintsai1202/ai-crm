@@ -2107,3 +2107,15 @@ button.renewal-bar.clickable:hover {
   color: #5e7280;
   font-weight: 500;
 }
+
+/* 業務分析頁：團隊 KPI 列 */
+.team-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: var(--panel-bg, #fff); border: 1px solid var(--border, #e5e7eb); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.kpi-label { font-size: 12px; color: var(--muted, #6b7280); }
+.kpi-value { font-size: 22px; font-weight: 700; }
+/* 區塊標題列 */
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+.ai-insight-actions { display: flex; align-items: center; gap: 12px; }
+.ai-insight-meta { color: var(--muted, #6b7280); }
+.row-selected { background: var(--row-selected, #eef2ff); }
+.report-markdown { line-height: 1.7; }

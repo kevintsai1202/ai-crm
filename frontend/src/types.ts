@@ -316,3 +316,50 @@ export interface DrilldownSource {
 export interface DashboardLayoutResponse {
   visibleOrder: string[] | null;
 }
+
+/** 單一業務績效統計（模組 B，對應後端 Dtos.OwnerStats）。 */
+export interface OwnerStats {
+  ownerId: number | null;
+  ownerName: string;
+  customerCount: number;
+  highRiskCount: number;
+  pipelineAmount: number;
+  activeOpportunityCount: number;
+  wonAmount: number;
+  wonCount: number;
+  /** 成交率 0~1。 */
+  winRate: number;
+  /** 平均互動間隔天數（全無互動則 null）。 */
+  avgDaysSinceInteraction: number | null;
+  /** 平均情緒分數（無分析則 null）。 */
+  avgSentimentScore: number | null;
+  renewalsThisMonth: number;
+  renewalsThisQuarter: number;
+}
+
+/** 團隊總覽（模組 B，對應後端 Dtos.TeamSummary）。 */
+export interface TeamSummary {
+  totalCustomers: number;
+  totalWonAmount: number;
+  totalPipeline: number;
+  totalHighRisk: number;
+  /** 各業務成交率平均 0~1。 */
+  avgWinRate: number;
+  ownerCount: number;
+}
+
+/** Manager 業務分析回應（模組 B）。 */
+export interface ManagerAnalyticsResponse {
+  team: TeamSummary;
+  owners: OwnerStats[];
+}
+
+/** Manager AI 分析回應（模組 C，對應後端 Dtos.ManagerInsightResponse）。 */
+export interface ManagerInsightResponse {
+  scope: "TEAM" | "OWNER";
+  ownerName: string | null;
+  content: string;
+  /** 產出模型；deterministic fallback 時為 null。 */
+  model: string | null;
+  generatedAt: string;
+}

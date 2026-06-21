@@ -1,0 +1,70 @@
+package com.aicrm.crm.api;
+
+import com.aicrm.crm.service.ManagerInsightService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Manager AI 分析 API（模組 C）：團隊整體診斷與個別業務 coaching。
+ * GET 讀快取（未生成回 204）；POST 點按生成（呼叫 LLM，無金鑰走 fallback）。
+ * 存取由 SecurityConfig 以 /api/manager/** → hasAnyRole("MANAGER","ADMIN") 保護。
+ */
+@RestController
+@RequestMapping("/api/manager/insights")
+public class ManagerInsightController {
+
+    /** AI 分析服務。 */
+    private final ManagerInsightService service;
+
+    public ManagerInsightController(ManagerInsightService service) {
+        this.service = service;
+    }
+
+    /**
+     * 讀團隊診斷快取；未生成回 204。
+     *
+     * @return 快取回應或 204
+     */
+    @GetMapping("/team")
+    public ResponseEntity<Dtos.ManagerInsightResponse> getTeam() {
+        var cached = service.getTeamInsight();
+        return cached == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(cached);
+    }
+
+    /**
+     * 生成團隊整體診斷（upsert 快取）。
+     *
+     * @return 生成後的回應
+     */
+    @PostMapping("/team")
+    public Dtos.ManagerInsightResponse generateTeam() {
+        return service.generateTeamInsight();
+    }
+
+    /**
+     * 讀個別業務 coaching 快取；未生成回 204。
+     *
+     * @param owner 業務顯示名稱
+     * @return 快取回應或 204
+     */
+    @GetMapping("/owner")
+    public ResponseEntity<Dtos.ManagerInsightResponse> getOwner(@RequestParam String owner) {
+        var cached = service.getOwnerInsight(owner);
+        return cached == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(cached);
+    }
+
+    /**
+     * 生成個別業務 coaching（upsert 快取）。
+     *
+     * @param owner 業務顯示名稱
+     * @return 生成後的回應
+     */
+    @PostMapping("/owner")
+    public Dtos.ManagerInsightResponse generateOwner(@RequestParam String owner) {
+        return service.generateOwnerInsight(owner);
+    }
+}

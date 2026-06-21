@@ -10,12 +10,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * AI CRM 後端啟動入口，負責載入 Spring Boot 與 JPA Auditing。
  */
 @EnableJpaAuditing
+@EnableScheduling
 @SpringBootApplication
 public class AiCrmApplication {
 
