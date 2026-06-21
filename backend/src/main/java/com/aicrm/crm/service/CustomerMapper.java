@@ -8,7 +8,6 @@ import com.aicrm.crm.domain.Opportunity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /**
@@ -39,7 +38,10 @@ public class CustomerMapper {
                 customer.getIndustry(),
                 customer.getOwnerName(),
                 customer.getStatus(),
-                calculateRiskLevel(customer, lastInteractionAt),
+                // 風險等級改讀已落地欄位；尚未回填(null)時即時計算當後備
+                customer.getRiskLevel() != null
+                        ? customer.getRiskLevel()
+                        : RiskLevelCalculator.calculate(lastInteractionAt, customer.getRenewalDueDate(), LocalDate.now()),
                 customer.getRenewalDueDate(),
                 lastInteractionAt,
                 amount
@@ -73,28 +75,6 @@ public class CustomerMapper {
                         .map(o -> new Dtos.OpportunityResponse(o.getId(), o.getName(), o.getStage(), o.getAmount(), o.getExpectedCloseDate(), o.getType()))
                         .toList()
         );
-    }
-
-    /**
-     * 依近期互動與續約日期計算前端顯示用風險等級。
-     *
-     * @param customer 客戶實體
-     * @param lastInteractionAt 最近互動時間
-     * @return HIGH / MEDIUM / LOW
-     */
-    private String calculateRiskLevel(Customer customer, LocalDateTime lastInteractionAt) {
-        if (lastInteractionAt == null) {
-            return "MEDIUM";
-        }
-        var days = ChronoUnit.DAYS.between(lastInteractionAt.toLocalDate(), LocalDate.now());
-        var renewalDueDate = customer.getRenewalDueDate();
-        if (days > 60 || (renewalDueDate != null && renewalDueDate.isBefore(LocalDate.now()))) {
-            return "HIGH";
-        }
-        if (days > 30) {
-            return "MEDIUM";
-        }
-        return "LOW";
     }
 }
 
