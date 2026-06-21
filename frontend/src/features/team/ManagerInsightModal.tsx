@@ -1,0 +1,126 @@
+import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  fetchTeamInsight,
+  generateTeamInsight,
+  fetchOwnerInsight,
+  generateOwnerInsight,
+  fetchTeamInsightCalls,
+  fetchOwnerInsightCalls
+} from "../../api";
+import type { ManagerInsightResponse, AiCallHistoryItem } from "../../types";
+import { formatDateTime } from "../../lib/format";
+import { AiBadge } from "../../components/common/AiBadge";
+import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
+
+/**
+ * Manager AI 分析彈窗：團隊診斷（scope=TEAM）或個別業務 coaching（scope=OWNER）。
+ * 函式級註解：開啟先讀快取顯示報告 + 上次分析時間；「重新分析」呼叫 LLM；「AI 歷程」開歷程彈窗。
+ *
+ * @param scope TEAM 或 OWNER
+ * @param owner OWNER 時的業務名
+ * @param onClose 關閉 callback
+ */
+export function ManagerInsightModal({ scope, owner, onClose }: {
+  scope: "TEAM" | "OWNER";
+  owner?: string;
+  onClose: () => void;
+}) {
+  const [insight, setInsight] = useState<ManagerInsightResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  // AI 歷程彈窗狀態
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
+  const [callsLoading, setCallsLoading] = useState(false);
+
+  const title = scope === "TEAM" ? "團隊整體診斷" : `${owner} 的輔導報告`;
+
+  // 開啟先讀快取
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr(null);
+    const p = scope === "TEAM" ? fetchTeamInsight() : fetchOwnerInsight(owner as string);
+    p.then((r) => { if (alive) setInsight(r); })
+      .catch((e) => { console.error("讀取 AI 分析快取失敗:", e); if (alive) setErr("讀取失敗"); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [scope, owner]);
+
+  /** 點按生成：呼叫 LLM 並更新顯示。 */
+  async function handleGenerate() {
+    setGenerating(true);
+    setErr(null);
+    try {
+      const r = scope === "TEAM" ? await generateTeamInsight() : await generateOwnerInsight(owner as string);
+      setInsight(r);
+    } catch (e) {
+      console.error("產生 AI 分析失敗:", e);
+      setErr("產生失敗，請稍後再試");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  /** 開啟 AI 歷程：載入對應範圍的歷次呼叫。 */
+  async function openHistory() {
+    setHistoryOpen(true);
+    setCallsLoading(true);
+    try {
+      const list = scope === "TEAM" ? await fetchTeamInsightCalls() : await fetchOwnerInsightCalls(owner as string);
+      setCalls(list);
+    } catch (e) {
+      console.error("讀取 AI 歷程失敗:", e);
+      setCalls([]);
+    } finally {
+      setCallsLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content report-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="report-header">
+            <div>
+              <h3>{title} <AiBadge onDark /></h3>
+              {insight ? <small>上次分析：{formatDateTime(insight.generatedAt)}{insight.model ? `（${insight.model}）` : "（教學版摘要）"}</small> : null}
+            </div>
+            <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+          </div>
+          <div className="report-body">
+            {loading ? (
+              <p className="chat-typing">載入中<span>…</span></p>
+            ) : err ? (
+              <p className="trace-empty">{err}</p>
+            ) : insight ? (
+              <div className="markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{insight.content}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="trace-empty">尚未產生分析，點「重新分析」由 AI 產出。</p>
+            )}
+          </div>
+          <div className="report-footer">
+            <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
+            <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
+              {generating ? "分析中…" : "重新分析"}
+            </button>
+            <button type="button" onClick={onClose}>關閉</button>
+          </div>
+        </div>
+      </div>
+      {historyOpen ? (
+        <AiCallHistoryModal
+          title={`${title} AI 歷程`}
+          calls={calls}
+          loading={callsLoading}
+          onClose={() => setHistoryOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
