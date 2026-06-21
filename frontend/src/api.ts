@@ -544,6 +544,32 @@ export async function fetchCustomerAiCalls(customerId: number) {
 }
 
 /**
+ * 取得團隊診斷（TEAM_ANALYSIS）的 AI 呼叫歷程。
+ */
+export async function fetchTeamInsightCalls() {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/manager/insights/team/calls");
+  return data;
+}
+
+/**
+ * 取得指定業務 coaching（OWNER_COACHING）的 AI 呼叫歷程。
+ *
+ * @param owner 業務顯示名稱
+ */
+export async function fetchOwnerInsightCalls(owner: string) {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/manager/insights/owner/calls", { params: { owner } });
+  return data;
+}
+
+/**
+ * 取得全公司 Portfolio 評估（PORTFOLIO）的 AI 呼叫歷程。
+ */
+export async function fetchPortfolioCalls() {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/ai/portfolio/calls");
+  return data;
+}
+
+/**
  * 取得指定客戶的 360 度整體評估報告。
  *
  * @param customerId 客戶 ID
