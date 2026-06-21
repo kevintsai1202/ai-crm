@@ -60,6 +60,10 @@ public class AiCallLog {
     @Column(columnDefinition = "text")
     private String answer;
 
+    /** 非客戶維度的分群鍵（OWNER_COACHING 存 ownerName；其餘為 null）。 */
+    @Column(length = 255)
+    private String subject;
+
     /** 建立時間（自行管理）。 */
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -68,7 +72,7 @@ public class AiCallLog {
     }
 
     /**
-     * 建立 AI 呼叫紀錄。
+     * 建立 AI 呼叫紀錄（向下相容，委派給含 subject 的建構子）。
      *
      * @param customerId 客戶 ID（可為 null）
      * @param callType 呼叫類型
@@ -83,8 +87,29 @@ public class AiCallLog {
     public AiCallLog(Long customerId, AiCallType callType, String model,
                      int promptTokens, int completionTokens, int totalTokens,
                      boolean aiEnabled, boolean piiMasked, String answer) {
+        this(customerId, callType, null, model, promptTokens, completionTokens, totalTokens, aiEnabled, piiMasked, answer);
+    }
+
+    /**
+     * 建立 AI 呼叫紀錄（含 subject 維度）。
+     *
+     * @param customerId 客戶 ID（可為 null）
+     * @param callType 呼叫類型
+     * @param subject 分群鍵（OWNER_COACHING 存 ownerName；其餘 null）
+     * @param model 模型名稱（可為 null）
+     * @param promptTokens 提示 token 數
+     * @param completionTokens 完成 token 數
+     * @param totalTokens 總 token 數
+     * @param aiEnabled 是否真實呼叫 LLM
+     * @param piiMasked 是否已遮罩 PII
+     * @param answer 回答內容
+     */
+    public AiCallLog(Long customerId, AiCallType callType, String subject, String model,
+                     int promptTokens, int completionTokens, int totalTokens,
+                     boolean aiEnabled, boolean piiMasked, String answer) {
         this.customerId = customerId;
         this.callType = callType;
+        this.subject = subject;
         this.model = model;
         this.promptTokens = promptTokens;
         this.completionTokens = completionTokens;
@@ -105,5 +130,6 @@ public class AiCallLog {
     public boolean isAiEnabled() { return aiEnabled; }
     public boolean isPiiMasked() { return piiMasked; }
     public String getAnswer() { return answer; }
+    public String getSubject() { return subject; }
     public Instant getCreatedAt() { return createdAt; }
 }

@@ -30,7 +30,7 @@ public class AiGovernanceService {
     }
 
     /**
-     * 記錄一次 AI 呼叫（含 fallback）。
+     * 記錄一次 AI 呼叫（含 fallback），委派給含 subject 的多載。
      *
      * @param type 呼叫類型
      * @param customerId 客戶 ID（Portfolio 可為 null）
@@ -47,8 +47,30 @@ public class AiGovernanceService {
     public AiCallLog record(AiCallType type, Long customerId, String model,
                             Integer promptTokens, Integer completionTokens, Integer totalTokens,
                             boolean aiEnabled, boolean masked, String answer) {
+        return record(type, customerId, null, model, promptTokens, completionTokens, totalTokens, aiEnabled, masked, answer);
+    }
+
+    /**
+     * 記錄一次 AI 呼叫（含 subject 維度，供 OWNER_COACHING 分業務）。
+     *
+     * @param type 呼叫類型
+     * @param customerId 客戶 ID（可為 null）
+     * @param subject 分群鍵（OWNER_COACHING 存 ownerName；其餘 null）
+     * @param model 模型名稱（fallback 為 null）
+     * @param promptTokens 提示 token 數
+     * @param completionTokens 完成 token 數
+     * @param totalTokens 總 token 數
+     * @param aiEnabled 是否真實呼叫 LLM
+     * @param masked 是否已遮罩 PII
+     * @param answer 回答內容
+     * @return 已儲存的呼叫紀錄
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AiCallLog record(AiCallType type, Long customerId, String subject, String model,
+                            Integer promptTokens, Integer completionTokens, Integer totalTokens,
+                            boolean aiEnabled, boolean masked, String answer) {
         var log = new AiCallLog(
-                customerId, type, model,
+                customerId, type, subject, model,
                 promptTokens == null ? 0 : promptTokens,
                 completionTokens == null ? 0 : completionTokens,
                 totalTokens == null ? 0 : totalTokens,
