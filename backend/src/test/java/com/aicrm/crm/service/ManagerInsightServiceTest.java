@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.aicrm.crm.repository.AiCallLogRepository;
 import com.aicrm.crm.repository.ManagerInsightRepository;
 import com.aicrm.crm.support.PostgresTestBase;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -16,6 +17,11 @@ class ManagerInsightServiceTest extends PostgresTestBase {
     @Autowired ManagerInsightService service;
     @Autowired ManagerInsightRepository insightRepo;
     @Autowired AiCallLogRepository callLogRepo;
+
+    @BeforeEach
+    void clearInsightCache() {
+        insightRepo.deleteAll();
+    }
 
     @Test
     void teamInsight_noKey_fallback_andCached() {

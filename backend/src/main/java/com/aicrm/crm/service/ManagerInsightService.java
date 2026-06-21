@@ -8,6 +8,8 @@ import com.aicrm.crm.domain.ManagerInsight;
 import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.repository.ManagerInsightRepository;
+import static java.util.stream.Collectors.joining;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -31,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
  * 「點按生成」時 upsert manager_insight 快取，進頁先讀快取顯示上次分析時間。</p>
  */
 @Service
+@Transactional(readOnly = true)
 public class ManagerInsightService {
 
     private static final Logger log = LoggerFactory.getLogger(ManagerInsightService.class);
@@ -217,7 +220,7 @@ public class ManagerInsightService {
                 o.avgDaysSinceInteraction() == null ? "—" : String.format("%.0f", o.avgDaysSinceInteraction()),
                 o.avgSentimentScore() == null ? "—" : String.format("%.1f", o.avgSentimentScore()),
                 o.renewalsThisMonth(), o.renewalsThisQuarter()))
-                .collect(java.util.stream.Collectors.joining("\n"));
+                .collect(joining("\n"));
         var t = data.team();
         return """
                 以下是全公司各業務的績效統計（系統計算，請勿更改數字）。
@@ -247,14 +250,14 @@ public class ManagerInsightService {
     private String buildOwnerPrompt(String owner, List<Customer> ownerCustomers) {
         var rows = ownerCustomers.stream().map(c -> {
             var amount = c.getOpportunities().stream().map(Opportunity::getAmount)
-                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             var lastDate = c.getInteractions().stream().map(Interaction::getOccurredAt)
                     .max(Comparator.naturalOrder()).map(d -> d.toLocalDate().toString()).orElse("無");
             return "- " + c.getName() + "｜產業" + c.getIndustry() + "｜風險" + c.getRiskLevel()
                     + "｜商機" + c.getOpportunities().size() + "筆/" + amount
                     + "｜最近互動" + lastDate
                     + "｜續約日" + (c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate());
-        }).collect(java.util.stream.Collectors.joining("\n"));
+        }).collect(joining("\n"));
         return """
                 以下是業務「%s」名下所有客戶的摘要（系統計算，請勿更改數字）。
 
