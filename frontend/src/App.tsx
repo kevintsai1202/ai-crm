@@ -2,11 +2,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./app/AppShell";
 import { ProtectedRoute } from "./app/ProtectedRoute";
 import { AdminRoute } from "./app/AdminRoute";
+import { ManagerRoute } from "./app/ManagerRoute";
 import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { CustomersPage } from "./features/customers/CustomersPage";
 import { MyWorkspacePage } from "./features/my-workspace/MyWorkspacePage";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
+import { TeamAnalyticsPage } from "./features/team/TeamAnalyticsPage";
 
 /**
  * 應用路由表：登入頁公開；其餘頁面需登入並套用 AppShell（側邊欄 + Outlet）。
@@ -22,6 +24,9 @@ export default function App() {
           <Route path="/my-work" element={<MyWorkspacePage />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomersPage />} />
+          <Route element={<ManagerRoute />}>
+            <Route path="/team" element={<TeamAnalyticsPage />} />
+          </Route>
           <Route element={<AdminRoute />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
           </Route>
