@@ -14,6 +14,8 @@ import type {
   HealthResponse,
   InteractionResponse,
   LoginResponse,
+  ManagerAnalyticsResponse,
+  ManagerInsightResponse,
   OpportunityResponse,
   PageResponse,
   Role,
@@ -95,6 +97,50 @@ export async function fetchHealth() {
  */
 export async function login(username: string, password: string) {
   const { data } = await apiClient.post<LoginResponse>("/auth/login", { username, password });
+  return data;
+}
+
+/**
+ * 讀取團隊診斷快取（未產生回 null）。
+ */
+export async function fetchTeamInsight() {
+  const { data } = await apiClient.get<ManagerInsightResponse | "">("/manager/insights/team");
+  return data || null;
+}
+
+/**
+ * 重新產生團隊整體診斷 + 逐業務點評（呼叫 LLM，逾時放寬）。
+ */
+export async function generateTeamInsight() {
+  const { data } = await apiClient.post<ManagerInsightResponse>("/manager/insights/team", null, { timeout: AI_TIMEOUT });
+  return data;
+}
+
+/**
+ * 讀取個別業務 coaching 快取（未產生回 null）。
+ *
+ * @param owner 業務名
+ */
+export async function fetchOwnerInsight(owner: string) {
+  const { data } = await apiClient.get<ManagerInsightResponse | "">("/manager/insights/owner", { params: { owner } });
+  return data || null;
+}
+
+/**
+ * 產生個別業務 coaching 輔導報告（呼叫 LLM，逾時放寬）。
+ *
+ * @param owner 業務名
+ */
+export async function generateOwnerInsight(owner: string) {
+  const { data } = await apiClient.post<ManagerInsightResponse>("/manager/insights/owner", null, { params: { owner }, timeout: AI_TIMEOUT });
+  return data;
+}
+
+/**
+ * 讀取 Manager 業務分析（團隊總覽 + 各業務統計，依成交金額降序）。
+ */
+export async function fetchManagerAnalytics() {
+  const { data } = await apiClient.get<ManagerAnalyticsResponse>("/manager/analytics");
   return data;
 }
 
