@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 
 /**
  * 業務分析頁（MANAGER）E2E：
- * A. manager 可見「📈 業務分析」側欄、進 /team 見團隊 KPI 列與業務績效表；
- *    可切換排序、點業務「輔導報告」叫出 AI-B 區塊、點團隊「重新分析」產出報告（無金鑰走教學版摘要）。
+ * A. manager 可見「📈 業務分析」側欄、進 /team 見團隊 KPI 列與業務績效表；可切換排序；
+ *    topbar「團隊整體診斷」開彈窗→重新分析產出報告→AI 歷程彈窗；點業務「輔導報告」開 coaching 彈窗。
  * B. sales 看不到「業務分析」側欄，直接連 /team 會被導回儀表板。
  *
  * 前置：後端需在 127.0.0.1:18080 啟動（Vite proxy /api → 18080）；seed 帳號密碼為 password123。
@@ -18,7 +18,7 @@ async function login(page: import("@playwright/test").Page, username: string) {
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
-test("MANAGER 可進業務分析頁（KPI/業務表/排序/AI 區塊）", async ({ page }) => {
+test("MANAGER 可進業務分析頁（KPI/業務表/排序/AI 彈窗/AI 歷程）", async ({ page }) => {
   await login(page, "manager@aurora.local");
 
   // 側欄有「業務分析」並可進入 /team
@@ -39,19 +39,29 @@ test("MANAGER 可進業務分析頁（KPI/業務表/排序/AI 區塊）", async 
   await page.locator(".sort-select select").selectOption("winRate");
   await expect(page.locator(".admin-user-table")).toBeVisible();
 
-  // AI-A 團隊整體診斷區塊存在
-  await expect(page.locator(".ai-insight-panel", { hasText: "團隊整體診斷" })).toBeVisible();
+  // topbar「團隊整體診斷」開彈窗
+  await page.locator(".topbar-actions button", { hasText: "團隊整體診斷" }).click();
+  const modal = page.locator(".report-modal", { hasText: "團隊整體診斷" });
+  await expect(modal).toBeVisible();
 
-  // 點第一列業務「輔導報告」→ AI-B 區塊（標題含「的輔導報告」）出現
+  // 重新分析 → 產出報告（無金鑰為教學版摘要；放寬等待涵蓋真 LLM）
+  await modal.locator("button", { hasText: "重新分析" }).click();
+  await expect(modal.locator(".markdown-body")).toBeVisible({ timeout: 60000 });
+
+  // AI 歷程 → 歷程彈窗出現（以歷程彈窗獨有的「歷次 AI 呼叫紀錄」副標定位，避免與診斷彈窗的「AI 歷程」按鈕字樣相撞）
+  await modal.locator("button", { hasText: "AI 歷程" }).click();
+  const history = page.locator(".report-modal", { hasText: "歷次 AI 呼叫紀錄" });
+  await expect(history).toBeVisible();
+  // 剛產出過團隊診斷 → 歷程至少一筆
+  await expect(history.locator(".ai-history-item").first()).toBeVisible({ timeout: 10000 });
+  await history.locator(".report-footer button", { hasText: "關閉" }).click();
+
+  // 關閉診斷彈窗
+  await modal.locator(".report-footer button", { hasText: "關閉" }).click();
+
+  // 點第一列業務「輔導報告」→ 業務 coaching 彈窗出現
   await ownerRows.first().locator("button", { hasText: "輔導報告" }).click();
-  await expect(page.locator(".ai-insight-panel", { hasText: "的輔導報告" })).toBeVisible();
-
-  // 點團隊區塊「重新分析」→ 產出報告（無金鑰為教學版摘要；放寬等待涵蓋真 LLM）
-  const teamPanel = page.locator(".ai-insight-panel", { hasText: "團隊整體診斷" });
-  await teamPanel.locator("button", { hasText: "重新分析" }).click();
-  await expect(teamPanel.locator(".report-markdown")).toBeVisible({ timeout: 60000 });
-  // 產出後顯示「上次分析」時間戳
-  await expect(teamPanel.locator(".ai-insight-meta")).toContainText("上次分析");
+  await expect(page.locator(".report-modal", { hasText: "的輔導報告" })).toBeVisible();
 });
 
 test("非 MANAGER/ADMIN 看不到業務分析且無法進入", async ({ page }) => {
