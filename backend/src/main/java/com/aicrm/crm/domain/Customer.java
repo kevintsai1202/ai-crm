@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,6 +88,14 @@ public class Customer extends AuditableEntity {
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Opportunity> opportunities = new ArrayList<>();
 
+    /** 已落地的風險等級（HIGH/MEDIUM/LOW）；由 RiskLevelMaintenanceService 維護，供清單 SQL 篩選。 */
+    @Column(name = "risk_level", length = 10)
+    private String riskLevel;
+
+    /** 風險等級最後重算時間，供觀測欄位是否過期。 */
+    @Column(name = "risk_computed_at")
+    private Instant riskComputedAt;
+
     protected Customer() {
     }
 
@@ -159,6 +168,16 @@ public class Customer extends AuditableEntity {
     }
 
     /**
+     * 套用重算後的風險等級並記錄重算時間。
+     *
+     * @param level HIGH / MEDIUM / LOW
+     */
+    public void applyRiskLevel(String level) {
+        this.riskLevel = level;
+        this.riskComputedAt = Instant.now();
+    }
+
+    /**
      * 加入互動紀錄並維護雙向關聯。
      *
      * @param interaction 互動紀錄
@@ -183,5 +202,7 @@ public class Customer extends AuditableEntity {
     public List<Contact> getContacts() { return contacts; }
     public List<Interaction> getInteractions() { return interactions; }
     public List<Opportunity> getOpportunities() { return opportunities; }
+    public String getRiskLevel() { return riskLevel; }
+    public Instant getRiskComputedAt() { return riskComputedAt; }
 }
 
