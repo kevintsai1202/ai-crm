@@ -31,7 +31,7 @@ class InsightServiceRiskTest {
         var governance = mock(AiGovernanceService.class);
         var chatMemory = mock(ChatMemoryService.class);
         var systemSettings = mock(SystemSettingService.class);
-        return new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, "");
+        return new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, "", "https://api.openai.com");
     }
 
     /** 建立指定產業/業務的空客戶。 */
