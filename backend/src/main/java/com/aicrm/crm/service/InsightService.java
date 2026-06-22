@@ -824,10 +824,13 @@ public class InsightService {
         var resolvedBaseUrl = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
                 ? provider.getBaseUrl()
                 : defaultOpenAiBaseUrl;
+        // maxTokens 留 null（不設）讓 Spring AI 不送 max_tokens；
+        // maxCompletionTokens 明確設值，支援 GPT-5.4+ 廢棄 max_tokens 的新模型。
         var options = OpenAiChatOptions.builder()
                 .apiKey(provider.getApiKey())
                 .baseUrl(resolvedBaseUrl)
                 .temperature(0.3)
+                .maxCompletionTokens(2000)
                 .build();
         return OpenAiChatModel.builder()
                 .options(options)

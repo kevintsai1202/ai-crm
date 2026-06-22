@@ -43,6 +43,11 @@ spring:
       chat:
         model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
         temperature: 0.3
+        options:
+          # GPT-5.4+ 已廢棄 max_tokens，改用 max_completion_tokens；
+          # 明確設 max-tokens 為空、max-completion-tokens 有值，避免 Spring AI 預設帶 max_tokens 導致 400。
+          max-tokens:
+          max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:2000}
 
 app:
   security:
