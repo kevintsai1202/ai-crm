@@ -780,8 +780,13 @@ public class InsightService {
                 """.formatted(all.size(), highRisk, totalPipeline, activeOpportunities,
                         PiiMasker.mask(String.join("\n", rows)));
 
+        // 在 system prompt 注入唯一 nonce，確保每次呼叫的 cache key 不同，
+        // 繞過 OpenAI/Gemini 等 LLM provider 的 prompt cache，強制走真實推理。
+        var nonce = java.util.UUID.randomUUID().toString();
+        var testSystemPrompt = SYSTEM_PROMPT + "\n<!-- run:" + nonce + " -->";
+
         // 優先使用傳入的 model 參數；為空則沿用系統設定
-        var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+        var spec = ChatClient.create(chatModel).prompt().system(testSystemPrompt).user(prompt);
         var testModel = (model != null && !model.isBlank()) ? model : null;
         if (testModel != null) {
             spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder().model(testModel));
