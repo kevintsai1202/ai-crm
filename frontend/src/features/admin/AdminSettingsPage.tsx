@@ -186,14 +186,19 @@ export default function AdminSettingsPage() {
     setProviderError(null);
   }
 
-  /** 刪除供應商，並清除相關模型選項的 provider 關聯。 */
+  /** 刪除供應商，並清除相關模型選項的 provider 關聯，同步儲存至 DB。 */
   async function handleDeleteProvider(id: number) {
     if (!window.confirm("確定刪除此供應商？相關模型選項的 provider 關聯將清除為 null。")) return;
     try {
       await deleteAiProvider(id);
+      // 先計算清理後的值，再一次性更新 state，確保傳給 saveAiSettings 的是清理後的結果
+      const cleanedOptions = options.map(o => o.providerId === id ? { ...o, providerId: null } : o);
+      const cleanedProviderId = currentProviderId === id ? null : currentProviderId;
       setProviders(prev => prev.filter(p => p.id !== id));
-      setOptions(prev => prev.map(o => o.providerId === id ? { ...o, providerId: null } : o));
-      if (currentProviderId === id) setCurrentProviderId(null);
+      setOptions(cleanedOptions);
+      setCurrentProviderId(cleanedProviderId);
+      // 自動同步清理後的設定至 DB，避免孤立的 providerId 留在 model_options
+      await saveAiSettings(currentModel, cleanedProviderId, cleanedOptions);
     } catch (e) {
       setProviderError(e instanceof Error ? e.message : "刪除失敗");
     }
