@@ -797,6 +797,23 @@ public class InsightService {
     }
 
     /**
+     * 過濾錯誤訊息中的敏感資訊（API key、token hash）後回傳前端安全版本。
+     * 日誌仍保留完整訊息供除錯；傳給使用者的只顯示錯誤類型與狀態碼。
+     *
+     * @param raw 原始 error.getMessage()
+     * @return 已遮蔽 API key 的安全訊息
+     */
+    private static String sanitizeErrMsg(String raw) {
+        if (raw == null) return "(無錯誤訊息)";
+        // 移除「Received API Key = sk-...」及其之後的敏感內容（換行前）
+        return raw.replaceAll("(?i)Received API Key\\s*=.*", "[API Key 已隱藏]")
+                  // 移除 sk- 開頭的 key 模式（OpenAI/相容 key 格式）
+                  .replaceAll("sk-[A-Za-z0-9_\\-]{10,}", "sk-[REDACTED]")
+                  // 移除 hash/token 長字串（64 個以上 hex 字元）
+                  .replaceAll("[0-9a-f]{40,}", "[HASH_REDACTED]");
+    }
+
+    /**
      * 以 AiProvider entity 動態建立 OpenAI 相容的 ChatModel（供競速測試用）。
      *
      * @param provider 已取得的 AiProvider
@@ -881,7 +898,7 @@ public class InsightService {
                 },
                 error -> {
                     log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());
-                    sendContent(emitter, "⚠️ 呼叫失敗：" + error.getMessage());
+                    sendContent(emitter, "⚠️ 呼叫失敗：" + sanitizeErrMsg(error.getMessage()));
                     sendSimpleTailAndComplete(emitter, null);
                 },
                 () -> {
@@ -993,7 +1010,7 @@ public class InsightService {
                 },
                 error -> {
                     log.warn("模型評分串流失敗：{}", error.getMessage());
-                    SseHelper.sendContent(emitter, "⚠️ 評分失敗：" + error.getMessage());
+                    SseHelper.sendContent(emitter, "⚠️ 評分失敗：" + sanitizeErrMsg(error.getMessage()));
                     SseHelper.sendSimpleTailAndComplete(emitter, null);
                 },
                 () -> {
