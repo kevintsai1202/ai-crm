@@ -424,8 +424,8 @@ export default function AdminSettingsPage() {
                                 {r.totalMs !== null && (
                                   <span style={{ fontSize: 11, color: "#64748b" }}>⏱ 總計 {(r.totalMs / 1000).toFixed(1)}s</span>
                                 )}
-                                {r.totalTokens !== null && (
-                                  <span style={{ fontSize: 11, color: "#8b5cf6" }}>🔢 {r.completionTokens ?? "–"} / {r.totalTokens} tokens</span>
+                                {r.promptTokens !== null && (
+                                  <span style={{ fontSize: 11, color: "#8b5cf6" }}>🔢 {r.promptTokens ?? "–"} in / {r.completionTokens ?? "–"} out</span>
                                 )}
                               </div>
                             </div>
