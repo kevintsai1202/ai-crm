@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     /** Cookie 名稱，與 JwtAuthenticationFilter 一致。 */
-    static final String COOKIE_NAME = "ai-crm-session";
+    public static final String COOKIE_NAME = "ai-crm-session";
 
     /** 登入服務。 */
     private final AuthService authService;
