@@ -728,15 +728,16 @@ public class InsightService {
     }
 
     /**
-     * 模型競速測試：以指定模型名對測試問題發起 SSE 串流，供 ADMIN 比較多個模型速度與品質。
-     * 函式級註解：model 參數直接覆蓋系統設定，無 grounding context，純粹比較裸 LLM 回應。
-     * 無 api-key 時送一筆 content 錯誤訊息後關閉，不 fallback deterministic（測試用途無意義）。
+     * 模型競速測試：以「全公司客戶組合」為 grounding context，讓指定模型回答固定分析任務。
+     * 函式級註解：所有模型收到完全相同的真實資料與任務，比較的是分析品質與速度，不是知識背景。
+     * grounding context 在交易內同步建立（讀所有客戶 LAZY 關聯），callback 執行緒只使用純值。
+     * 無 api-key 時送錯誤訊息後關閉；不走 deterministic fallback（測試目的不同）。
      *
      * @param model 要測試的模型名（空時沿用系統設定或環境變數預設）
-     * @param message 測試問題
+     * @param ignored 保留參數（grounding context 由後端自行建構，前端傳入值不使用）
      * @return SseEmitter 串流發送器
      */
-    public SseEmitter streamModelTest(String model, String message) {
+    public SseEmitter streamModelTest(String model, String ignored) {
         SseEmitter emitter = new SseEmitter(120_000L);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
         if (chatModel == null) {
@@ -745,11 +746,46 @@ public class InsightService {
             return emitter;
         }
 
-        var spec = ChatClient.create(chatModel).prompt()
-                .system("你是一位 B2B CRM 業務顧問，請用繁體中文簡潔回答，回答不超過 200 字。")
-                .user(message == null ? "" : message);
+        // 在交易內建立全公司客戶 grounding context（與 streamPortfolioAssessment 一致）
+        var all = customers.findAllWithDetail();
+        var rows = new java.util.ArrayList<String>();
+        var totalPipeline = BigDecimal.ZERO;
+        long activeOpportunities = 0;
+        int highRisk = 0;
+        for (var c : all) {
+            var risk = calculateOpportunityRisk(c);
+            var amount = c.getOpportunities().stream().map(Opportunity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            var active = c.getOpportunities().stream().filter(o -> o.getStage() != OpportunityStage.CLOSED_LOST).count();
+            var lastDate = c.getInteractions().stream().map(Interaction::getOccurredAt).max(LocalDateTime::compareTo)
+                    .map(d -> d.toLocalDate().toString()).orElse("無");
+            totalPipeline = totalPipeline.add(amount);
+            activeOpportunities += active;
+            if (risk.churnRisk() >= 50 || risk.renewalDelayRisk() >= 50) highRisk++;
+            rows.add(c.getName() + "｜" + c.getIndustry() + "｜" + c.getOwnerName()
+                    + "｜流失" + risk.churnRisk() + "/續約延遲" + risk.renewalDelayRisk()
+                    + "｜商機" + c.getOpportunities().size() + "筆/" + amount
+                    + "｜最近互動" + lastDate
+                    + "｜續約日" + (c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate()));
+        }
+
+        // 固定分析任務：所有模型相同，確保比較公平
+        final String prompt = """
+                以下是全公司 CRM 客戶組合資料（系統計算，請勿更改數字）。
+
+                # 彙總統計
+                客戶總數：%d｜高風險客戶數：%d｜商機總額：%s｜活躍商機數：%d
+
+                # 客戶清單（名稱｜產業｜負責人｜流失/續約延遲風險｜商機｜最近互動｜續約日）
+                %s
+
+                # 分析任務
+                請找出「最需要立即關注的前 3 名客戶」，每位附上：① 風險原因（依據上方數字）② 建議的具體下一步行動。
+                格式要求：Markdown 清單，繁體中文，每位客戶說明不超過 60 字，不可編造任何未在資料中出現的數字或事件。
+                """.formatted(all.size(), highRisk, totalPipeline, activeOpportunities,
+                        PiiMasker.mask(String.join("\n", rows)));
 
         // 優先使用傳入的 model 參數；為空則沿用系統設定
+        var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
         var testModel = (model != null && !model.isBlank()) ? model : null;
         if (testModel != null) {
             spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder().model(testModel));
@@ -758,15 +794,11 @@ public class InsightService {
             if (opts != null) spec = spec.options(opts);
         }
 
-        var fullAnswer = new StringBuilder();
         spec.stream().chatResponse().subscribe(
                 cr -> {
                     var result = cr.getResult();
                     var text = result == null ? null : result.getOutput().getText();
-                    if (text != null && !text.isEmpty()) {
-                        fullAnswer.append(text);
-                        sendContent(emitter, text);
-                    }
+                    if (text != null && !text.isEmpty()) sendContent(emitter, text);
                 },
                 error -> {
                     log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());

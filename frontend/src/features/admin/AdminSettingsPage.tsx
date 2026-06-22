@@ -18,7 +18,8 @@ interface ModelRaceResult {
   errorMsg?: string;
 }
 
-const DEFAULT_QUESTION = "請列出 3 個提高 B2B 客戶續約率的具體行動建議。";
+/** 固定任務說明（grounding context 由後端從真實 DB 建構，前端不需傳問題）。 */
+const TEST_TASK_LABEL = "分析全公司客戶組合，找出最需立即關注的前 3 名客戶（含風險原因 + 建議行動）";
 
 /**
  * 系統設定頁（限 ADMIN）：AI 模型設定 + 多模型競速測試。
@@ -37,7 +38,6 @@ export default function AdminSettingsPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   /* ── 測試區狀態 ─────────────────────────────── */
-  const [testQuestion, setTestQuestion] = useState(DEFAULT_QUESTION);
   const [raceResults, setRaceResults] = useState<Record<string, ModelRaceResult>>({});
   const [racing, setRacing] = useState(false);
   /** 追蹤每個模型的開始時間（ref 避免 closure 問題）。 */
@@ -102,7 +102,7 @@ export default function AdminSettingsPage() {
 
   /* ── 競速測試方法 ─────────────────────────────── */
   function startRace() {
-    if (!testQuestion.trim() || options.length === 0 || racing) return;
+    if (options.length === 0 || racing) return;
     setRacing(true);
 
     // 初始化所有模型的結果
@@ -121,7 +121,7 @@ export default function AdminSettingsPage() {
       startTimeRef.current[model] = t0;
 
       streamModelTest(
-        testQuestion,
+        "",   // 問題由後端從真實 DB 建構，前端不傳
         model,
         (chunk) => {
           if (chunk.type === "content" && chunk.delta) {
@@ -291,20 +291,24 @@ export default function AdminSettingsPage() {
               <p style={{ fontSize: 13, color: "#94a3b8" }}>請先在上方新增候選模型才能執行測試。</p>
             ) : (
               <>
-                {/* 問題輸入 */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                  <input
-                    value={testQuestion}
-                    onChange={(e) => setTestQuestion(e.target.value)}
-                    placeholder="輸入測試問題…"
-                    style={{ flex: 1, padding: "9px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
-                  />
+                {/* 固定任務說明 + 啟動按鈕 */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  padding: "12px 14px", background: "#f0fdf4",
+                  border: "1px solid #bbf7d0", borderRadius: 8, marginBottom: 16
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginBottom: 3 }}>
+                      📊 測試任務（使用真實 CRM 資料）
+                    </div>
+                    <div style={{ fontSize: 13, color: "#334155" }}>{TEST_TASK_LABEL}</div>
+                  </div>
                   <button
                     type="button"
                     className="btn-assess"
-                    disabled={racing || !testQuestion.trim()}
+                    disabled={racing}
                     onClick={startRace}
-                    style={{ whiteSpace: "nowrap", padding: "9px 18px", borderRadius: 8, fontWeight: 700 }}
+                    style={{ whiteSpace: "nowrap", padding: "9px 18px", borderRadius: 8, fontWeight: 700, flexShrink: 0 }}
                   >
                     {racing ? "測試中…" : "▶ 開始比較"}
                   </button>
