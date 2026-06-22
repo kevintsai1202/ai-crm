@@ -9,6 +9,7 @@ import type { AiSettingsResponse, AiCallHistoryItem, ModelResultItem } from "../
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
+import { downloadMarkdown } from "../../lib/download";
 
 /** 單一模型的競速測試結果。 */
 interface ModelRaceResult {
@@ -429,12 +430,28 @@ export default function AdminSettingsPage() {
                               </div>
                             </div>
                             {/* 串流內容 */}
-                            <div style={{ padding: "10px 12px", minHeight: 120, maxHeight: 280, overflowY: "auto", fontSize: 13, lineHeight: 1.6, color: r.status === "error" ? "#dc2626" : "#334155", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                            <div
+                              className={r.status === "streaming" ? "ai-streaming-body" : ""}
+                              style={{ padding: "10px 12px", minHeight: 120, maxHeight: 280, overflowY: "auto", fontSize: 13, lineHeight: 1.6, color: r.status === "error" ? "#dc2626" : "#334155", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                            >
                               {r.status === "waiting" && <AiThinkingIndicator label="等待回應" />}
                               {r.status === "error" && <span>⚠️ {r.errorMsg}</span>}
                               {r.content}
-                              {r.status === "streaming" && <span style={{ display: "inline-block", width: 8, height: 14, background: "#3b82f6", marginLeft: 2, verticalAlign: "text-bottom", animation: "blink 1s step-end infinite" }} />}
+                              {r.status === "streaming" && <span className="ai-stream-cursor" />}
                             </div>
+                            {/* 完成後顯示下載按鈕 */}
+                            {r.status === "done" && r.content && (
+                              <div style={{ padding: "6px 12px", borderTop: "1px solid #f1f5f9", textAlign: "right" }}>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ fontSize: 12, padding: "3px 10px" }}
+                                  onClick={() => downloadMarkdown(`${model}-回答`, r.content)}
+                                >
+                                  ⬇ 下載 MD
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

@@ -11,6 +11,7 @@ import {
 } from "../../api";
 import type { ManagerInsightResponse, AiCallHistoryItem } from "../../types";
 import { formatDateTime } from "../../lib/format";
+import { downloadMarkdown } from "../../lib/download";
 import { AiBadge } from "../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
@@ -130,6 +131,16 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
           </div>
           <div className="report-footer">
             <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
+            {insight?.content && !generating ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ fontSize: 13 }}
+                onClick={() => downloadMarkdown(title, insight.content)}
+              >
+                ⬇ 下載 MD
+              </button>
+            ) : null}
             <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
               {generating ? "分析中…" : "重新分析"}
             </button>

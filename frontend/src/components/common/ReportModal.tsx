@@ -3,6 +3,7 @@ import remarkGfm from "remark-gfm";
 import { AiBadge } from "./AiBadge";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { AiThinkingIndicator } from "./AiThinkingIndicator";
+import { downloadMarkdown } from "../../lib/download";
 
 /**
  * 整體評估報告 Modal：渲染 AI 產出的 Markdown 報告（單客戶 360° 或 Portfolio 共用）。
@@ -46,6 +47,16 @@ export function ReportModal({ report, onClose }: {
         </div>
         <div className="report-footer">
           {!report.loading && !isStreaming ? <FeedbackButtons callId={report.callId} /> : null}
+          {!report.loading && report.markdown ? (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontSize: 13 }}
+              onClick={() => downloadMarkdown(report.title, report.markdown)}
+            >
+              ⬇ 下載 MD
+            </button>
+          ) : null}
           <button type="button" onClick={onClose}>關閉</button>
         </div>
       </div>
