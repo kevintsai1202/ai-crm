@@ -30,4 +30,5 @@ SET setting_value = (
 )
 WHERE setting_key = 'ai.chat.model_options'
   AND setting_value IS NOT NULL
-  AND setting_value ~ '^\s*\[';
+  AND pg_input_is_valid(setting_value, 'jsonb')
+  AND jsonb_typeof(setting_value::jsonb) = 'array';
