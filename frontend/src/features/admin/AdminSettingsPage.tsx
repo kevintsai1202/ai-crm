@@ -9,7 +9,7 @@ import type { AiSettingsResponse, AiCallHistoryItem, ModelResultItem } from "../
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
-import { downloadMarkdown } from "../../lib/download";
+import { downloadMarkdown, downloadZip } from "../../lib/download";
 
 /** 單一模型的競速測試結果。 */
 interface ModelRaceResult {
@@ -459,8 +459,30 @@ export default function AdminSettingsPage() {
 
                     {/* 評分按鈕（全部完成後顯示） */}
                     {allDone && hasDoneResults && (
-                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f1f5f9", flexWrap: "wrap" }}>
                         <button type="button" className="btn-secondary" onClick={openScoreHistory}>🕘 評分歷程</button>
+                        {/* ZIP 下載：評分完成後才顯示 */}
+                        {scoreReport && !scoreReport.loading && scoreReport.markdown && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => {
+                              // 組裝所有模型回答 + 評分報告為 ZIP
+                              const ts = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+                              const files: Record<string, string> = {};
+                              Object.entries(raceResults).forEach(([model, r]) => {
+                                if (r.content) {
+                                  const safeName = model.replace(/[/\\:*?"<>|]/g, "_");
+                                  files[`${safeName}.md`] = r.content;
+                                }
+                              });
+                              files["00_評分報告.md"] = scoreReport.markdown;
+                              downloadZip(`競速測試_${ts}`, files);
+                            }}
+                          >
+                            📦 下載全部 ZIP
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn-assess"
