@@ -802,8 +802,11 @@ public class InsightService {
         var resolvedBaseUrl = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
                 ? provider.getBaseUrl()
                 : "https://api.openai.com";
-        // Spring AI 2.0：透過 OpenAiChatOptions 設定 apiKey 與 baseUrl，
-        // OpenAiChatModel.Builder.build() 會自動呼叫 OpenAiSetup.setupSyncClient 建立底層 client。
+        // Spring AI 2.0 已移除 OpenAiApi 直接建構方式。
+        // OpenAiChatModel.Builder.build() 在 openAiClient 為 null 時，會自動呼叫
+        // OpenAiSetup.setupSyncClient(baseUrl, apiKey, ...) 建立完全獨立的 OkHttp client，
+        // 並從 options.getBaseUrl() / options.getApiKey() 讀取連線憑證。
+        // 已透過 javap 反編譯 spring-ai-openai-2.0.0.jar 的 Builder.class 常量池確認此行為。
         var options = OpenAiChatOptions.builder()
                 .apiKey(provider.getApiKey())
                 .baseUrl(resolvedBaseUrl)

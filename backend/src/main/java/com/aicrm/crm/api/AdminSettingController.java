@@ -61,7 +61,7 @@ public class AdminSettingController {
     public Dtos.AiSettingsResponse updateAiSettings(@RequestBody Dtos.AiSettingsRequest request,
                                                      Authentication authentication) {
         try {
-            systemSettings.updateAiSettings(request.model(), request.modelOptions(), resolveUsername(authentication));
+            systemSettings.updateAiSettings(request.model(), request.providerId(), request.modelOptions(), resolveUsername(authentication));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
@@ -81,7 +81,7 @@ public class AdminSettingController {
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         response.setHeader("Pragma", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
-        return insightService.streamModelTest(request.model(), request.message());
+        return insightService.streamModelTest(request.model(), request.providerId(), request.message());
     }
 
     /**
