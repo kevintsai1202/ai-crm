@@ -17,6 +17,9 @@ public class HealthController {
     /** 是否設定 OpenAI api-key，作為 AI 模式判斷依據。 */
     private final boolean aiEnabled;
 
+    /** Bean 建立時的毫秒時間戳，等同後端部署/重啟時間，供前端偵測後端更新。 */
+    private final long serverStartTime = System.currentTimeMillis();
+
     public HealthController(@Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
@@ -34,6 +37,6 @@ public class HealthController {
                 "database", "JPA",
                 "security", "JWT",
                 "ai", aiMode
-        ));
+        ), serverStartTime);
     }
 }

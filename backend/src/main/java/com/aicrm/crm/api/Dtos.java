@@ -24,7 +24,8 @@ public final class Dtos {
     private Dtos() {
     }
 
-    public record HealthResponse(String status, Instant timestamp, Map<String, String> features) {}
+    /** serverStartTime：後端 bean 建立時的 Unix 毫秒，用於前端偵測後端重新部署。 */
+    public record HealthResponse(String status, Instant timestamp, Map<String, String> features, long serverStartTime) {}
 
     /** 儀表板版面回應（SP7）：可見區塊有序 id 陣列；尚未設定時 visibleOrder 為 null。 */
     public record DashboardLayoutResponse(List<String> visibleOrder) {}

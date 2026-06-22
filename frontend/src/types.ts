@@ -41,6 +41,8 @@ export interface HealthResponse {
   status: "UP" | string;
   timestamp: string;
   features: Record<string, string>;
+  /** 後端啟動時間（Unix ms），後端重新部署後值會改變，供前端偵測後端更新。 */
+  serverStartTime?: number;
 }
 
 export interface PageResponse<T> {

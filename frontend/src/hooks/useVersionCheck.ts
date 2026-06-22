@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 
-/** 從 /build-info.json 讀取本次啟動時的 buildTime（由 Vite plugin 在 build 時寫入）。 */
-async function fetchBuildTime(bustCache = false): Promise<number> {
+/** 從 /build-info.json 讀取前端 buildTime（由 Vite buildInfoPlugin 在 build 時寫入）。 */
+async function fetchFrontendBuildTime(bustCache = false): Promise<number> {
   try {
-    // bustCache=true 時加時間戳，強制繞過 CDN / proxy 快取
     const url = bustCache ? `/build-info.json?_t=${Date.now()}` : "/build-info.json";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return 0;
@@ -14,39 +13,61 @@ async function fetchBuildTime(bustCache = false): Promise<number> {
   }
 }
 
-/** 每 5 分鐘輪詢一次新版本；開發環境（buildTime=0）不觸發。 */
+/** 從 /api/health 讀取後端 serverStartTime（後端每次重新部署/重啟後值改變）。 */
+async function fetchBackendStartTime(): Promise<number> {
+  try {
+    const res = await fetch(`/api/health?_t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return typeof data.serverStartTime === "number" ? data.serverStartTime : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 每 5 分鐘輪詢一次；前端 build hash 或後端啟動時間任一改變即通知。 */
 const POLL_MS = 5 * 60 * 1000;
 
 /**
- * 版本更新偵測 hook：比對頁面載入時與最新部署的 buildTime。
- * 函式級註解：Vite buildInfoPlugin 在每次 build 時寫入 public/build-info.json，
- * 每次部署後 buildTime 自動遞增；CDN 快取由 `?_t=` query 強制失效。
- * buildTime=0 視為開發環境，不啟動偵測以避免誤觸發。
+ * 版本更新偵測 hook：同時監聽前端 bundle buildTime 與後端 serverStartTime。
+ * 函式級註解：
+ * - 前端部署 → build-info.json 的 buildTime 改變 → 觸發
+ * - 後端部署/重啟 → health 的 serverStartTime 改變 → 觸發
+ * - buildTime=0（開發環境）自動跳過，不誤觸發。
  */
 export function useVersionCheck(): boolean {
   const [hasUpdate, setHasUpdate] = useState(false);
 
   useEffect(() => {
-    let currentBuildTime = 0;
+    let frontendBuildTime = 0;
+    let backendStartTime = 0;
 
-    // 先讀取當前 buildTime（不帶快取破壞，拿的就是本次載入的版本）
-    fetchBuildTime(false).then((t) => {
-      currentBuildTime = t;
-      // buildTime=0 表示開發環境或尚未 build，不啟動偵測
-      if (t === 0) return;
+    // 初始讀取兩個版本基準
+    Promise.all([fetchFrontendBuildTime(false), fetchBackendStartTime()]).then(([ft, bt]) => {
+      frontendBuildTime = ft;
+      backendStartTime = bt;
 
-      // 首次 20 秒後 check，之後每 5 分鐘
-      const first = setTimeout(check, 20_000);
-      const interval = setInterval(check, POLL_MS);
+      // 開發環境（frontendBuildTime=0）不啟動偵測
+      if (ft === 0) return;
 
       async function check() {
-        const latest = await fetchBuildTime(true); // 強制繞過快取
-        if (latest !== 0 && latest > currentBuildTime) {
+        const [latestFt, latestBt] = await Promise.all([
+          fetchFrontendBuildTime(true),
+          fetchBackendStartTime()
+        ]);
+
+        const frontendUpdated = latestFt !== 0 && latestFt > frontendBuildTime;
+        const backendUpdated  = latestBt  !== 0 && latestBt  > backendStartTime;
+
+        if (frontendUpdated || backendUpdated) {
           setHasUpdate(true);
         }
       }
 
-      // 清理
+      // 首次 20s 後 check，之後每 5 分鐘
+      const first = setTimeout(check, 20_000);
+      const interval = setInterval(check, POLL_MS);
+
       return () => {
         clearTimeout(first);
         clearInterval(interval);
