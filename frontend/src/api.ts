@@ -788,7 +788,7 @@ export async function saveAiSettings(
 }
 
 /** 新增 AI 供應商（限 ADMIN）。 */
-export async function createAiProvider(name: string, baseUrl: string, apiKey: string) {
+export async function createAiProvider(name: string, baseUrl: string | null, apiKey: string) {
   const { data } = await apiClient.post<import("./types").AiProviderItem>(
     "/admin/settings/ai/providers",
     { name, baseUrl, apiKey }
