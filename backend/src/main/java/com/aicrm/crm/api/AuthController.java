@@ -44,9 +44,10 @@ public class AuthController {
                                     HttpServletResponse response) {
         var result = authService.login(request);
         // 以 response header 直接寫入 SameSite=Strict，避免 Jakarta Cookie API 版本差異
+        // SameSite=None 允許跨域攜帶 cookie（前端 ai-crm.springai.world → 後端 zeabur.app）
         response.addHeader("Set-Cookie",
                 COOKIE_NAME + "=" + result.token()
-                + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + tokenTtlSeconds);
+                + "; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=" + tokenTtlSeconds);
         // body 只回傳 user 資訊，不帶明文 token
         return new Dtos.LoginResponse(null, result.user());
     }
@@ -59,6 +60,6 @@ public class AuthController {
     @PostMapping("/logout")
     public void logout(HttpServletResponse response) {
         response.addHeader("Set-Cookie",
-                COOKIE_NAME + "=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
+                COOKIE_NAME + "=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0");
     }
 }
