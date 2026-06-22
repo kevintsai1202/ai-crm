@@ -797,25 +797,16 @@ public class InsightService {
     }
 
     /**
-     * 以指定 provider 的 URL 與 apiKey 動態建立 OpenAI 相容的 ChatModel。
-     * 函式級註解：不快取—每次競速測試建立一次，用完由 GC 回收。
+     * 以 AiProvider entity 動態建立 OpenAI 相容的 ChatModel（供競速測試用）。
      *
-     * @param providerId provider DB id
-     * @return ChatModel；provider 不存在或 apiKey 未設定時回 null
+     * @param provider 已取得的 AiProvider
+     * @return 對應 ChatModel
      */
-    private ChatModel buildChatModelForProvider(Long providerId) {
-        if (providerId == null) return null;
-        var provider = systemSettings.findProviderById(providerId).orElse(null);
-        if (provider == null || !provider.isApiKeySet()) return null;
+    private ChatModel buildChatModelForProvider(com.aicrm.crm.domain.AiProvider provider) {
         // baseUrl 為空時 fallback 至 YAML spring.ai.openai.base-url（可由 BASE_URL env 覆蓋）
         var resolvedBaseUrl = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
                 ? provider.getBaseUrl()
                 : defaultOpenAiBaseUrl;
-        // Spring AI 2.0 已移除 OpenAiApi 直接建構方式。
-        // OpenAiChatModel.Builder.build() 在 openAiClient 為 null 時，會自動呼叫
-        // OpenAiSetup.setupSyncClient(baseUrl, apiKey, ...) 建立完全獨立的 OkHttp client，
-        // 並從 options.getBaseUrl() / options.getApiKey() 讀取連線憑證。
-        // 已透過 javap 反編譯 spring-ai-openai-2.0.0.jar 的 Builder.class 常量池確認此行為。
         var options = OpenAiChatOptions.builder()
                 .apiKey(provider.getApiKey())
                 .baseUrl(resolvedBaseUrl)
@@ -826,19 +817,102 @@ public class InsightService {
                 .build();
     }
 
+    /**
+     * 以 providerId 查詢並建立 ChatModel；provider 不存在或 apiKey 未設定時回 null。
+     *
+     * @param providerId provider DB id
+     * @return ChatModel 或 null
+     */
+    private ChatModel buildChatModelForProvider(Long providerId) {
+        if (providerId == null) return null;
+        var provider = systemSettings.findProviderById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        return buildChatModelForProvider(provider);
+    }
+
+    /**
+     * Chat Completions API 回 404 時（例如 gpt-5+ 改用 Responses API），
+     * 以 RestTemplate 直接呼叫 /v1/responses 作為備援，結果以單一 SSE chunk 回傳。
+     * Spring AI 2.0 尚未支援 Responses API，預計 2.1（2026-11）加入。
+     *
+     * @param model      模型名稱
+     * @param provider   API 憑證來源
+     * @param prompt     測試提示詞
+     * @param emitter    SSE 發送器
+     */
+    @SuppressWarnings("unchecked")
+    private void tryResponsesApiFallback(String model, com.aicrm.crm.domain.AiProvider provider,
+                                          String prompt, SseEmitter emitter) {
+        try {
+            var base = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
+                    ? provider.getBaseUrl()
+                    : defaultOpenAiBaseUrl;
+            // 確保路徑正確，避免雙斜線
+            var url = base.endsWith("/") ? base + "v1/responses" : base + "/v1/responses";
+
+            var restTemplate = new org.springframework.web.client.RestTemplate();
+            var headers = new org.springframework.http.HttpHeaders();
+            headers.set("Authorization", "Bearer " + provider.getApiKey());
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+            var body = java.util.Map.of(
+                    "model", model,
+                    "input", prompt,
+                    "max_output_tokens", 1000
+            );
+
+            var response = restTemplate.postForObject(
+                    url,
+                    new org.springframework.http.HttpEntity<>(body, headers),
+                    java.util.Map.class
+            );
+
+            // 解析 Responses API 回應：output[].content[].text
+            var text = new StringBuilder();
+            if (response != null) {
+                var output = (java.util.List<java.util.Map<String, Object>>) response.get("output");
+                if (output != null) {
+                    for (var item : output) {
+                        var content = (java.util.List<java.util.Map<String, Object>>) item.get("content");
+                        if (content != null) {
+                            for (var c : content) {
+                                if ("output_text".equals(c.get("type"))) {
+                                    text.append(c.get("text"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            var resultText = text.toString().isBlank() ? "(Responses API 無文字輸出)" : text.toString();
+            sendContent(emitter, resultText);
+            sendSimpleTailAndComplete(emitter, null);
+
+        } catch (Exception e) {
+            log.warn("Responses API fallback 失敗 model={}：{}", model, e.getMessage());
+            sendContent(emitter, "⚠️ 呼叫失敗（需要 Responses API 但也失敗）：" + e.getMessage());
+            sendSimpleTailAndComplete(emitter, null);
+        }
+    }
+
     public SseEmitter streamModelTest(String model, Long providerId, String ignored) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
-        // 優先使用 provider 動態憑證；未指定 provider 時回退 Spring 注入的預設 ChatModel
+        // 先取得 provider entity，供 ChatModel 建立與 Responses API fallback 共用
+        final com.aicrm.crm.domain.AiProvider resolvedProvider;
         final ChatModel chatModel;
+
         if (providerId != null) {
-            chatModel = buildChatModelForProvider(providerId);
-            if (chatModel == null) {
+            resolvedProvider = systemSettings.findProviderById(providerId).orElse(null);
+            if (resolvedProvider == null || !resolvedProvider.isApiKeySet()) {
                 sendContent(emitter, "⚠️ Provider 不存在或 API 金鑰未設定，無法執行模型測試。");
                 sendSimpleTailAndComplete(emitter, null);
                 return emitter;
             }
+            chatModel = buildChatModelForProvider(resolvedProvider);
         } else {
+            resolvedProvider = null;
             var defaultModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
             if (defaultModel == null) {
                 sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
@@ -876,9 +950,17 @@ public class InsightService {
                     if (text != null && !text.isEmpty()) sendContent(emitter, text);
                 },
                 error -> {
-                    log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());
-                    sendContent(emitter, "⚠️ 呼叫失敗：" + error.getMessage());
-                    sendSimpleTailAndComplete(emitter, null);
+                    var errMsg = error.getMessage();
+                    // 404 代表 model 需要 OpenAI Responses API（gpt-5+ 系列），
+                    // Spring AI 2.0 尚不支援，自動 fallback 至直接呼叫 /v1/responses
+                    if (errMsg != null && errMsg.contains("404") && resolvedProvider != null) {
+                        log.info("model={} Chat Completions 404，切換 Responses API fallback", testModel);
+                        tryResponsesApiFallback(testModel, resolvedProvider, prompt, emitter);
+                    } else {
+                        log.warn("模型測試串流失敗 model={}：{}", model, errMsg);
+                        sendContent(emitter, "⚠️ 呼叫失敗：" + errMsg);
+                        sendSimpleTailAndComplete(emitter, null);
+                    }
                 },
                 () -> {
                     // 串流完成：擷取 token 用量並送出，再送 [DONE]
