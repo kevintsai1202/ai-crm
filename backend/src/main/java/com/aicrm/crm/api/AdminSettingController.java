@@ -70,7 +70,7 @@ public class AdminSettingController {
      * @return SseEmitter 串流發送器
      */
     @PostMapping(value = "/ai/test", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter testModel(@Valid @RequestBody Dtos.AiTestRequest request) {
+    public SseEmitter testModel(@RequestBody Dtos.AiTestRequest request) {
         return insightService.streamModelTest(request.model(), request.message());
     }
 
