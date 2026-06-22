@@ -26,3 +26,6 @@ frontend/dist/
 # === 作業系統 ===
 Thumbs.db
 .DS_Store
+
+# === Git Worktrees ===
+.worktrees/
