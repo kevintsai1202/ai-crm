@@ -807,7 +807,8 @@ export async function streamModelTest(
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ message, model })
+      // _t 時間戳確保每次 POST 請求唯一，避免 CDN / proxy 回傳 cached response
+      body: JSON.stringify({ message, model, _t: new Date().getTime() })
     });
     if (!response.ok) {
       handleStreamUnauthorized(response);

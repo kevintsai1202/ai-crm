@@ -3,7 +3,7 @@ package com.aicrm.crm.api;
 import com.aicrm.crm.service.InsightService;
 import com.aicrm.crm.service.JwtService;
 import com.aicrm.crm.service.SystemSettingService;
-import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -70,7 +70,11 @@ public class AdminSettingController {
      * @return SseEmitter 串流發送器
      */
     @PostMapping(value = "/ai/test", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter testModel(@RequestBody Dtos.AiTestRequest request) {
+    public SseEmitter testModel(@RequestBody Dtos.AiTestRequest request, HttpServletResponse response) {
+        // 禁止 HTTP cache 與 Nginx/Zeabur proxy buffer，確保每次測試均呼叫真實 LLM 並即時串流
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("X-Accel-Buffering", "no");
         return insightService.streamModelTest(request.model(), request.message());
     }
 
