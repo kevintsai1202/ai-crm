@@ -733,16 +733,21 @@ public class InsightService {
      * @param ignored 保留參數（grounding context 由後端自行建構，前端傳入值不使用）
      * @return SseEmitter 串流發送器
      */
-    public SseEmitter streamModelTest(String model, String ignored) {
-        SseEmitter emitter = new SseEmitter(120_000L);
-        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        if (chatModel == null) {
-            sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
-            sendSimpleTailAndComplete(emitter, null);
-            return emitter;
-        }
+    /**
+     * 全公司客戶 grounding context 資料容器（供測試與評分共用）。
+     *
+     * @param prompt 完整的客戶資料 + 分析任務 prompt 字串
+     * @param rawData 未經 PII 遮罩的原始客戶清單（僅供評審使用，不送被測模型）
+     */
+    private record TestGrounding(String prompt, String rawData) {}
 
-        // 在交易內建立全公司客戶 grounding context（與 streamPortfolioAssessment 一致）
+    /**
+     * 建立全公司客戶 grounding context，供競速測試與評分共用，確保評審拿到相同資料。
+     * 函式級註解：在 @Transactional readOnly 交易內呼叫，讀所有客戶 LAZY 關聯後組裝成 prompt。
+     *
+     * @return TestGrounding（prompt 已 PII 遮罩；rawData 為原始資料供評審判斷準確性）
+     */
+    private TestGrounding buildTestGrounding() {
         var all = customers.findAllWithDetail();
         var rows = new java.util.ArrayList<String>();
         var totalPipeline = BigDecimal.ZERO;
@@ -763,9 +768,8 @@ public class InsightService {
                     + "｜最近互動" + lastDate
                     + "｜續約日" + (c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate()));
         }
-
-        // 固定分析任務：所有模型相同，確保比較公平
-        final String prompt = """
+        var rawData = String.join("\n", rows);
+        var prompt = """
                 以下是全公司 CRM 客戶組合資料（系統計算，請勿更改數字）。
 
                 # 彙總統計
@@ -778,7 +782,21 @@ public class InsightService {
                 請找出「最需要立即關注的前 3 名客戶」，每位附上：① 風險原因（依據上方數字）② 建議的具體下一步行動。
                 格式要求：Markdown 清單，繁體中文，每位客戶說明不超過 60 字，不可編造任何未在資料中出現的數字或事件。
                 """.formatted(all.size(), highRisk, totalPipeline, activeOpportunities,
-                        PiiMasker.mask(String.join("\n", rows)));
+                        PiiMasker.mask(rawData));
+        return new TestGrounding(prompt, rawData);
+    }
+
+    public SseEmitter streamModelTest(String model, String ignored) {
+        SseEmitter emitter = new SseEmitter(120_000L);
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        if (chatModel == null) {
+            sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
+            sendSimpleTailAndComplete(emitter, null);
+            return emitter;
+        }
+
+        // 建立 grounding context（在交易內同步執行）
+        final String prompt = buildTestGrounding().prompt();
 
         // 在 system prompt 注入唯一 nonce，確保每次呼叫的 cache key 不同，
         // 繞過 OpenAI/Gemini 等 LLM provider 的 prompt cache，強制走真實推理。
@@ -847,17 +865,24 @@ public class InsightService {
             return emitter;
         }
 
-        // 組裝評審 prompt
+        // 建立與測試模型相同的 grounding context，確保評審有原始資料可核對
+        var grounding = buildTestGrounding();
+
+        // 組裝評審 prompt（包含真實 CRM 資料）
         var sb = new StringBuilder();
         sb.append("""
-                你是一位 AI 模型效能評審員。請根據以下「多模型競速測試」結果，對各模型進行綜合評分。
+                你是一位 AI 模型效能評審員。以下「多模型競速測試」使用真實 CRM 資料，每個模型收到相同的客戶資料與任務，請綜合評分。
 
-                ## 測試任務
+                ## 真實 CRM 原始資料（評審參考基準，用於核對各模型回答準確性）
+                """);
+        sb.append(grounding.rawData()).append("\n\n");
+        sb.append("""
+                ## 測試任務（所有模型共同回答）
                 分析全公司 CRM 客戶組合，找出最需立即關注的前 3 名客戶（含風險原因 + 建議行動）。
 
                 ## 評分標準
                 - **回應速度**（30 分）：首字延遲越低、總耗時越短越佳
-                - **回答品質**（50 分）：客戶識別是否準確、風險原因是否有依據、建議是否具體可行
+                - **回答品質**（50 分）：是否正確識別高風險客戶（對照上方原始資料）、風險原因是否有據、建議是否具體可行
                 - **Token 效率**（20 分）：相同任務用較少 completion token 完成代表更高效
 
                 ## 各模型測試結果
