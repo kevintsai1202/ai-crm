@@ -728,6 +728,56 @@ public class InsightService {
     }
 
     /**
+     * 模型競速測試：以指定模型名對測試問題發起 SSE 串流，供 ADMIN 比較多個模型速度與品質。
+     * 函式級註解：model 參數直接覆蓋系統設定，無 grounding context，純粹比較裸 LLM 回應。
+     * 無 api-key 時送一筆 content 錯誤訊息後關閉，不 fallback deterministic（測試用途無意義）。
+     *
+     * @param model 要測試的模型名（空時沿用系統設定或環境變數預設）
+     * @param message 測試問題
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamModelTest(String model, String message) {
+        SseEmitter emitter = new SseEmitter(120_000L);
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        if (chatModel == null) {
+            sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
+            sendSimpleTailAndComplete(emitter, null);
+            return emitter;
+        }
+
+        var spec = ChatClient.create(chatModel).prompt()
+                .system("你是一位 B2B CRM 業務顧問，請用繁體中文簡潔回答，回答不超過 200 字。")
+                .user(message == null ? "" : message);
+
+        // 優先使用傳入的 model 參數；為空則沿用系統設定
+        var testModel = (model != null && !model.isBlank()) ? model : null;
+        if (testModel != null) {
+            spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder().model(testModel));
+        } else {
+            var opts = systemSettings.resolveChatOptions();
+            if (opts != null) spec = spec.options(opts);
+        }
+
+        var fullAnswer = new StringBuilder();
+        spec.stream().chatResponse().subscribe(
+                cr -> {
+                    var result = cr.getResult();
+                    var text = result == null ? null : result.getOutput().getText();
+                    if (text != null && !text.isEmpty()) {
+                        fullAnswer.append(text);
+                        sendContent(emitter, text);
+                    }
+                },
+                error -> {
+                    log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());
+                    sendContent(emitter, "⚠️ 呼叫失敗：" + error.getMessage());
+                    sendSimpleTailAndComplete(emitter, null);
+                },
+                () -> sendSimpleTailAndComplete(emitter, null));
+        return emitter;
+    }
+
+    /**
      * 以 SSE 真串流推送 Portfolio 全公司整體評估報告。
      * 函式級註解：在交易內先算好所有 grounding data 與 fallback 文字，供 callback 執行緒安全使用。
      * Portfolio 無 per-customer citations/risk，串流尾段只送 callId 與 [DONE]。

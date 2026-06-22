@@ -779,3 +779,42 @@ export async function saveAiSettings(model: string, modelOptions: string[]) {
   const { data } = await apiClient.put<import("./types").AiSettingsResponse>("/admin/settings/ai", { model, modelOptions });
   return data;
 }
+
+/**
+ * 模型競速測試（SSE 串流）：以指定 model 對問題發起 LLM 呼叫，限 ADMIN。
+ * 函式級註解：message 與 model 均傳入後端；前端並行呼叫多次以比較不同模型速度。
+ *
+ * @param message 測試問題
+ * @param model 要測試的模型名
+ * @param onChunk 收到內容 chunk 的回呼
+ * @param onDone 串流結束回呼
+ * @param onError 錯誤回呼
+ */
+export async function streamModelTest(
+  message: string,
+  model: string,
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/admin/settings/ai/test`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ message, model })
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}

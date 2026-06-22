@@ -428,4 +428,7 @@ public final class Dtos {
 
     /** AI 設定更新請求：model 為選用模型（空字串=用環境變數）；modelOptions 為候選清單。 */
     public record AiSettingsRequest(String model, List<String> modelOptions) {}
+
+    /** AI 模型測試請求：message 為測試問題，model 為要測試的模型名。 */
+    public record AiTestRequest(@jakarta.validation.constraints.NotBlank String message, String model) {}
 }
