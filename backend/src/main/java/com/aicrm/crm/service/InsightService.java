@@ -22,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -786,13 +788,52 @@ public class InsightService {
         return new TestGrounding(prompt, rawData);
     }
 
-    public SseEmitter streamModelTest(String model, String ignored) {
+    /**
+     * 以指定 provider 的 URL 與 apiKey 動態建立 OpenAI 相容的 ChatModel。
+     * 函式級註解：不快取—每次競速測試建立一次，用完由 GC 回收。
+     *
+     * @param providerId provider DB id
+     * @return ChatModel；provider 不存在或 apiKey 未設定時回 null
+     */
+    private ChatModel buildChatModelForProvider(Long providerId) {
+        if (providerId == null) return null;
+        var provider = systemSettings.findProviderById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        var resolvedBaseUrl = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
+                ? provider.getBaseUrl()
+                : "https://api.openai.com";
+        // Spring AI 2.0：透過 OpenAiChatOptions 設定 apiKey 與 baseUrl，
+        // OpenAiChatModel.Builder.build() 會自動呼叫 OpenAiSetup.setupSyncClient 建立底層 client。
+        var options = OpenAiChatOptions.builder()
+                .apiKey(provider.getApiKey())
+                .baseUrl(resolvedBaseUrl)
+                .temperature(0.3)
+                .build();
+        return OpenAiChatModel.builder()
+                .options(options)
+                .build();
+    }
+
+    public SseEmitter streamModelTest(String model, Long providerId, String ignored) {
         SseEmitter emitter = new SseEmitter(120_000L);
-        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        if (chatModel == null) {
-            sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
-            sendSimpleTailAndComplete(emitter, null);
-            return emitter;
+
+        // 優先使用 provider 動態憑證；未指定 provider 時回退 Spring 注入的預設 ChatModel
+        final ChatModel chatModel;
+        if (providerId != null) {
+            chatModel = buildChatModelForProvider(providerId);
+            if (chatModel == null) {
+                sendContent(emitter, "⚠️ Provider 不存在或 API 金鑰未設定，無法執行模型測試。");
+                sendSimpleTailAndComplete(emitter, null);
+                return emitter;
+            }
+        } else {
+            var defaultModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+            if (defaultModel == null) {
+                sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
+                sendSimpleTailAndComplete(emitter, null);
+                return emitter;
+            }
+            chatModel = defaultModel;
         }
 
         // 建立 grounding context（在交易內同步執行）
