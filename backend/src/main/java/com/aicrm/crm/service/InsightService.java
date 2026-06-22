@@ -97,6 +97,12 @@ public class InsightService {
     /** 系統設定服務：提供 AI 模型覆蓋（DB 設定優先於環境變數）。 */
     private final SystemSettingService systemSettings;
 
+    /**
+     * YAML spring.ai.openai.base-url 的值（可透過 BASE_URL 環境變數覆蓋）。
+     * Provider 的 baseUrl 為空時以此為 fallback，確保 DB provider 與預設 bean 行為一致。
+     */
+    private final String defaultOpenAiBaseUrl;
+
     public InsightService(CustomerService customers,
                           KnowledgeDocumentRepository knowledgeDocuments,
                           EmbeddingClient embeddingClient,
@@ -105,7 +111,8 @@ public class InsightService {
                           AiGovernanceService aiGovernance,
                           ChatMemoryService chatMemory,
                           SystemSettingService systemSettings,
-                          @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
+                          @Value("${spring.ai.openai.api-key:}") String openAiApiKey,
+                          @Value("${spring.ai.openai.base-url:https://api.openai.com}") String defaultOpenAiBaseUrl) {
         this.customers = customers;
         this.knowledgeDocuments = knowledgeDocuments;
         this.embeddingClient = embeddingClient;
@@ -115,6 +122,7 @@ public class InsightService {
         this.chatMemory = chatMemory;
         this.systemSettings = systemSettings;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
+        this.defaultOpenAiBaseUrl = defaultOpenAiBaseUrl;
     }
 
     /**
@@ -799,9 +807,10 @@ public class InsightService {
         if (providerId == null) return null;
         var provider = systemSettings.findProviderById(providerId).orElse(null);
         if (provider == null || !provider.isApiKeySet()) return null;
+        // baseUrl 為空時 fallback 至 YAML spring.ai.openai.base-url（可由 BASE_URL env 覆蓋）
         var resolvedBaseUrl = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
                 ? provider.getBaseUrl()
-                : "https://api.openai.com";
+                : defaultOpenAiBaseUrl;
         // Spring AI 2.0 已移除 OpenAiApi 直接建構方式。
         // OpenAiChatModel.Builder.build() 在 openAiClient 為 null 時，會自動呼叫
         // OpenAiSetup.setupSyncClient(baseUrl, apiKey, ...) 建立完全獨立的 OkHttp client，
