@@ -19,7 +19,7 @@ $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ## File Structure
 
 **後端（新建）**
-- `backend/src/main/resources/db/migration/V17__add_system_settings.sql` — 建表 + 種子兩列
+- `backend/src/main/resources/db/migration/V16__add_system_settings.sql` — 建表 + 種子兩列（最新業務 migration 為 V15，故新檔為 V16）
 - `backend/src/main/java/com/aicrm/crm/domain/SystemSetting.java` — Entity（key-value）
 - `backend/src/main/java/com/aicrm/crm/repository/SystemSettingRepository.java` — JpaRepository
 - `backend/src/main/java/com/aicrm/crm/service/SystemSettingService.java` — 讀寫 + resolveChatOptions
@@ -49,13 +49,13 @@ $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ## Task 1: 資料表與 Entity / Repository
 
 **Files:**
-- Create: `backend/src/main/resources/db/migration/V17__add_system_settings.sql`
+- Create: `backend/src/main/resources/db/migration/V16__add_system_settings.sql`
 - Create: `backend/src/main/java/com/aicrm/crm/domain/SystemSetting.java`
 - Create: `backend/src/main/java/com/aicrm/crm/repository/SystemSettingRepository.java`
 
 - [ ] **Step 1: 建立 Flyway migration**
 
-建立 `backend/src/main/resources/db/migration/V17__add_system_settings.sql`：
+建立 `backend/src/main/resources/db/migration/V16__add_system_settings.sql`（最新業務 migration 為 V15，故新檔為 V16）：
 
 ```sql
 -- 通用系統設定（全域 key-value）。本次用於 AI 對話模型設定：
@@ -180,7 +180,7 @@ Expected: BUILD SUCCESS（無編譯錯誤）。
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/src/main/resources/db/migration/V17__add_system_settings.sql backend/src/main/java/com/aicrm/crm/domain/SystemSetting.java backend/src/main/java/com/aicrm/crm/repository/SystemSettingRepository.java
+git add backend/src/main/resources/db/migration/V16__add_system_settings.sql backend/src/main/java/com/aicrm/crm/domain/SystemSetting.java backend/src/main/java/com/aicrm/crm/repository/SystemSettingRepository.java
 git commit -m "feat(settings): system_settings 表 + Entity/Repository"
 ```
 
@@ -1135,7 +1135,7 @@ cd frontend; pnpm dev
 - **spec「envDefaultModel 唯讀顯示 + 來源標示」** → Task 2 `getAiSettingsView` + Task 6 顯示。✓
 - **spec 測試項（service 解析/回退、controller 403/一致/400、既有 fallback 不破壞）** → Task 2/3/4。✓
 - **型別一致性**：`AiSettingsResponse(currentModel, modelOptions, envDefaultModel, source)`、`AiSettingsRequest(model, modelOptions)`、`resolveChatOptions()`、`getAiSettingsView()`、`getAiChatModel()`、`getModelOptions()`、`updateAiSettings(model, options, username)` 跨後端/前端/測試一致。✓
-- **Migration 版本**：V16 已存在（add_ai_call_log_latency），本計畫用 **V17**。✓
+- **Migration 版本**：最新業務 migration 為 V15，本計畫新表用 **V16**。✓
 
 無 placeholder；所有步驟含完整程式碼與指令。
 ```
