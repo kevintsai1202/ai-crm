@@ -795,8 +795,11 @@ public class InsightService {
             if (opts != null) spec = spec.options(opts);
         }
 
+        var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+
         spec.stream().chatResponse().subscribe(
                 cr -> {
+                    lastResponse.set(cr);
                     var result = cr.getResult();
                     var text = result == null ? null : result.getOutput().getText();
                     if (text != null && !text.isEmpty()) sendContent(emitter, text);
@@ -806,7 +809,119 @@ public class InsightService {
                     sendContent(emitter, "⚠️ 呼叫失敗：" + error.getMessage());
                     sendSimpleTailAndComplete(emitter, null);
                 },
-                () -> sendSimpleTailAndComplete(emitter, null));
+                () -> {
+                    // 串流完成：擷取 token 用量並送出，再送 [DONE]
+                    var resp = lastResponse.get();
+                    var meta = resp == null ? null : resp.getMetadata();
+                    var usage = meta == null ? null : meta.getUsage();
+                    if (usage != null) {
+                        try {
+                            emitter.send(SseEmitter.event().data(Map.of(
+                                    "type", "tokens",
+                                    "promptTokens",     usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0,
+                                    "completionTokens", usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0,
+                                    "totalTokens",      usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0
+                            )));
+                        } catch (Exception e) {
+                            log.warn("送 tokens SSE 失敗：{}", e.getMessage());
+                        }
+                    }
+                    sendSimpleTailAndComplete(emitter, null);
+                });
+        return emitter;
+    }
+
+    /**
+     * 多模型競速測試評分：以 claude-opus-4-8 作為評審，根據速度、token 效率、回答品質綜合評分。
+     * 函式級註解：評審模型固定為 claude-opus-4-8，不受系統設定影響；每次評分寫入 ai_call_log（MODEL_EVAL）。
+     *
+     * @param request 各模型的測試結果（時間、token、內容）
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamModelScore(Dtos.AiScoreRequest request) {
+        SseEmitter emitter = new SseEmitter(180_000L);
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        if (chatModel == null) {
+            SseHelper.sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行評分。");
+            SseHelper.sendSimpleTailAndComplete(emitter, null);
+            return emitter;
+        }
+
+        // 組裝評審 prompt
+        var sb = new StringBuilder();
+        sb.append("""
+                你是一位 AI 模型效能評審員。請根據以下「多模型競速測試」結果，對各模型進行綜合評分。
+
+                ## 測試任務
+                分析全公司 CRM 客戶組合，找出最需立即關注的前 3 名客戶（含風險原因 + 建議行動）。
+
+                ## 評分標準
+                - **回應速度**（30 分）：首字延遲越低、總耗時越短越佳
+                - **回答品質**（50 分）：客戶識別是否準確、風險原因是否有依據、建議是否具體可行
+                - **Token 效率**（20 分）：相同任務用較少 completion token 完成代表更高效
+
+                ## 各模型測試結果
+                """);
+
+        for (var r : request.results()) {
+            sb.append("### ").append(r.model()).append("\n");
+            sb.append("- 首字延遲：").append(r.firstTokenMs()).append(" ms\n");
+            sb.append("- 總耗時：").append(String.format("%.1f", r.totalMs() / 1000.0)).append(" s\n");
+            sb.append("- Token 用量：prompt=").append(r.promptTokens())
+              .append(", completion=").append(r.completionTokens())
+              .append(", total=").append(r.totalTokens()).append("\n");
+            sb.append("- 回答內容：\n").append(r.content()).append("\n\n");
+        }
+
+        sb.append("""
+                ## 輸出要求
+                請以 Markdown 格式輸出評分報告，包含：
+                1. **評分總表**（每個模型三個維度分數 + 總分，表格格式）
+                2. **逐模型評語**（速度表現、回答亮點、不足之處）
+                3. **最終排名與綜合建議**（哪個模型最適合此類任務）
+                使用繁體中文，語氣客觀，不偏袒特定廠商。
+                """);
+
+        final String scorePrompt = sb.toString();
+        final String scoreSystemPrompt = "你是一位客觀的 AI 模型效能評審員，專精 B2B CRM 應用場景。" +
+                "\n<!-- eval-run:" + java.util.UUID.randomUUID() + " -->";
+
+        // 固定使用 claude-opus-4-8 作為評審
+        var spec = ChatClient.create(chatModel).prompt()
+                .system(scoreSystemPrompt)
+                .user(scorePrompt)
+                .options(org.springframework.ai.openai.OpenAiChatOptions.builder().model("claude-opus-4-8"));
+
+        var fullAnswer = new StringBuilder();
+        var lastResp = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+
+        spec.stream().chatResponse().subscribe(
+                cr -> {
+                    lastResp.set(cr);
+                    var result = cr.getResult();
+                    var text = result == null ? null : result.getOutput().getText();
+                    if (text != null && !text.isEmpty()) {
+                        fullAnswer.append(text);
+                        SseHelper.sendContent(emitter, text);
+                    }
+                },
+                error -> {
+                    log.warn("模型評分串流失敗：{}", error.getMessage());
+                    SseHelper.sendContent(emitter, "⚠️ 評分失敗：" + error.getMessage());
+                    SseHelper.sendSimpleTailAndComplete(emitter, null);
+                },
+                () -> {
+                    var answer = fullAnswer.toString().strip();
+                    var resp = lastResp.get();
+                    var meta = resp == null ? null : resp.getMetadata();
+                    var usage = meta == null ? null : meta.getUsage();
+                    var usedModel = meta == null ? "claude-opus-4-8" : meta.getModel();
+                    Integer pt = usage == null ? null : usage.getPromptTokens();
+                    Integer ct = usage == null ? null : usage.getCompletionTokens();
+                    Integer tt = usage == null ? null : usage.getTotalTokens();
+                    var saved = aiGovernance.record(AiCallType.MODEL_EVAL, null, null, usedModel, pt, ct, tt, true, true, answer);
+                    SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
+                });
         return emitter;
     }
 

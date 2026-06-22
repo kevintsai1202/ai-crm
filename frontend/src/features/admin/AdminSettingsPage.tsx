@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { fetchAiSettings, saveAiSettings, streamModelTest } from "../../api";
-import type { AiSettingsResponse } from "../../types";
+import {
+  fetchAiSettings, saveAiSettings, streamModelTest,
+  streamModelScore, fetchModelScoreCalls
+} from "../../api";
+import type { AiSettingsResponse, AiCallHistoryItem, ModelResultItem } from "../../types";
+import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
+import { ReportModal } from "../../components/common/ReportModal";
+import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 
 /** 單一模型的競速測試結果。 */
 interface ModelRaceResult {
-  /** 目前狀態。 */
   status: "idle" | "waiting" | "streaming" | "done" | "error";
-  /** 累積的串流文字。 */
   content: string;
-  /** 首字延遲（ms），收到第一個 token 時記錄。 */
   firstTokenMs: number | null;
-  /** 總耗時（ms），串流完成時記錄。 */
   totalMs: number | null;
-  /** 錯誤訊息。 */
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
   errorMsg?: string;
 }
 
@@ -40,8 +44,14 @@ export default function AdminSettingsPage() {
   /* ── 測試區狀態 ─────────────────────────────── */
   const [raceResults, setRaceResults] = useState<Record<string, ModelRaceResult>>({});
   const [racing, setRacing] = useState(false);
-  /** 追蹤每個模型的開始時間（ref 避免 closure 問題）。 */
   const startTimeRef = useRef<Record<string, number>>({});
+
+  /* ── 評分區狀態 ─────────────────────────────── */
+  const [scoreReport, setScoreReport] = useState<{ open: boolean; loading: boolean; streaming?: boolean; markdown: string; callId?: number | null } | null>(null);
+  const [scoring, setScoring] = useState(false);
+  const [scoreHistoryOpen, setScoreHistoryOpen] = useState(false);
+  const [scoreCalls, setScoreCalls] = useState<AiCallHistoryItem[]>([]);
+  const [scoreCallsLoading, setScoreCallsLoading] = useState(false);
 
   if (user?.role !== "ADMIN") return <Navigate to="/dashboard" replace />;
 
@@ -104,11 +114,12 @@ export default function AdminSettingsPage() {
   function startRace() {
     if (options.length === 0 || racing) return;
     setRacing(true);
+    setScoreReport(null); // 清空上次評分
 
-    // 初始化所有模型的結果
     const init: Record<string, ModelRaceResult> = {};
     options.forEach((m) => {
-      init[m] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null };
+      init[m] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null,
+                  promptTokens: null, completionTokens: null, totalTokens: null };
     });
     setRaceResults(init);
     startTimeRef.current = {};
@@ -121,24 +132,34 @@ export default function AdminSettingsPage() {
       startTimeRef.current[model] = t0;
 
       streamModelTest(
-        "",   // 問題由後端從真實 DB 建構，前端不傳
-        model,
-        (chunk) => {
+        "", model,
+        (chunk: any) => {
           if (chunk.type === "content" && chunk.delta) {
             const now = performance.now();
             setRaceResults((prev) => {
-              const cur = prev[model] ?? { status: "streaming", content: "", firstTokenMs: null, totalMs: null };
-              const isFirst = cur.firstTokenMs === null;
+              const cur = prev[model] ?? { status: "streaming", content: "", firstTokenMs: null, totalMs: null,
+                                           promptTokens: null, completionTokens: null, totalTokens: null };
               return {
                 ...prev,
                 [model]: {
                   ...cur,
                   status: "streaming",
                   content: cur.content + chunk.delta,
-                  firstTokenMs: isFirst ? Math.round(now - t0) : cur.firstTokenMs,
+                  firstTokenMs: cur.firstTokenMs === null ? Math.round(now - t0) : cur.firstTokenMs,
                 }
               };
             });
+          } else if (chunk.type === "tokens") {
+            // 後端串流完成後送出的 token 用量
+            setRaceResults((prev) => ({
+              ...prev,
+              [model]: {
+                ...prev[model],
+                promptTokens: chunk.promptTokens ?? null,
+                completionTokens: chunk.completionTokens ?? null,
+                totalTokens: chunk.totalTokens ?? null,
+              }
+            }));
           }
         },
         () => {
@@ -162,9 +183,66 @@ export default function AdminSettingsPage() {
     });
   }
 
+  /* ── 評分方法 ─────────────────────────────── */
+  function startScore() {
+    const doneResults = Object.entries(raceResults)
+      .filter(([, r]) => r.status === "done")
+      .map(([model, r]): ModelResultItem => ({
+        model,
+        firstTokenMs: r.firstTokenMs ?? 0,
+        totalMs: r.totalMs ?? 0,
+        promptTokens: r.promptTokens ?? 0,
+        completionTokens: r.completionTokens ?? 0,
+        totalTokens: r.totalTokens ?? 0,
+        content: r.content,
+      }));
+
+    if (doneResults.length === 0) return;
+    setScoring(true);
+    setScoreReport({ open: true, loading: true, streaming: true, markdown: "" });
+
+    streamModelScore(
+      doneResults,
+      (chunk: any) => {
+        if (chunk.type === "content" && chunk.delta) {
+          setScoreReport((prev) => prev
+            ? { ...prev, loading: false, streaming: true, markdown: (prev.markdown ?? "") + chunk.delta }
+            : prev);
+        } else if (chunk.type === "callId" && chunk.callId) {
+          setScoreReport((prev) => prev ? { ...prev, callId: chunk.callId } : prev);
+        }
+      },
+      () => {
+        setScoreReport((prev) => prev ? { ...prev, loading: false, streaming: false } : prev);
+        setScoring(false);
+      },
+      (err) => {
+        console.error("評分失敗:", err);
+        setScoreReport((prev) => prev
+          ? { ...prev, loading: false, streaming: false, markdown: "⚠️ 評分失敗，請稍後再試。" }
+          : prev);
+        setScoring(false);
+      }
+    );
+  }
+
+  async function openScoreHistory() {
+    setScoreHistoryOpen(true);
+    setScoreCallsLoading(true);
+    try {
+      setScoreCalls(await fetchModelScoreCalls());
+    } catch {
+      setScoreCalls([]);
+    } finally {
+      setScoreCallsLoading(false);
+    }
+  }
+
   /* ── 渲染 ─────────────────────────────── */
   const envLabel = settings?.envDefaultModel || "未設定";
   const hasRaceResults = Object.keys(raceResults).length > 0;
+  const allDone = hasRaceResults && Object.values(raceResults).every((r) => r.status === "done" || r.status === "error");
+  const hasDoneResults = hasRaceResults && Object.values(raceResults).some((r) => r.status === "done");
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 900 }}>
@@ -316,74 +394,101 @@ export default function AdminSettingsPage() {
 
                 {/* 競速結果並排顯示 */}
                 {hasRaceResults && (
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${Math.min(options.length, 2)}, 1fr)`,
-                    gap: 12
-                  }}>
-                    {options.map((model) => {
-                      const r = raceResults[model];
-                      if (!r) return null;
+                  <>
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: `repeat(${Math.min(options.length, 2)}, 1fr)`,
+                      gap: 12,
+                      marginBottom: 16
+                    }}>
+                      {options.map((model) => {
+                        const r = raceResults[model];
+                        if (!r) return null;
+                        const statusColor = { idle: "#94a3b8", waiting: "#f59e0b", streaming: "#3b82f6", done: "#16a34a", error: "#dc2626" }[r.status];
+                        const statusLabel = { idle: "–", waiting: "等待中", streaming: "生成中", done: "完成", error: "失敗" }[r.status];
 
-                      const statusColor = { idle: "#94a3b8", waiting: "#f59e0b", streaming: "#3b82f6", done: "#16a34a", error: "#dc2626" }[r.status];
-                      const statusLabel = { idle: "–", waiting: "等待中", streaming: "生成中", done: "完成", error: "失敗" }[r.status];
-
-                      return (
-                        <div
-                          key={model}
-                          style={{
-                            border: `1.5px solid ${r.status === "done" ? "#86efac" : r.status === "error" ? "#fca5a5" : "#e2e8f0"}`,
-                            borderRadius: 10,
-                            overflow: "hidden",
-                          }}
-                        >
-                          {/* 模型標頭 */}
-                          <div style={{
-                            padding: "8px 12px",
-                            background: r.status === "done" ? "#f0fdf4" : r.status === "error" ? "#fef2f2" : "#f8fafc",
-                            borderBottom: "1px solid #f1f5f9",
-                            display: "flex", alignItems: "center", justifyContent: "space-between"
-                          }}>
-                            <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "#122232" }}>{model}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              {r.firstTokenMs !== null && (
-                                <span style={{ fontSize: 11, color: "#64748b" }}>首字 {r.firstTokenMs}ms</span>
-                              )}
-                              {r.totalMs !== null && (
-                                <span style={{ fontSize: 11, color: "#64748b" }}>總計 {(r.totalMs / 1000).toFixed(1)}s</span>
-                              )}
-                              <span style={{ fontSize: 11, color: statusColor, fontWeight: 600 }}>● {statusLabel}</span>
+                        return (
+                          <div key={model} style={{ border: `1.5px solid ${r.status === "done" ? "#86efac" : r.status === "error" ? "#fca5a5" : "#e2e8f0"}`, borderRadius: 10, overflow: "hidden" }}>
+                            {/* 模型標頭 */}
+                            <div style={{ padding: "8px 12px", background: r.status === "done" ? "#f0fdf4" : r.status === "error" ? "#fef2f2" : "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
+                                <span style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "#122232" }}>{model}</span>
+                                <span style={{ fontSize: 11, color: statusColor, fontWeight: 600 }}>● {statusLabel}</span>
+                              </div>
+                              {/* 速度 + Token 統計列 */}
+                              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                {r.firstTokenMs !== null && (
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>⚡ 首字 {r.firstTokenMs}ms</span>
+                                )}
+                                {r.totalMs !== null && (
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>⏱ 總計 {(r.totalMs / 1000).toFixed(1)}s</span>
+                                )}
+                                {r.totalTokens !== null && (
+                                  <span style={{ fontSize: 11, color: "#8b5cf6" }}>🔢 {r.completionTokens ?? "–"} / {r.totalTokens} tokens</span>
+                                )}
+                              </div>
+                            </div>
+                            {/* 串流內容 */}
+                            <div style={{ padding: "10px 12px", minHeight: 120, maxHeight: 280, overflowY: "auto", fontSize: 13, lineHeight: 1.6, color: r.status === "error" ? "#dc2626" : "#334155", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                              {r.status === "waiting" && <AiThinkingIndicator label="等待回應" />}
+                              {r.status === "error" && <span>⚠️ {r.errorMsg}</span>}
+                              {r.content}
+                              {r.status === "streaming" && <span style={{ display: "inline-block", width: 8, height: 14, background: "#3b82f6", marginLeft: 2, verticalAlign: "text-bottom", animation: "blink 1s step-end infinite" }} />}
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          {/* 串流內容 */}
-                          <div style={{
-                            padding: "10px 12px",
-                            minHeight: 120, maxHeight: 280,
-                            overflowY: "auto",
-                            fontSize: 13, lineHeight: 1.6, color: r.status === "error" ? "#dc2626" : "#334155",
-                            whiteSpace: "pre-wrap", wordBreak: "break-word"
-                          }}>
-                            {r.status === "waiting" && (
-                              <span style={{ color: "#94a3b8" }}>等待回應…</span>
-                            )}
-                            {r.status === "error" && (
-                              <span>⚠️ {r.errorMsg}</span>
-                            )}
-                            {r.content}
-                            {r.status === "streaming" && (
-                              <span style={{ display: "inline-block", width: 8, height: 14, background: "#3b82f6", marginLeft: 2, verticalAlign: "text-bottom", animation: "blink 1s step-end infinite" }} />
-                            )}
-                          </div>
+                    {/* 評分按鈕（全部完成後顯示） */}
+                    {allDone && hasDoneResults && (
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                        <button type="button" className="btn-secondary" onClick={openScoreHistory}>🕘 評分歷程</button>
+                        <button
+                          type="button"
+                          className="btn-assess"
+                          disabled={scoring}
+                          onClick={startScore}
+                          style={{ fontWeight: 700, padding: "9px 20px", borderRadius: 8 }}
+                        >
+                          {scoring ? "評分中…" : "🏆 claude-opus-4-8 評分"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 評分進行中的提示（尚未有內容時顯示） */}
+                    {scoreReport && scoring && !scoreReport.markdown && (
+                      <div style={{ marginTop: 12, padding: "12px 14px", background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 10 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#122232", marginBottom: 8 }}>
+                          🏆 評分報告 <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>（claude-opus-4-8）</span>
+                          {scoreReport.streaming && <AiThinkingIndicator label="" />}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
           </div>
         </>
+      )}
+
+      {/* 評分報告 Modal */}
+      {scoreReport?.open && (
+        <ReportModal
+          report={{ title: "🏆 多模型競速評分報告", loading: scoreReport.loading, streaming: scoreReport.streaming, markdown: scoreReport.markdown, callId: scoreReport.callId }}
+          onClose={() => setScoreReport(null)}
+        />
+      )}
+
+      {/* 評分歷程 Modal */}
+      {scoreHistoryOpen && (
+        <AiCallHistoryModal
+          title="評分 AI 歷程（claude-opus-4-8）"
+          calls={scoreCalls}
+          loading={scoreCallsLoading}
+          onClose={() => setScoreHistoryOpen(false)}
+        />
       )}
     </div>
   );

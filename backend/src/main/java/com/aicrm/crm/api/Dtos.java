@@ -432,4 +432,17 @@ public final class Dtos {
 
     /** AI 模型測試請求：model 為要測試的模型名；message 保留欄位（後端使用真實 DB 資料，不使用此值）。 */
     public record AiTestRequest(String message, String model) {}
+
+    /** 單一模型的競速測試結果（供評分 API 傳入）。 */
+    public record ModelResultItem(
+            String model,
+            long firstTokenMs,
+            long totalMs,
+            int promptTokens,
+            int completionTokens,
+            int totalTokens,
+            String content) {}
+
+    /** 多模型評分請求：包含所有模型的測試結果。 */
+    public record AiScoreRequest(List<ModelResultItem> results) {}
 }

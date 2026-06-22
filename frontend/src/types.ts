@@ -374,3 +374,14 @@ export interface AiSettingsResponse {
   envDefaultModel: string;
   source: "DB" | "ENV";
 }
+
+/** 單一模型競速測試結果（供評分 API 傳送）。 */
+export interface ModelResultItem {
+  model: string;
+  firstTokenMs: number;
+  totalMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  content: string;
+}

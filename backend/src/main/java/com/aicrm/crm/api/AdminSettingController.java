@@ -1,5 +1,6 @@
 package com.aicrm.crm.api;
 
+import com.aicrm.crm.service.AiGovernanceService;
 import com.aicrm.crm.service.InsightService;
 import com.aicrm.crm.service.JwtService;
 import com.aicrm.crm.service.SystemSettingService;
@@ -26,12 +27,17 @@ public class AdminSettingController {
 
     /** 系統設定服務。 */
     private final SystemSettingService systemSettings;
-    /** AI 洞察服務（借用串流基礎設施執行模型測試）。 */
+    /** AI 洞察服務（借用串流基礎設施執行模型測試與評分）。 */
     private final InsightService insightService;
+    /** AI 治理服務（查詢評分 AI 歷程）。 */
+    private final AiGovernanceService aiGovernance;
 
-    public AdminSettingController(SystemSettingService systemSettings, InsightService insightService) {
+    public AdminSettingController(SystemSettingService systemSettings,
+                                  InsightService insightService,
+                                  AiGovernanceService aiGovernance) {
         this.systemSettings = systemSettings;
         this.insightService = insightService;
+        this.aiGovernance = aiGovernance;
     }
 
     /**
@@ -76,6 +82,30 @@ public class AdminSettingController {
         response.setHeader("Pragma", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         return insightService.streamModelTest(request.model(), request.message());
+    }
+
+    /**
+     * 多模型競速評分（SSE 串流）：以 claude-opus-4-8 評審各模型速度、token 效率與回答品質。
+     *
+     * @param request 各模型測試結果
+     * @param response HTTP 回應（設 no-cache 標頭）
+     * @return SseEmitter 串流發送器
+     */
+    @PostMapping(value = "/ai/score", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter scoreModels(@RequestBody Dtos.AiScoreRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.setHeader("X-Accel-Buffering", "no");
+        return insightService.streamModelScore(request);
+    }
+
+    /**
+     * 取得多模型評分的 AI 歷程（MODEL_EVAL 類型）。
+     *
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/ai/score/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> scoreCalls() {
+        return aiGovernance.historyByType(com.aicrm.crm.domain.AiCallType.MODEL_EVAL);
     }
 
     /** 從認證主體解析登入帳號；無法解析時回 "unknown"。 */

@@ -819,3 +819,40 @@ export async function streamModelTest(
     onError(error);
   }
 }
+
+/**
+ * 多模型競速評分（SSE 串流）：以 claude-opus-4-8 評審速度、token 效率與回答品質。
+ */
+export async function streamModelScore(
+  results: import("./types").ModelResultItem[],
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/admin/settings/ai/score`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ results })
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/** 取得模型評分 AI 歷程（MODEL_EVAL）。 */
+export async function fetchModelScoreCalls() {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/admin/settings/ai/score/calls");
+  return data;
+}
