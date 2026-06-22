@@ -887,6 +887,27 @@ public class InsightService {
 
             var resultText = text.toString().isBlank() ? "(Responses API 無文字輸出)" : text.toString();
             sendContent(emitter, resultText);
+
+            // 解析 Responses API 的 token 用量（欄位名稱與 Chat Completions 不同）
+            // Responses API: usage.input_tokens / output_tokens
+            if (response != null) {
+                var usage = (java.util.Map<String, Object>) response.get("usage");
+                if (usage != null) {
+                    try {
+                        var inputTokens  = usage.get("input_tokens")  instanceof Number n ? n.longValue() : 0L;
+                        var outputTokens = usage.get("output_tokens") instanceof Number n ? n.longValue() : 0L;
+                        emitter.send(SseEmitter.event().data(Map.of(
+                                "type", "tokens",
+                                "promptTokens",     inputTokens,
+                                "completionTokens", outputTokens,
+                                "totalTokens",      inputTokens + outputTokens
+                        )));
+                    } catch (Exception e) {
+                        log.warn("Responses API fallback 送 tokens SSE 失敗：{}", e.getMessage());
+                    }
+                }
+            }
+
             sendSimpleTailAndComplete(emitter, null);
 
         } catch (Exception e) {
