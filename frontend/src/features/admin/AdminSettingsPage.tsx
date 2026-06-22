@@ -5,7 +5,7 @@ import {
   fetchAiSettings, saveAiSettings, streamModelTest,
   streamModelScore, fetchModelScoreCalls
 } from "../../api";
-import type { AiSettingsResponse, AiCallHistoryItem, ModelResultItem } from "../../types";
+import type { AiSettingsResponse, AiCallHistoryItem, ModelResultItem, ModelOptionItem } from "../../types";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
@@ -35,7 +35,8 @@ export default function AdminSettingsPage() {
   /* ── 設定區狀態 ─────────────────────────────── */
   const [settings, setSettings] = useState<AiSettingsResponse | null>(null);
   const [currentModel, setCurrentModel] = useState("");
-  const [options, setOptions] = useState<string[]>([]);
+  const [currentProviderId, setCurrentProviderId] = useState<number | null>(null);
+  const [options, setOptions] = useState<ModelOptionItem[]>([]);
   const [newModel, setNewModel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,6 +65,7 @@ export default function AdminSettingsPage() {
       const data = await fetchAiSettings();
       setSettings(data);
       setCurrentModel(data.currentModel);
+      setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "載入失敗");
@@ -82,14 +84,16 @@ export default function AdminSettingsPage() {
   function addModel() {
     const m = newModel.trim();
     if (!m) return;
-    if (!options.includes(m)) setOptions((prev) => [...prev, m]);
+    if (!options.some((o) => o.model === m)) {
+      setOptions((prev) => [...prev, { model: m, providerId: null }]);
+    }
     setCurrentModel(m);
     setNewModel("");
     setActionMsg(null);
   }
 
   function removeModel(m: string) {
-    setOptions((prev) => prev.filter((o) => o !== m));
+    setOptions((prev) => prev.filter((o) => o.model !== m));
     if (currentModel === m) setCurrentModel("");
     setActionMsg(null);
   }
@@ -99,9 +103,10 @@ export default function AdminSettingsPage() {
     setSettingError(null);
     setActionMsg(null);
     try {
-      const data = await saveAiSettings(currentModel, options);
+      const data = await saveAiSettings(currentModel, currentProviderId, options);
       setSettings(data);
       setCurrentModel(data.currentModel);
+      setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setActionMsg("已儲存，AI 呼叫即時生效。");
     } catch (e) {
@@ -118,8 +123,8 @@ export default function AdminSettingsPage() {
     setScoreReport(null); // 清空上次評分
 
     const init: Record<string, ModelRaceResult> = {};
-    options.forEach((m) => {
-      init[m] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null,
+    options.forEach((opt) => {
+      init[opt.model] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null,
                   promptTokens: null, completionTokens: null, totalTokens: null };
     });
     setRaceResults(init);
@@ -128,12 +133,13 @@ export default function AdminSettingsPage() {
     let doneCount = 0;
     const total = options.length;
 
-    options.forEach((model) => {
+    options.forEach((opt) => {
+      const model = opt.model;
       const t0 = performance.now();
       startTimeRef.current[model] = t0;
 
       streamModelTest(
-        "", model,
+        "", model, opt.providerId,
         (chunk: any) => {
           if (chunk.type === "content" && chunk.delta) {
             const now = performance.now();
@@ -172,7 +178,7 @@ export default function AdminSettingsPage() {
           doneCount++;
           if (doneCount >= total) setRacing(false);
         },
-        (err) => {
+        (err: any) => {
           setRaceResults((prev) => ({
             ...prev,
             [model]: { ...prev[model], status: "error", errorMsg: err?.message ?? "連線失敗" }
@@ -291,12 +297,12 @@ export default function AdminSettingsPage() {
               {options.length === 0 && (
                 <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>尚無候選模型，請在下方輸入後新增。</p>
               )}
-              {options.map((o) => {
-                const isSelected = currentModel === o;
+              {options.map((opt) => {
+                const isSelected = currentModel === opt.model;
                 return (
                   <div
-                    key={o}
-                    onClick={() => selectModel(o)}
+                    key={opt.model}
+                    onClick={() => selectModel(opt.model)}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "10px 14px",
@@ -315,7 +321,7 @@ export default function AdminSettingsPage() {
                       }}>
                         {isSelected && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
                       </div>
-                      <span style={{ fontFamily: "monospace", fontSize: 14, color: "#122232" }}>{o}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 14, color: "#122232" }}>{opt.model}</span>
                       {isSelected && (
                         <span style={{ fontSize: 11, color: "#166534", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>使用中</span>
                       )}
@@ -324,7 +330,7 @@ export default function AdminSettingsPage() {
                       type="button"
                       className="btn-danger"
                       style={{ padding: "3px 10px", fontSize: 12 }}
-                      onClick={(e) => { e.stopPropagation(); removeModel(o); }}
+                      onClick={(e) => { e.stopPropagation(); removeModel(opt.model); }}
                     >
                       刪除
                     </button>
@@ -402,7 +408,8 @@ export default function AdminSettingsPage() {
                       gap: 12,
                       marginBottom: 16
                     }}>
-                      {options.map((model) => {
+                      {options.map((opt) => {
+                        const model = opt.model;
                         const r = raceResults[model];
                         if (!r) return null;
                         const statusColor = { idle: "#94a3b8", waiting: "#f59e0b", streaming: "#3b82f6", done: "#16a34a", error: "#dc2626" }[r.status];

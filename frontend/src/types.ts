@@ -367,12 +367,28 @@ export interface ManagerInsightResponse {
 }
 
 
-/** AI 設定回應：currentModel 空字串代表用環境變數；source 為 "DB" | "ENV"。 */
+/** 模型設定項目（含供應商關聯）。 */
+export interface ModelOptionItem {
+  model: string;
+  providerId: number | null;
+}
+
+/** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
+export interface AiProviderItem {
+  id: number;
+  name: string;
+  baseUrl: string | null;
+  apiKeySet: boolean;
+}
+
+/** AI 設定回應（含 providers 清單與帶 providerId 的 modelOptions）。 */
 export interface AiSettingsResponse {
   currentModel: string;
-  modelOptions: string[];
+  currentProviderId: number | null;
+  modelOptions: ModelOptionItem[];
+  providers: AiProviderItem[];
   envDefaultModel: string;
-  source: "DB" | "ENV";
+  source: string;
 }
 
 /** 單一模型競速測試結果（供評分 API 傳送）。 */
