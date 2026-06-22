@@ -65,8 +65,6 @@ public class ManagerInsightService {
     /** 系統設定服務：提供 AI 模型覆蓋（DB 設定優先於環境變數）。 */
     private final SystemSettingService systemSettings;
 
-    /** InsightService：借用 sendSimpleTailAndComplete（無 citations/risk 的 SSE 尾段）。 */
-    private final InsightService insightService;
 
     public ManagerInsightService(ManagerAnalyticsService analytics,
                                  ManagerInsightRepository insights,
@@ -74,7 +72,6 @@ public class ManagerInsightService {
                                  AiGovernanceService aiGovernance,
                                  ObjectProvider<ChatModel> chatModelProvider,
                                  SystemSettingService systemSettings,
-                                 InsightService insightService,
                                  @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.analytics = analytics;
         this.insights = insights;
@@ -82,7 +79,6 @@ public class ManagerInsightService {
         this.aiGovernance = aiGovernance;
         this.chatModelProvider = chatModelProvider;
         this.systemSettings = systemSettings;
-        this.insightService = insightService;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
 
@@ -340,8 +336,8 @@ public class ManagerInsightService {
         if (chatModel == null) {
             aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
             upsert("TEAM", null, fallback, null);
-            insightService.sendContent(emitter, fallback);
-            insightService.sendSimpleTailAndComplete(emitter, null);
+            SseHelper.sendContent(emitter, fallback);
+            SseHelper.sendSimpleTailAndComplete(emitter, null);
             return emitter;
         }
 
@@ -357,23 +353,23 @@ public class ManagerInsightService {
                     var text = result == null ? null : result.getOutput().getText();
                     if (text != null && !text.isEmpty()) {
                         fullAnswer.append(text);
-                        insightService.sendContent(emitter, text);
+                        SseHelper.sendContent(emitter, text);
                     }
                 },
                 error -> {
                     log.warn("OpenAI 團隊診斷串流失敗，改用 fallback：{}", error.getMessage());
                     aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
                     upsert("TEAM", null, fallback, null);
-                    if (fullAnswer.toString().isBlank()) insightService.sendContent(emitter, fallback);
-                    insightService.sendSimpleTailAndComplete(emitter, null);
+                    if (fullAnswer.toString().isBlank()) SseHelper.sendContent(emitter, fallback);
+                    SseHelper.sendSimpleTailAndComplete(emitter, null);
                 },
                 () -> {
                     var answer = fullAnswer.toString().strip();
                     if (answer.isBlank()) {
                         aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
                         upsert("TEAM", null, fallback, null);
-                        insightService.sendContent(emitter, fallback);
-                        insightService.sendSimpleTailAndComplete(emitter, null);
+                        SseHelper.sendContent(emitter, fallback);
+                        SseHelper.sendSimpleTailAndComplete(emitter, null);
                         return;
                     }
                     var meta = lastResp.get() == null ? null : lastResp.get().getMetadata();
@@ -384,7 +380,7 @@ public class ManagerInsightService {
                     Integer tt = usage == null ? null : usage.getTotalTokens();
                     aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, model, pt, ct, tt, true, true, answer);
                     upsert("TEAM", null, answer, model);
-                    insightService.sendSimpleTailAndComplete(emitter, null);
+                    SseHelper.sendSimpleTailAndComplete(emitter, null);
                 });
         return emitter;
     }
@@ -409,8 +405,8 @@ public class ManagerInsightService {
         if (chatModel == null) {
             aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
             upsert("OWNER", owner, fallback, null);
-            insightService.sendContent(emitter, fallback);
-            insightService.sendSimpleTailAndComplete(emitter, null);
+            SseHelper.sendContent(emitter, fallback);
+            SseHelper.sendSimpleTailAndComplete(emitter, null);
             return emitter;
         }
 
@@ -426,23 +422,23 @@ public class ManagerInsightService {
                     var text = result == null ? null : result.getOutput().getText();
                     if (text != null && !text.isEmpty()) {
                         fullAnswer.append(text);
-                        insightService.sendContent(emitter, text);
+                        SseHelper.sendContent(emitter, text);
                     }
                 },
                 error -> {
                     log.warn("OpenAI 業務 coaching 串流失敗，改用 fallback：{}", error.getMessage());
                     aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
                     upsert("OWNER", owner, fallback, null);
-                    if (fullAnswer.toString().isBlank()) insightService.sendContent(emitter, fallback);
-                    insightService.sendSimpleTailAndComplete(emitter, null);
+                    if (fullAnswer.toString().isBlank()) SseHelper.sendContent(emitter, fallback);
+                    SseHelper.sendSimpleTailAndComplete(emitter, null);
                 },
                 () -> {
                     var answer = fullAnswer.toString().strip();
                     if (answer.isBlank()) {
                         aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
                         upsert("OWNER", owner, fallback, null);
-                        insightService.sendContent(emitter, fallback);
-                        insightService.sendSimpleTailAndComplete(emitter, null);
+                        SseHelper.sendContent(emitter, fallback);
+                        SseHelper.sendSimpleTailAndComplete(emitter, null);
                         return;
                     }
                     var meta = lastResp.get() == null ? null : lastResp.get().getMetadata();
@@ -453,7 +449,7 @@ public class ManagerInsightService {
                     Integer tt = usage == null ? null : usage.getTotalTokens();
                     aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, model, pt, ct, tt, true, true, answer);
                     upsert("OWNER", owner, answer, model);
-                    insightService.sendSimpleTailAndComplete(emitter, null);
+                    SseHelper.sendSimpleTailAndComplete(emitter, null);
                 });
         return emitter;
     }

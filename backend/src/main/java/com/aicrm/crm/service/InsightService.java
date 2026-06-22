@@ -322,11 +322,7 @@ public class InsightService {
      * @param delta 內容片段
      */
     void sendContent(SseEmitter emitter, String delta) {
-        try {
-            emitter.send(SseEmitter.event().data(Map.of("type", "content", "delta", delta)));
-        } catch (Exception e) {
-            emitter.completeWithError(e);
-        }
+        SseHelper.sendContent(emitter, delta);
     }
 
     /**
@@ -929,14 +925,6 @@ public class InsightService {
      * @param callId AI 呼叫紀錄 id（可為 null）
      */
     void sendSimpleTailAndComplete(SseEmitter emitter, Long callId) {
-        try {
-            if (callId != null) {
-                emitter.send(SseEmitter.event().data(Map.of("type", "callId", "callId", callId)));
-            }
-            emitter.send(SseEmitter.event().data("[DONE]"));
-            emitter.complete();
-        } catch (Exception e) {
-            emitter.completeWithError(e);
-        }
+        SseHelper.sendSimpleTailAndComplete(emitter, callId);
     }
 }
