@@ -47,15 +47,16 @@ public class AiProvider {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.updatedBy = updatedBy;
-        this.createdAt = Instant.now();
-        this.updatedAt = Instant.now();
+        var now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     /** 更新 provider 設定；apiKey 為 null 時保留現有金鑰不異動。 */
     public void update(String name, String baseUrl, String apiKey, String updatedBy) {
         this.name = name;
         this.baseUrl = baseUrl;
-        if (apiKey != null) this.apiKey = apiKey;
+        if (apiKey != null && !apiKey.isBlank()) this.apiKey = apiKey;
         this.updatedBy = updatedBy;
         this.updatedAt = Instant.now();
     }
@@ -63,6 +64,7 @@ public class AiProvider {
     public Long getId() { return id; }
     public String getName() { return name; }
     public String getBaseUrl() { return baseUrl; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public String getApiKey() { return apiKey; }
     /** apiKey 是否已設定（非空）。 */
     public boolean isApiKeySet() { return apiKey != null && !apiKey.isBlank(); }
