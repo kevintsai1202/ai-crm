@@ -461,28 +461,28 @@ export default function AdminSettingsPage() {
                     {allDone && hasDoneResults && (
                       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f1f5f9", flexWrap: "wrap" }}>
                         <button type="button" className="btn-secondary" onClick={openScoreHistory}>🕘 評分歷程</button>
-                        {/* ZIP 下載：評分完成後才顯示 */}
-                        {scoreReport && !scoreReport.loading && scoreReport.markdown && (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => {
-                              // 組裝所有模型回答 + 評分報告為 ZIP
-                              const ts = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
-                              const files: Record<string, string> = {};
-                              Object.entries(raceResults).forEach(([model, r]) => {
-                                if (r.content) {
-                                  const safeName = model.replace(/[/\\:*?"<>|]/g, "_");
-                                  files[`${safeName}.md`] = r.content;
-                                }
-                              });
+                        {/* ZIP 下載：模型全部完成即顯示，有評分報告則一起打包 */}
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            // 組裝所有模型回答（+ 評分報告若已完成）為 ZIP
+                            const ts = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+                            const files: Record<string, string> = {};
+                            Object.entries(raceResults).forEach(([model, r]) => {
+                              if (r.content) {
+                                const safeName = model.replace(/[/\\:*?"<>|]/g, "_");
+                                files[`${safeName}.md`] = r.content;
+                              }
+                            });
+                            if (scoreReport?.markdown) {
                               files["00_評分報告.md"] = scoreReport.markdown;
-                              downloadZip(`競速測試_${ts}`, files);
-                            }}
-                          >
-                            📦 下載全部 ZIP
-                          </button>
-                        )}
+                            }
+                            downloadZip(`競速測試_${ts}`, files);
+                          }}
+                        >
+                          📦 下載全部 ZIP
+                        </button>
                         <button
                           type="button"
                           className="btn-assess"
@@ -516,7 +516,7 @@ export default function AdminSettingsPage() {
       {scoreReport?.open && (
         <ReportModal
           report={{ title: "🏆 多模型競速評分報告", loading: scoreReport.loading, streaming: scoreReport.streaming, markdown: scoreReport.markdown, callId: scoreReport.callId }}
-          onClose={() => setScoreReport(null)}
+          onClose={() => setScoreReport((prev) => prev ? { ...prev, open: false } : null)}
         />
       )}
 
