@@ -8,7 +8,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -61,7 +63,7 @@ public class AdminSettingController {
     public Dtos.AiSettingsResponse updateAiSettings(@RequestBody Dtos.AiSettingsRequest request,
                                                      Authentication authentication) {
         try {
-            systemSettings.updateAiSettings(request.model(), request.modelOptions(), resolveUsername(authentication));
+            systemSettings.updateAiSettings(request.model(), request.providerId(), request.modelOptions(), resolveUsername(authentication));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
@@ -81,7 +83,7 @@ public class AdminSettingController {
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         response.setHeader("Pragma", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
-        return insightService.streamModelTest(request.model(), request.message());
+        return insightService.streamModelTest(request.model(), request.providerId(), request.message());
     }
 
     /**
@@ -96,6 +98,68 @@ public class AdminSettingController {
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
         response.setHeader("X-Accel-Buffering", "no");
         return insightService.streamModelScore(request);
+    }
+
+    /**
+     * 取得所有 AI 供應商（不含 apiKey）。
+     *
+     * @return provider 清單
+     */
+    @GetMapping("/ai/providers")
+    public java.util.List<Dtos.AiProviderItem> getProviders() {
+        return systemSettings.getProviders();
+    }
+
+    /**
+     * 新增 AI 供應商。
+     *
+     * @param request 供應商請求 DTO
+     * @param authentication 登入認證
+     * @return 新增後的 provider
+     */
+    @PostMapping("/ai/providers")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
+    public Dtos.AiProviderItem createProvider(@jakarta.validation.Valid @RequestBody Dtos.AiProviderRequest request,
+                                               Authentication authentication) {
+        try {
+            return systemSettings.createProvider(request, resolveUsername(authentication));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /**
+     * 更新 AI 供應商；apiKey 為 null 或空字串時保留現有金鑰。
+     *
+     * @param id provider id
+     * @param request 供應商請求 DTO
+     * @param authentication 登入認證
+     * @return 更新後的 provider
+     */
+    @PutMapping("/ai/providers/{id}")
+    public Dtos.AiProviderItem updateProvider(@PathVariable Long id,
+                                               @jakarta.validation.Valid @RequestBody Dtos.AiProviderRequest request,
+                                               Authentication authentication) {
+        try {
+            return systemSettings.updateProvider(id, request, resolveUsername(authentication));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /**
+     * 刪除 AI 供應商。
+     *
+     * @param id provider id
+     */
+    @DeleteMapping("/ai/providers/{id}")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteProvider(@PathVariable Long id) {
+        try {
+            systemSettings.deleteProvider(id);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
     }
 
     /**

@@ -775,9 +775,44 @@ export async function fetchAiSettings() {
 }
 
 /** 更新 AI 設定（限 ADMIN），回傳更新後的設定。 */
-export async function saveAiSettings(model: string, modelOptions: string[]) {
-  const { data } = await apiClient.put<import("./types").AiSettingsResponse>("/admin/settings/ai", { model, modelOptions });
+export async function saveAiSettings(
+  model: string,
+  providerId: number | null,
+  modelOptions: import("./types").ModelOptionItem[]
+) {
+  const { data } = await apiClient.put<import("./types").AiSettingsResponse>(
+    "/admin/settings/ai",
+    { model, providerId, modelOptions }
+  );
   return data;
+}
+
+/** 新增 AI 供應商（限 ADMIN）。 */
+export async function createAiProvider(name: string, baseUrl: string | null, apiKey: string) {
+  const { data } = await apiClient.post<import("./types").AiProviderItem>(
+    "/admin/settings/ai/providers",
+    { name, baseUrl, apiKey }
+  );
+  return data;
+}
+
+/** 更新 AI 供應商；apiKey 為 null 代表保留現有金鑰。 */
+export async function updateAiProvider(
+  id: number,
+  name: string,
+  baseUrl: string,
+  apiKey: string | null
+) {
+  const { data } = await apiClient.put<import("./types").AiProviderItem>(
+    `/admin/settings/ai/providers/${id}`,
+    { name, baseUrl, apiKey }
+  );
+  return data;
+}
+
+/** 刪除 AI 供應商（限 ADMIN）。 */
+export async function deleteAiProvider(id: number) {
+  await apiClient.delete(`/admin/settings/ai/providers/${id}`);
 }
 
 /**
@@ -793,6 +828,7 @@ export async function saveAiSettings(model: string, modelOptions: string[]) {
 export async function streamModelTest(
   message: string,
   model: string,
+  providerId: number | null,
   onChunk: (chunk: SseChunk) => void,
   onDone: () => void,
   onError: (err: any) => void
@@ -808,7 +844,7 @@ export async function streamModelTest(
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       // _t 時間戳確保每次 POST 請求唯一，避免 CDN / proxy 回傳 cached response
-      body: JSON.stringify({ message, model, _t: new Date().getTime() })
+      body: JSON.stringify({ message, model, providerId, _t: new Date().getTime() })
     });
     if (!response.ok) {
       handleStreamUnauthorized(response);

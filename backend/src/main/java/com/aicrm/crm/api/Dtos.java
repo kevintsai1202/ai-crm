@@ -423,15 +423,34 @@ public final class Dtos {
     /** 優先關懷單筆：客戶與中文關懷理由。 */
     public record PriorityCareItem(Long customerId, String name, String reason) {}
 
-    /** AI 設定回應：currentModel 空字串代表用環境變數；source 為 DB / ENV。 */
-    public record AiSettingsResponse(String currentModel, List<String> modelOptions,
-                                     String envDefaultModel, String source) {}
+    /** 模型設定項目（含供應商關聯）。 */
+    public record ModelOptionItem(String model, Long providerId) {}
 
-    /** AI 設定更新請求：model 為選用模型（空字串=用環境變數）；modelOptions 為候選清單。 */
-    public record AiSettingsRequest(String model, List<String> modelOptions) {}
+    /** AI 供應商檢視（apiKey 永不回傳前端，以 apiKeySet 布林代替）。 */
+    public record AiProviderItem(Long id, String name, String baseUrl, boolean apiKeySet) {}
 
-    /** AI 模型測試請求：model 為要測試的模型名；message 保留欄位（後端使用真實 DB 資料，不使用此值）。 */
-    public record AiTestRequest(String message, String model) {}
+    /** 新增/更新供應商請求；apiKey 為 null 代表不更換現有金鑰。 */
+    public record AiProviderRequest(
+        @jakarta.validation.constraints.NotBlank String name,
+        String baseUrl,
+        String apiKey
+    ) {}
+
+    /** AI 設定回應（含供應商清單與帶 providerId 的模型選項）。 */
+    public record AiSettingsResponse(
+        String currentModel,
+        Long currentProviderId,
+        List<ModelOptionItem> modelOptions,
+        List<AiProviderItem> providers,
+        String envDefaultModel,
+        String source
+    ) {}
+
+    /** AI 設定更新請求。 */
+    public record AiSettingsRequest(String model, Long providerId, List<ModelOptionItem> modelOptions) {}
+
+    /** 模型競速測試請求（providerId 指定使用哪組 API 憑證）。 */
+    public record AiTestRequest(String message, String model, Long providerId) {}
 
     /** 單一模型的競速測試結果（供評分 API 傳入）。 */
     public record ModelResultItem(
