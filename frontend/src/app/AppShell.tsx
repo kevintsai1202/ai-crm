@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { clearToken } from "../api";
+import { useVersionCheck } from "../hooks/useVersionCheck";
 import type { HealthResponse } from "../types";
 import { formatDateTime } from "../lib/format";
 
@@ -21,13 +23,39 @@ function HealthBadge({ health, error, onRefresh }: { health: HealthResponse | nu
 }
 
 /**
+ * 系統更新通知橫幅：偵測到新版本時顯示於頂部，引導使用者重新整理。
+ * 函式級註解：「立即更新」會清除 JWT token 並強制重載，確保新版本 API 與前端同步。
+ */
+function UpdateBanner() {
+  function handleUpdate() {
+    clearToken();
+    window.location.reload();
+  }
+
+  return (
+    <div className="update-banner">
+      <span className="update-banner__icon">🚀</span>
+      <span className="update-banner__text">
+        系統已更新，請重新整理以使用最新功能
+      </span>
+      <button type="button" className="update-banner__btn" onClick={handleUpdate}>
+        立即更新
+      </button>
+    </div>
+  );
+}
+
+/**
  * 應用外殼：左側邊欄（品牌 + 健康狀態 + 使用者卡 + 導覽）+ 右側 <Outlet/>。
  * 函式級註解：側邊欄導覽提供「儀表板」與「客戶」兩個主入口，達成儀表板與操作分頁。
  */
 export function AppShell() {
   const { user, health, healthError, refreshHealth, logout } = useAuth();
+  const hasUpdate = useVersionCheck();
+
   return (
     <div className="app-shell">
+      {hasUpdate && <UpdateBanner />}
       <aside className="sidebar">
         <div className="brand-block">
           <img src="/crm-hero.svg" alt="AI CRM 工作台視覺" />
