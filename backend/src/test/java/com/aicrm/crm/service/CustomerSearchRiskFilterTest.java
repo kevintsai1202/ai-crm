@@ -28,10 +28,10 @@ class CustomerSearchRiskFilterTest extends PostgresTestBase {
         maintenance.recompute(id);
     }
 
-    /** search 帶 riskLevel=HIGH 時，回傳項目應全為 HIGH。 */
+    /** search 帶 riskLevel=HIGH 時，回傳項目應全為 HIGH（null principal 模擬 ADMIN/MANAGER 不限角色）。 */
     @Test
     void search_byHighRisk_returnsOnlyHigh() {
-        var result = customerService.search(0, 20, null, "風險篩選產業", null, null, "HIGH", null, null);
+        var result = customerService.search(null, 0, 20, null, "風險篩選產業", null, null, "HIGH", null, null);
         assertThat(result.items()).isNotEmpty();
         assertThat(result.items()).allMatch(s -> "HIGH".equals(s.riskLevel()));
         assertThat(result.totalElements()).isEqualTo(result.items().size());
