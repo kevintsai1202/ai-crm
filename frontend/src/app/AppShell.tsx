@@ -44,7 +44,10 @@ export function AppShell() {
             <NavLink to="/team" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>📈 業務分析</NavLink>
           ) : null}
           {user?.role === "ADMIN" ? (
-            <NavLink to="/admin/users" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>⚙️ 帳號管理</NavLink>
+            <>
+              <NavLink to="/admin/users" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>⚙️ 帳號管理</NavLink>
+              <NavLink to="/admin/settings" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>🔧 系統設定</NavLink>
+            </>
           ) : null}
         </nav>
         <HealthBadge health={health} error={healthError} onRefresh={refreshHealth} />

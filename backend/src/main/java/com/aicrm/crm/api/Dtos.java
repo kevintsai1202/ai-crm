@@ -421,4 +421,11 @@ public final class Dtos {
 
     /** 優先關懷單筆：客戶與中文關懷理由。 */
     public record PriorityCareItem(Long customerId, String name, String reason) {}
+
+    /** AI 設定回應：currentModel 空字串代表用環境變數；source 為 DB / ENV。 */
+    public record AiSettingsResponse(String currentModel, List<String> modelOptions,
+                                     String envDefaultModel, String source) {}
+
+    /** AI 設定更新請求：model 為選用模型（空字串=用環境變數）；modelOptions 為候選清單。 */
+    public record AiSettingsRequest(String model, List<String> modelOptions) {}
 }

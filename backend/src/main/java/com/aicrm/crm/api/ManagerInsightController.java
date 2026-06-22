@@ -2,12 +2,14 @@ package com.aicrm.crm.api;
 
 import com.aicrm.crm.service.AiGovernanceService;
 import com.aicrm.crm.service.ManagerInsightService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Manager AI 分析 API（模組 C）：團隊整體診斷與個別業務 coaching。
@@ -45,9 +47,19 @@ public class ManagerInsightController {
      *
      * @return 生成後的回應
      */
-    @PostMapping("/team")
+    @PostMapping(value = "/team", produces = MediaType.APPLICATION_JSON_VALUE)
     public Dtos.ManagerInsightResponse generateTeam() {
         return service.generateTeamInsight();
+    }
+
+    /**
+     * 以 SSE 串流推送團隊整體診斷（邊產生邊送，完成後 upsert 快取）。
+     *
+     * @return SseEmitter 串流發送器
+     */
+    @PostMapping(value = "/team", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamTeam() {
+        return service.streamTeamInsight();
     }
 
     /**
@@ -68,9 +80,20 @@ public class ManagerInsightController {
      * @param owner 業務顯示名稱
      * @return 生成後的回應
      */
-    @PostMapping("/owner")
+    @PostMapping(value = "/owner", produces = MediaType.APPLICATION_JSON_VALUE)
     public Dtos.ManagerInsightResponse generateOwner(@RequestParam String owner) {
         return service.generateOwnerInsight(owner);
+    }
+
+    /**
+     * 以 SSE 串流推送個別業務 coaching（邊產生邊送，完成後 upsert 快取）。
+     *
+     * @param owner 業務顯示名稱
+     * @return SseEmitter 串流發送器
+     */
+    @PostMapping(value = "/owner", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamOwner(@RequestParam String owner) {
+        return service.streamOwnerInsight(owner);
     }
 
     /**

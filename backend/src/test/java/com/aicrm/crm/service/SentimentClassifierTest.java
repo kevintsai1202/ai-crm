@@ -22,7 +22,8 @@ class SentimentClassifierTest {
         var insights = mock(InteractionInsightRepository.class);
         var provider = (ObjectProvider<ChatModel>) mock(ObjectProvider.class);
         var objectMapper = new ObjectMapper();
-        return new SentimentIntentService(insights, provider, objectMapper, "");
+        var systemSettings = mock(SystemSettingService.class);
+        return new SentimentIntentService(insights, provider, objectMapper, systemSettings, "");
     }
 
     @Test

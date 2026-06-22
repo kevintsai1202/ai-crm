@@ -92,6 +92,9 @@ public class InsightService {
     /** 對話記憶服務：時序 + 語意向量雙路召回與保存（可寫交易，與本服務 readOnly 隔離）。 */
     private final ChatMemoryService chatMemory;
 
+    /** 系統設定服務：提供 AI 模型覆蓋（DB 設定優先於環境變數）。 */
+    private final SystemSettingService systemSettings;
+
     public InsightService(CustomerService customers,
                           KnowledgeDocumentRepository knowledgeDocuments,
                           EmbeddingClient embeddingClient,
@@ -99,6 +102,7 @@ public class InsightService {
                           ObjectProvider<ChatModel> chatModelProvider,
                           AiGovernanceService aiGovernance,
                           ChatMemoryService chatMemory,
+                          SystemSettingService systemSettings,
                           @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.customers = customers;
         this.knowledgeDocuments = knowledgeDocuments;
@@ -107,6 +111,7 @@ public class InsightService {
         this.chatModelProvider = chatModelProvider;
         this.aiGovernance = aiGovernance;
         this.chatMemory = chatMemory;
+        this.systemSettings = systemSettings;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
 
@@ -234,7 +239,10 @@ public class InsightService {
         var fullAnswer = new StringBuilder();
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
 
-        ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt).stream().chatResponse()
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+        var streamOpts = systemSettings.resolveChatOptions();
+        if (streamOpts != null) streamSpec = streamSpec.options(streamOpts);
+        streamSpec.stream().chatResponse()
                 .subscribe(
                         chatResponse -> {
                             lastResponse.set(chatResponse);
@@ -313,7 +321,7 @@ public class InsightService {
      * @param emitter SSE 發送器
      * @param delta 內容片段
      */
-    private void sendContent(SseEmitter emitter, String delta) {
+    void sendContent(SseEmitter emitter, String delta) {
         try {
             emitter.send(SseEmitter.event().data(Map.of("type", "content", "delta", delta)));
         } catch (Exception e) {
@@ -425,12 +433,10 @@ public class InsightService {
             return recordFallback(type, customer, risk);
         }
         try {
-            var chatResponse = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user(userPrompt)
-                    .call()
-                    .chatResponse();
+            var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+            var opts = systemSettings.resolveChatOptions();
+            if (opts != null) spec = spec.options(opts);
+            var chatResponse = spec.call().chatResponse();
             var content = chatResponse == null ? null : chatResponse.getResult().getOutput().getText();
             if (content == null || content.isBlank()) {
                 log.warn("OpenAI 回傳空白內容，customerId={}，改用 deterministic fallback", customer.getId());
@@ -719,5 +725,136 @@ public class InsightService {
             reasons.add("續約日已逾期 " + overdue + " 天");
         }
         return new Dtos.RiskResponse(Math.min(churn, 100), Math.min(renewal, 100), reasons);
+    }
+
+    /**
+     * 以 SSE 真串流推送 Portfolio 全公司整體評估報告。
+     * 函式級註解：在交易內先算好所有 grounding data 與 fallback 文字，供 callback 執行緒安全使用。
+     * Portfolio 無 per-customer citations/risk，串流尾段只送 callId 與 [DONE]。
+     *
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamPortfolioAssessment() {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        // 在交易內同步建立 grounding context（讀所有客戶 LAZY 關聯）
+        var all = customers.findAllWithDetail();
+        var rows = new java.util.ArrayList<String>();
+        var totalPipeline = BigDecimal.ZERO;
+        long activeOpportunities = 0;
+        int highRisk = 0;
+        for (var c : all) {
+            var risk = calculateOpportunityRisk(c);
+            var amount = c.getOpportunities().stream().map(Opportunity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            var active = c.getOpportunities().stream().filter(o -> o.getStage() != OpportunityStage.CLOSED_LOST).count();
+            var lastDate = c.getInteractions().stream().map(Interaction::getOccurredAt).max(LocalDateTime::compareTo)
+                    .map(d -> d.toLocalDate().toString()).orElse("無");
+            totalPipeline = totalPipeline.add(amount);
+            activeOpportunities += active;
+            if (risk.churnRisk() >= 50 || risk.renewalDelayRisk() >= 50) highRisk++;
+            rows.add(c.getName() + "｜" + c.getIndustry() + "｜" + c.getOwnerName()
+                    + "｜流失" + risk.churnRisk() + "/續約延遲" + risk.renewalDelayRisk()
+                    + "｜商機" + c.getOpportunities().size() + "筆/" + amount
+                    + "｜最近互動" + lastDate
+                    + "｜續約日" + (c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate()));
+        }
+
+        final int finalHighRisk = highRisk;
+        final BigDecimal finalPipeline = totalPipeline;
+        final long finalActive = activeOpportunities;
+        final String fallback = deterministicPortfolio(all.size(), highRisk, totalPipeline, activeOpportunities);
+        final var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+
+        // 無金鑰：直接 fallback，送完整報告後結束
+        if (chatModel == null) {
+            var saved = aiGovernance.record(AiCallType.PORTFOLIO, null, null, 0, 0, 0, false, true, fallback);
+            sendContent(emitter, fallback);
+            sendSimpleTailAndComplete(emitter, saved.getId());
+            return emitter;
+        }
+
+        final String prompt = """
+                以下是全公司 CRM 客戶組合資料，請產出「Portfolio 整體評估報告」（Markdown 格式）。
+
+                # 彙總統計（系統計算，請勿更改數字）
+                客戶總數：%d
+                高風險客戶數（流失或續約延遲 >= 50）：%d
+                商機總額：%s
+                活躍商機數：%d
+
+                # 客戶清單（名稱｜產業｜負責人｜風險｜商機｜最近互動｜續約日）
+                %s
+
+                # 報告要求
+                請涵蓋：①整體健康度總評 ②風險分布洞察與「最該優先處理的客戶 Top 3」（附理由） ③Pipeline 重點與機會 ④給銷售主管的具體建議行動。使用繁體中文、條理清楚、勿編造數字。
+                """.formatted(all.size(), finalHighRisk, finalPipeline, finalActive,
+                        PiiMasker.mask(String.join("\n", rows)));
+
+        var fullAnswer = new StringBuilder();
+        var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+        var streamOpts = systemSettings.resolveChatOptions();
+        if (streamOpts != null) streamSpec = streamSpec.options(streamOpts);
+        streamSpec.stream().chatResponse()
+                .subscribe(
+                        chatResponse -> {
+                            lastResponse.set(chatResponse);
+                            var result = chatResponse.getResult();
+                            var text = result == null ? null : result.getOutput().getText();
+                            if (text != null && !text.isEmpty()) {
+                                fullAnswer.append(text);
+                                sendContent(emitter, text);
+                            }
+                        },
+                        error -> {
+                            log.warn("OpenAI Portfolio 串流失敗，改用 fallback：{}", error.getMessage());
+                            if (fullAnswer.toString().isBlank()) {
+                                var saved = aiGovernance.record(AiCallType.PORTFOLIO, null, null, 0, 0, 0, false, true, fallback);
+                                sendContent(emitter, fallback);
+                                sendSimpleTailAndComplete(emitter, saved.getId());
+                            } else {
+                                var partial = fullAnswer.toString().strip();
+                                var saved = aiGovernance.record(AiCallType.PORTFOLIO, null, null, 0, 0, 0, true, true, partial);
+                                sendSimpleTailAndComplete(emitter, saved.getId());
+                            }
+                        },
+                        () -> {
+                            var answer = fullAnswer.toString().strip();
+                            if (answer.isBlank()) {
+                                var saved = aiGovernance.record(AiCallType.PORTFOLIO, null, null, 0, 0, 0, false, true, fallback);
+                                sendContent(emitter, fallback);
+                                sendSimpleTailAndComplete(emitter, saved.getId());
+                                return;
+                            }
+                            var resp = lastResponse.get();
+                            var metadata = resp == null ? null : resp.getMetadata();
+                            var usage = metadata == null ? null : metadata.getUsage();
+                            var model = metadata == null ? null : metadata.getModel();
+                            Integer pt = usage == null ? null : usage.getPromptTokens();
+                            Integer ct = usage == null ? null : usage.getCompletionTokens();
+                            Integer tt = usage == null ? null : usage.getTotalTokens();
+                            var saved = aiGovernance.record(AiCallType.PORTFOLIO, null, model, pt, ct, tt, true, true, answer);
+                            sendSimpleTailAndComplete(emitter, saved.getId());
+                        });
+        return emitter;
+    }
+
+    /**
+     * 串流尾段（無 citations/risk 版本）：只送 callId 與 [DONE]，用於 Portfolio/Team/Owner 等無 RAG 引用的串流。
+     *
+     * @param emitter SSE 發送器
+     * @param callId AI 呼叫紀錄 id（可為 null）
+     */
+    void sendSimpleTailAndComplete(SseEmitter emitter, Long callId) {
+        try {
+            if (callId != null) {
+                emitter.send(SseEmitter.event().data(Map.of("type", "callId", "callId", callId)));
+            }
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
     }
 }

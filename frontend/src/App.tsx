@@ -8,6 +8,7 @@ import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { CustomersPage } from "./features/customers/CustomersPage";
 import { MyWorkspacePage } from "./features/my-workspace/MyWorkspacePage";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
+import AdminSettingsPage from "./features/admin/AdminSettingsPage";
 import { TeamAnalyticsPage } from "./features/team/TeamAnalyticsPage";
 
 /**
@@ -29,6 +30,7 @@ export default function App() {
           </Route>
           <Route element={<AdminRoute />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>
       </Route>

@@ -363,3 +363,12 @@ export interface ManagerInsightResponse {
   model: string | null;
   generatedAt: string;
 }
+
+
+/** AI 設定回應：currentModel 空字串代表用環境變數；source 為 "DB" | "ENV"。 */
+export interface AiSettingsResponse {
+  currentModel: string;
+  modelOptions: string[];
+  envDefaultModel: string;
+  source: "DB" | "ENV";
+}

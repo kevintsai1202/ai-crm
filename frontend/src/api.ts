@@ -668,3 +668,114 @@ export async function fetchDashboardLayout() {
 export async function saveDashboardLayout(visibleOrder: string[]) {
   await apiClient.put("/me/preferences/dashboard-layout", { visibleOrder });
 }
+
+/**
+ * 取得 Portfolio 全公司整體評估報告（SSE 串流版）。
+ * 函式級註解：GET + Accept: text/event-stream，與 fetchCustomerAssessmentStream 共用 readSseStream 解析器。
+ *
+ * @param onChunk 收到每一個資料區段時的回呼
+ * @param onDone 串流完成時的回呼
+ * @param onError 發生錯誤時的回呼
+ */
+export async function streamPortfolioAssessment(
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/ai/portfolio/assessment`, {
+      method: "GET",
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/**
+ * 以 SSE 串流推送團隊整體診斷（POST + Accept: text/event-stream）。
+ *
+ * @param onChunk 收到每一個資料區段時的回呼
+ * @param onDone 串流完成時的回呼
+ * @param onError 發生錯誤時的回呼
+ */
+export async function streamTeamInsight(
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/manager/insights/team`, {
+      method: "POST",
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/**
+ * 以 SSE 串流推送個別業務 coaching（POST + Accept: text/event-stream）。
+ *
+ * @param owner 業務顯示名稱
+ * @param onChunk 收到每一個資料區段時的回呼
+ * @param onDone 串流完成時的回呼
+ * @param onError 發生錯誤時的回呼
+ */
+export async function streamOwnerInsight(
+  owner: string,
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const token = getToken();
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/manager/insights/owner?owner=${encodeURIComponent(owner)}`, {
+      method: "POST",
+      headers: {
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/** 取得 AI 設定（限 ADMIN）。 */
+export async function fetchAiSettings() {
+  const { data } = await apiClient.get<import("./types").AiSettingsResponse>("/admin/settings/ai");
+  return data;
+}
+
+/** 更新 AI 設定（限 ADMIN），回傳更新後的設定。 */
+export async function saveAiSettings(model: string, modelOptions: string[]) {
+  const { data } = await apiClient.put<import("./types").AiSettingsResponse>("/admin/settings/ai", { model, modelOptions });
+  return data;
+}

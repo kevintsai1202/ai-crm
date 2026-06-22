@@ -89,9 +89,19 @@ public class AiController {
      *
      * @return Portfolio 評估回應
      */
-    @GetMapping("/portfolio/assessment")
+    @GetMapping(value = "/portfolio/assessment", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     public Dtos.PortfolioAssessmentResponse portfolioAssessment() {
         return insightService.portfolioAssessment();
+    }
+
+    /**
+     * 以 SSE 串流推送 Portfolio 全公司整體評估報告。
+     *
+     * @return SseEmitter 串流發送器
+     */
+    @GetMapping(value = "/portfolio/assessment", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamPortfolioAssessment() {
+        return insightService.streamPortfolioAssessment();
     }
 
     /**

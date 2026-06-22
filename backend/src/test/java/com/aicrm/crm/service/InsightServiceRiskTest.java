@@ -30,7 +30,8 @@ class InsightServiceRiskTest {
         var provider = (ObjectProvider<ChatModel>) mock(ObjectProvider.class);
         var governance = mock(AiGovernanceService.class);
         var chatMemory = mock(ChatMemoryService.class);
-        return new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, "");
+        var systemSettings = mock(SystemSettingService.class);
+        return new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, "");
     }
 
     /** 建立指定產業/業務的空客戶。 */

@@ -3,9 +3,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   fetchTeamInsight,
-  generateTeamInsight,
   fetchOwnerInsight,
-  generateOwnerInsight,
+  streamTeamInsight,
+  streamOwnerInsight,
   fetchTeamInsightCalls,
   fetchOwnerInsightCalls
 } from "../../api";
@@ -50,18 +50,34 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
     return () => { alive = false; };
   }, [scope, owner]);
 
-  /** 點按生成：呼叫 LLM 並更新顯示。 */
-  async function handleGenerate() {
+  /** 點按生成：以 SSE 串流推送，邊產生邊渲染。 */
+  function handleGenerate() {
     setGenerating(true);
     setErr(null);
-    try {
-      const r = scope === "TEAM" ? await generateTeamInsight() : await generateOwnerInsight(owner as string);
-      setInsight(r);
-    } catch (e) {
-      console.error("產生 AI 分析失敗:", e);
-      setErr("產生失敗，請稍後再試");
-    } finally {
+    // 清空舊內容，準備接收串流
+    setInsight((prev) => prev ? { ...prev, content: "" } : { scope, ownerName: owner ?? null, content: "", model: null, generatedAt: new Date().toISOString() });
+
+    const onChunk = (chunk: { type: string; delta?: string }) => {
+      if (chunk.type === "content" && chunk.delta) {
+        setInsight((prev) => prev ? { ...prev, content: prev.content + chunk.delta } : prev);
+      }
+    };
+    const onDone = () => {
       setGenerating(false);
+      // 完成後重讀快取，確保 generatedAt / model 是後端最新值
+      const p = scope === "TEAM" ? fetchTeamInsight() : fetchOwnerInsight(owner as string);
+      p.then((r) => { if (r) setInsight(r); }).catch(() => {});
+    };
+    const onError = (e: any) => {
+      console.error("產生 AI 分析串流失敗:", e);
+      setErr("產生失敗，請稍後再試");
+      setGenerating(false);
+    };
+
+    if (scope === "TEAM") {
+      streamTeamInsight(onChunk, onDone, onError);
+    } else {
+      streamOwnerInsight(owner as string, onChunk, onDone, onError);
     }
   }
 

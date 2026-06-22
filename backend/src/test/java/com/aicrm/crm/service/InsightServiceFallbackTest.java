@@ -48,7 +48,8 @@ class InsightServiceFallbackTest {
                 .thenReturn(List.of());
 
         var chatMemory = mock(ChatMemoryService.class); // recall 預設回 null/空、save 不動作，不影響 fallback 行為
-        var service = new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, ""); // 空金鑰 → aiEnabled=false
+        var systemSettings = mock(SystemSettingService.class);
+        var service = new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, ""); // 空金鑰 → aiEnabled=false
         var response = service.chat(new Dtos.ChatRequest(1L, "請評估這位客戶"));
 
         assertThat(response.answer()).contains("艾克玫");          // deterministic 內容含客戶名

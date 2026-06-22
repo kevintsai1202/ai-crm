@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchAiUsage, fetchDashboard, fetchDashboardLayout, fetchDashboardReports, fetchDrilldown, fetchPortfolioAssessment, fetchPortfolioCalls, fetchRfm, fetchSentimentRadar, generateDemoData, saveDashboardLayout } from "../../api";
+import { fetchAiUsage, fetchDashboard, fetchDashboardLayout, fetchDashboardReports, fetchDrilldown, fetchPortfolioCalls, fetchRfm, fetchSentimentRadar, generateDemoData, saveDashboardLayout, streamPortfolioAssessment } from "../../api";
 import type { AiCallHistoryItem, DashboardReports, DashboardSummary, DrilldownResponse, DrilldownSource, RfmResponse, SentimentRadarResponse, UsageSummaryResponse } from "../../types";
 import { formatMoney } from "../../lib/format";
 import { useAuth } from "../../context/AuthContext";
@@ -158,23 +158,30 @@ export function DashboardPage() {
     navigate(`/customers/${id}`, { state: source });
   }
 
-  /** 開啟 Portfolio 全公司整體評估報告。 */
-  async function openPortfolioAssessment() {
+  /** 開啟 Portfolio 全公司整體評估報告（SSE 串流版）。 */
+  function openPortfolioAssessment() {
+    // 立即顯示 modal（loading=true），第一個 token 到達後轉為逐字渲染
     setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: true, markdown: "" });
-    try {
-      const result = await fetchPortfolioAssessment();
-      setReport({
-        open: true,
-        title: "Portfolio 整體評估（全公司）",
-        loading: false,
-        markdown: result.assessment,
-        meta: `客戶 ${result.customerCount} · 高風險 ${result.highRiskCount} · 商機總額 ${formatMoney(result.totalPipeline)} · 活躍商機 ${result.activeOpportunityCount}`,
-        callId: result.callId
-      });
-    } catch (e) {
-      console.error("Portfolio 整體評估失敗:", e);
-      setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
-    }
+    streamPortfolioAssessment(
+      (chunk) => {
+        if (chunk.type === "content" && chunk.delta) {
+          // 第一個 token 時關掉 loading spinner，改為逐字顯示
+          setReport((prev) => prev
+            ? { ...prev, loading: false, markdown: (prev.markdown ?? "") + chunk.delta }
+            : prev);
+        } else if (chunk.type === "callId" && chunk.callId) {
+          setReport((prev) => prev ? { ...prev, callId: chunk.callId } : prev);
+        }
+      },
+      () => {
+        // 串流完成：確保 loading 已關閉
+        setReport((prev) => prev ? { ...prev, loading: false } : prev);
+      },
+      (err) => {
+        console.error("Portfolio 整體評估串流失敗:", err);
+        setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
+      }
+    );
   }
 
   /** 開啟全公司評估的 AI 歷程。 */

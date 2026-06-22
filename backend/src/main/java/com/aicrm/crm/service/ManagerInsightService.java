@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Manager AI 分析服務（模組 C）：團隊整體診斷與個別業務 coaching。
@@ -61,17 +62,27 @@ public class ManagerInsightService {
     /** 是否啟用真實 OpenAI：以 api-key 是否實際設定為準。 */
     private final boolean aiEnabled;
 
+    /** 系統設定服務：提供 AI 模型覆蓋（DB 設定優先於環境變數）。 */
+    private final SystemSettingService systemSettings;
+
+    /** InsightService：借用 sendSimpleTailAndComplete（無 citations/risk 的 SSE 尾段）。 */
+    private final InsightService insightService;
+
     public ManagerInsightService(ManagerAnalyticsService analytics,
                                  ManagerInsightRepository insights,
                                  CustomerRepository customers,
                                  AiGovernanceService aiGovernance,
                                  ObjectProvider<ChatModel> chatModelProvider,
+                                 SystemSettingService systemSettings,
+                                 InsightService insightService,
                                  @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.analytics = analytics;
         this.insights = insights;
         this.customers = customers;
         this.aiGovernance = aiGovernance;
         this.chatModelProvider = chatModelProvider;
+        this.systemSettings = systemSettings;
+        this.insightService = insightService;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
 
@@ -157,8 +168,10 @@ public class ManagerInsightService {
             return new LlmResult(fallbackAnswer, null);
         }
         try {
-            var chatResponse = ChatClient.create(chatModel).prompt()
-                    .system(SYSTEM_PROMPT).user(userPrompt).call().chatResponse();
+            var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+            var opts = systemSettings.resolveChatOptions();
+            if (opts != null) spec = spec.options(opts);
+            var chatResponse = spec.call().chatResponse();
             var content = chatResponse == null ? null : chatResponse.getResult().getOutput().getText();
             if (content == null || content.isBlank()) {
                 log.warn("OpenAI {} 回傳空白，改用 fallback", type);
@@ -309,5 +322,139 @@ public class ManagerInsightService {
 
                 > 目前未設定 OpenAI 金鑰，顯示為系統彙總的 deterministic 摘要；設定金鑰後可取得 AI 個別輔導建議。
                 """.formatted(owner, ownerCustomers.size(), highRisk);
+    }
+
+    /**
+     * 以 SSE 串流推送團隊整體診斷；完成後 upsert 快取。
+     * 函式級註解：在方法開頭同步算好 prompt 與 fallback，callback 執行緒只使用純值；upsert 與 aiGovernance.record 各自有獨立交易，可於 callback 安全呼叫。
+     *
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamTeamInsight() {
+        var data = analytics.analytics();
+        final String prompt = buildTeamPrompt(data);
+        final String fallback = deterministicTeam(data);
+        final var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        if (chatModel == null) {
+            aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
+            upsert("TEAM", null, fallback, null);
+            insightService.sendContent(emitter, fallback);
+            insightService.sendSimpleTailAndComplete(emitter, null);
+            return emitter;
+        }
+
+        var fullAnswer = new StringBuilder();
+        var lastResp = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+        var opts = systemSettings.resolveChatOptions();
+        if (opts != null) streamSpec = streamSpec.options(opts);
+        streamSpec.stream().chatResponse().subscribe(
+                cr -> {
+                    lastResp.set(cr);
+                    var result = cr.getResult();
+                    var text = result == null ? null : result.getOutput().getText();
+                    if (text != null && !text.isEmpty()) {
+                        fullAnswer.append(text);
+                        insightService.sendContent(emitter, text);
+                    }
+                },
+                error -> {
+                    log.warn("OpenAI 團隊診斷串流失敗，改用 fallback：{}", error.getMessage());
+                    aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
+                    upsert("TEAM", null, fallback, null);
+                    if (fullAnswer.toString().isBlank()) insightService.sendContent(emitter, fallback);
+                    insightService.sendSimpleTailAndComplete(emitter, null);
+                },
+                () -> {
+                    var answer = fullAnswer.toString().strip();
+                    if (answer.isBlank()) {
+                        aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, null, 0, 0, 0, false, true, fallback);
+                        upsert("TEAM", null, fallback, null);
+                        insightService.sendContent(emitter, fallback);
+                        insightService.sendSimpleTailAndComplete(emitter, null);
+                        return;
+                    }
+                    var meta = lastResp.get() == null ? null : lastResp.get().getMetadata();
+                    var usage = meta == null ? null : meta.getUsage();
+                    var model = meta == null ? null : meta.getModel();
+                    Integer pt = usage == null ? null : usage.getPromptTokens();
+                    Integer ct = usage == null ? null : usage.getCompletionTokens();
+                    Integer tt = usage == null ? null : usage.getTotalTokens();
+                    aiGovernance.record(AiCallType.TEAM_ANALYSIS, null, null, model, pt, ct, tt, true, true, answer);
+                    upsert("TEAM", null, answer, model);
+                    insightService.sendSimpleTailAndComplete(emitter, null);
+                });
+        return emitter;
+    }
+
+    /**
+     * 以 SSE 串流推送個別業務 coaching；完成後 upsert 快取。
+     *
+     * @param owner 業務顯示名稱
+     * @return SseEmitter 串流發送器
+     */
+    public SseEmitter streamOwnerInsight(String owner) {
+        var ownerCustomers = customers.findAll().stream()
+                .filter(c -> owner.equals(c.getOwnerName())).toList();
+        if (ownerCustomers.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "查無此業務：" + owner);
+        }
+        final String prompt = buildOwnerPrompt(owner, ownerCustomers);
+        final String fallback = deterministicOwner(owner, ownerCustomers);
+        final var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        if (chatModel == null) {
+            aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
+            upsert("OWNER", owner, fallback, null);
+            insightService.sendContent(emitter, fallback);
+            insightService.sendSimpleTailAndComplete(emitter, null);
+            return emitter;
+        }
+
+        var fullAnswer = new StringBuilder();
+        var lastResp = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+        var opts = systemSettings.resolveChatOptions();
+        if (opts != null) streamSpec = streamSpec.options(opts);
+        streamSpec.stream().chatResponse().subscribe(
+                cr -> {
+                    lastResp.set(cr);
+                    var result = cr.getResult();
+                    var text = result == null ? null : result.getOutput().getText();
+                    if (text != null && !text.isEmpty()) {
+                        fullAnswer.append(text);
+                        insightService.sendContent(emitter, text);
+                    }
+                },
+                error -> {
+                    log.warn("OpenAI 業務 coaching 串流失敗，改用 fallback：{}", error.getMessage());
+                    aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
+                    upsert("OWNER", owner, fallback, null);
+                    if (fullAnswer.toString().isBlank()) insightService.sendContent(emitter, fallback);
+                    insightService.sendSimpleTailAndComplete(emitter, null);
+                },
+                () -> {
+                    var answer = fullAnswer.toString().strip();
+                    if (answer.isBlank()) {
+                        aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, null, 0, 0, 0, false, true, fallback);
+                        upsert("OWNER", owner, fallback, null);
+                        insightService.sendContent(emitter, fallback);
+                        insightService.sendSimpleTailAndComplete(emitter, null);
+                        return;
+                    }
+                    var meta = lastResp.get() == null ? null : lastResp.get().getMetadata();
+                    var usage = meta == null ? null : meta.getUsage();
+                    var model = meta == null ? null : meta.getModel();
+                    Integer pt = usage == null ? null : usage.getPromptTokens();
+                    Integer ct = usage == null ? null : usage.getCompletionTokens();
+                    Integer tt = usage == null ? null : usage.getTotalTokens();
+                    aiGovernance.record(AiCallType.OWNER_COACHING, null, owner, model, pt, ct, tt, true, true, answer);
+                    upsert("OWNER", owner, answer, model);
+                    insightService.sendSimpleTailAndComplete(emitter, null);
+                });
+        return emitter;
     }
 }

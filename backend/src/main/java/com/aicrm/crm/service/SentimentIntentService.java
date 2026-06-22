@@ -54,13 +54,18 @@ public class SentimentIntentService {
     /** 是否啟用真實 OpenAI：以 api-key 是否實際設定為準（與 InsightService 一致）。 */
     private final boolean aiEnabled;
 
+    /** 系統設定服務：提供 AI 模型覆蓋（DB 設定優先於環境變數）。 */
+    private final SystemSettingService systemSettings;
+
     public SentimentIntentService(InteractionInsightRepository insights,
                                   ObjectProvider<ChatModel> chatModelProvider,
                                   ObjectMapper objectMapper,
+                                  SystemSettingService systemSettings,
                                   @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.insights = insights;
         this.chatModelProvider = chatModelProvider;
         this.objectMapper = objectMapper;
+        this.systemSettings = systemSettings;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
 
@@ -125,12 +130,11 @@ public class SentimentIntentService {
             return classifyDeterministic(content);
         }
         try {
-            var chatResponse = ChatClient.create(chatModel)
-                    .prompt()
-                    .system(SYSTEM_PROMPT)
-                    .user(content == null ? "" : content)
-                    .call()
-                    .chatResponse();
+            var spec = ChatClient.create(chatModel).prompt()
+                    .system(SYSTEM_PROMPT).user(content == null ? "" : content);
+            var opts = systemSettings.resolveChatOptions();
+            if (opts != null) spec = spec.options(opts);
+            var chatResponse = spec.call().chatResponse();
             var json = chatResponse == null ? null : chatResponse.getResult().getOutput().getText();
             if (json == null || json.isBlank()) {
                 return classifyDeterministic(content);
