@@ -1,18 +1,17 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { getToken } from "../../api";
 import { useAuth } from "../../context/AuthContext";
 
 /**
  * 登入頁：已登入自動導向儀表板，否則顯示教學帳號登入表單。
  */
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthed } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState("");
 
   // 已登入則直接導向儀表板
-  if (getToken()) return <Navigate to="/dashboard" replace />;
+  if (isAuthed) return <Navigate to="/dashboard" replace />;
 
   /** 處理登入表單送出。 */
   async function handleLogin(event: FormEvent<HTMLFormElement>) {

@@ -1,8 +1,10 @@
 package com.aicrm.crm.api;
 
 import com.aicrm.crm.service.CustomerService;
+import com.aicrm.crm.service.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,6 +42,7 @@ public class CustomerController {
      */
     @GetMapping
     public Dtos.PageResponse<Dtos.CustomerSummaryResponse> search(
+            @AuthenticationPrincipal JwtService.AuthPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
@@ -50,7 +53,7 @@ public class CustomerController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate renewalFrom,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate renewalTo
     ) {
-        return customerService.search(page, size, keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
+        return customerService.search(principal, page, size, keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
     }
 
     /**

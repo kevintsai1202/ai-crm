@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { clearToken, fetchHealth, getToken, login as apiLogin, saveToken } from "../api";
+import { fetchHealth, login as apiLogin, logout as apiLogout } from "../api";
 import type { HealthResponse, UserResponse } from "../types";
 
 /** Auth 與 health 全域狀態介面。 */
@@ -9,48 +9,19 @@ interface AuthContextValue {
   healthError: boolean;
   isAuthed: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshHealth: () => Promise<void>;
 }
+
+/** sessionStorage key：存放非敏感 user 資訊，供頁面重整後還原 UI（token 在 httpOnly cookie）。 */
+const USER_KEY = "ai-crm-user";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * 解碼 Base64Url 字串為 UTF-8 文字（JWT payload 用；displayName 為中文需走 UTF-8）。
- */
-function base64UrlDecode(input: string): string {
-  const b64 = input.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = b64 + (b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "");
-  const binary = atob(padded);
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-  return new TextDecoder("utf-8").decode(bytes);
-}
-
-/**
- * 從 JWT 還原使用者（不驗章，僅供前端重整後還原顯示用；伺服器仍會驗證每次請求）。
- * 函式級註解：payload 含 sub/uid/name/role/exp；過期或格式錯誤回 null。
- */
-function decodeUserFromToken(token: string): UserResponse | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(base64UrlDecode(parts[1]));
-    // 已過期視為無效
-    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
-    return {
-      id: typeof payload.uid === "number" ? payload.uid : 0,
-      username: payload.sub ?? "",
-      displayName: payload.name ?? payload.sub ?? "",
-      role: payload.role
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * 全域 Auth/Health Provider：集中管理登入態與後端健康檢查。
- * 函式級註解：監聽 api.ts 派發的 auth:logout 事件，401 時自動清除使用者狀態。
+ * 函式級註解：JWT 改存 httpOnly cookie，JS 不可讀；user 資訊存 sessionStorage，
+ * 頁面重整後可還原顯示名稱 / 角色，401 事件自動清除。
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserResponse | null>(null);
@@ -69,30 +40,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /** 登入並保存 token。 */
+  /** 登入：後端設 httpOnly cookie，前端只存 user 資訊至 sessionStorage。 */
   async function login(username: string, password: string) {
     const result = await apiLogin(username, password);
-    saveToken(result.token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(result.user));
     setUser(result.user);
   }
 
-  /** 登出並清除全部 auth 狀態。 */
-  function logout() {
-    clearToken();
+  /** 登出：呼叫後端清除 cookie，清除 sessionStorage 與 UI 狀態。 */
+  async function logout() {
+    try {
+      await apiLogout();
+    } catch {
+      // 登出失敗仍清除前端狀態（防止 cookie 過期但 UI 卡住）
+    }
+    sessionStorage.removeItem(USER_KEY);
     setUser(null);
   }
 
-  // 啟動時測健康、從既有 token 還原使用者（重整後不致遺失登入卡與角色功能）；監聽 401 事件以自動登出
+  // 啟動時測健康；從 sessionStorage 還原 user（重整後不致遺失登入卡與角色）；監聽 401 自動登出
   useEffect(() => {
     void refreshHealth();
-    // 重整後 token 仍在但 user 為 null 時，從 token 還原使用者；過期/壞 token 則清除
-    const token = getToken();
-    if (token) {
-      const restored = decodeUserFromToken(token);
-      if (restored) setUser(restored);
-      else clearToken();
+    // 頁面重整後從 sessionStorage 還原 user 資訊（token 由 cookie 自動帶入每次請求）
+    const stored = sessionStorage.getItem(USER_KEY);
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored) as UserResponse);
+      } catch {
+        sessionStorage.removeItem(USER_KEY);
+      }
     }
-    const onLogout = () => setUser(null);
+    const onLogout = () => {
+      sessionStorage.removeItem(USER_KEY);
+      setUser(null);
+    };
     window.addEventListener("auth:logout", onLogout);
     return () => window.removeEventListener("auth:logout", onLogout);
   }, []);
@@ -101,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     health,
     healthError,
-    isAuthed: !!getToken(),
+    isAuthed: !!user,
     login,
     logout,
     refreshHealth

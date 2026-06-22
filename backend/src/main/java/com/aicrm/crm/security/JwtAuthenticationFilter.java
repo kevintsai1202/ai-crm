@@ -1,8 +1,10 @@
 package com.aicrm.crm.security;
 
+import com.aicrm.crm.api.AuthController;
 import com.aicrm.crm.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -14,7 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * JWT 認證過濾器，解析 Authorization Bearer Token 並寫入 SecurityContext。
+ * JWT 認證過濾器，優先從 httpOnly cookie 讀取 token，
+ * 退而讀取 Authorization Bearer header（相容舊版與本機開發）。
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -36,10 +39,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        var header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
+        var token = extractToken(request);
+        if (token != null) {
             try {
-                var principal = jwtService.parse(header.substring(7));
+                var principal = jwtService.parse(token);
                 var auth = new UsernamePasswordAuthenticationToken(
                         principal,
                         null,
@@ -52,5 +55,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         filterChain.doFilter(request, response);
     }
-}
 
+    /**
+     * 從 request 取出 JWT：先找 httpOnly cookie，找不到再看 Authorization Bearer header。
+     *
+     * @param request HTTP request
+     * @return JWT 字串，或 null
+     */
+    private String extractToken(HttpServletRequest request) {
+        // 1. 優先讀取 httpOnly cookie
+        if (request.getCookies() != null) {
+            for (Cookie c : request.getCookies()) {
+                if (AuthController.COOKIE_NAME.equals(c.getName())) {
+                    return c.getValue();
+                }
+            }
+        }
+        // 2. 退而讀取 Authorization Bearer header（相容本機 curl / Swagger UI）
+        var header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
+    }
+}

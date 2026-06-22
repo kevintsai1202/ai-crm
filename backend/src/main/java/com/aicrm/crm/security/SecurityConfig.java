@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/auth/login", "/h2-console/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                        .requestMatchers("/api/health", "/api/auth/login", "/api/auth/logout", "/h2-console/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/ai/knowledge/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/ai/usage").hasAnyRole("MANAGER", "ADMIN")
@@ -95,6 +95,8 @@ public class SecurityConfig {
         config.setAllowedOriginPatterns(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Caddy 代理後前端同域請求仍帶 Origin，需 allowCredentials 讓 cookie 隨請求回傳
+        config.setAllowCredentials(true);
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

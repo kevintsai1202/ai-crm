@@ -7,6 +7,7 @@ import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.InteractionInsight;
 import com.aicrm.crm.domain.Role;
 import com.aicrm.crm.domain.Contact;
+import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import java.time.LocalDate;
 import com.aicrm.crm.repository.AppUserRepository;
 import com.aicrm.crm.repository.ContactRepository;
@@ -82,13 +83,14 @@ public class CustomerService {
      * @return 分頁客戶摘要
      */
     @Transactional(readOnly = true)
-    public Dtos.PageResponse<Dtos.CustomerSummaryResponse> search(int page, int size, String keyword, String industry,
-                                                                  String owner, CustomerStatus status, String riskLevel,
+    public Dtos.PageResponse<Dtos.CustomerSummaryResponse> search(AuthPrincipal principal, int page, int size,
+                                                                  String keyword, String industry, String owner,
+                                                                  CustomerStatus status, String riskLevel,
                                                                   LocalDate renewalFrom, LocalDate renewalTo) {
         int pageIdx = Math.max(page, 0);
         int pageSize = Math.min(Math.max(size, 1), 50);
         // risk_level 已為 DB 欄位(V13)，所有條件（含 riskLevel）皆可走 DB 層分頁，不需記憶體全撈。
-        var spec = buildSpec(keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
+        var spec = buildSpec(principal, keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
         var pageable = PageRequest.of(pageIdx, pageSize, Sort.by("id").ascending());
         var result = customers.findAll(spec, pageable);
         var items = result.getContent().stream().map(mapper::toSummary).toList();
@@ -255,7 +257,7 @@ public class CustomerService {
      * @param owner 負責業務
      * @return JPA Specification
      */
-    private Specification<Customer> buildSpec(String keyword, String industry, String owner,
+    private Specification<Customer> buildSpec(AuthPrincipal principal, String keyword, String industry, String owner,
                                               CustomerStatus status, String riskLevel,
                                               LocalDate renewalFrom, LocalDate renewalTo) {
         return (root, query, cb) -> {
@@ -277,7 +279,10 @@ public class CustomerService {
             if (StringUtils.hasText(industry)) {
                 predicate = cb.and(predicate, cb.equal(root.get("industry"), industry));
             }
-            if (StringUtils.hasText(owner)) {
+            // SALES 角色：強制只顯示自己負責的客戶，忽略傳入的 owner 篩選參數
+            if (principal != null && principal.role() == Role.SALES) {
+                predicate = cb.and(predicate, cb.equal(root.get("ownerName"), principal.displayName()));
+            } else if (StringUtils.hasText(owner)) {
                 predicate = cb.and(predicate, cb.equal(root.get("ownerName"), owner));
             }
             if (status != null) {

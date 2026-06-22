@@ -26,14 +26,14 @@ import type {
   UsageSummaryResponse
 } from "./types";
 
-const TOKEN_KEY = "ai-crm-token";
-
 /**
- * 共用 Axios client，集中處理 baseURL、JWT 注入與 401 清理。
+ * 共用 Axios client：baseURL 預設 /api（Caddy 代理至後端），
+ * withCredentials 讓瀏覽器隨請求帶上 httpOnly cookie。
  */
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
-  timeout: 30000
+  timeout: 30000,
+  withCredentials: true
 });
 
 /**
@@ -44,45 +44,15 @@ export const apiClient = axios.create({
  */
 const AI_TIMEOUT = 120000;
 
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
       window.dispatchEvent(new Event("auth:logout"));
     }
     return Promise.reject(error);
   }
 );
-
-/**
- * 儲存 JWT token。
- */
-export function saveToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * 讀取目前 JWT token。
- */
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * 清除 JWT token。
- */
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
 
 /**
  * 呼叫健康檢查 API。
@@ -93,11 +63,18 @@ export async function fetchHealth() {
 }
 
 /**
- * 登入並取得 JWT。
+ * 登入：後端在 Set-Cookie 設定 httpOnly token，response body 僅含 user 資訊。
  */
 export async function login(username: string, password: string) {
   const { data } = await apiClient.post<LoginResponse>("/auth/login", { username, password });
   return data;
+}
+
+/**
+ * 登出：呼叫後端清除 httpOnly cookie。
+ */
+export async function logout() {
+  await apiClient.post("/auth/logout");
 }
 
 /**
@@ -243,13 +220,12 @@ async function readSseStream(response: Response, onChunk: (chunk: SseChunk) => v
 }
 
 /**
- * 共用：401 時清除 token 並廣播登出事件。
+ * 共用：401 時廣播登出事件（cookie 由後端清除，前端只需清除 UI 狀態）。
  *
  * @param response fetch 回應
  */
 function handleStreamUnauthorized(response: Response) {
   if (response.status === 401) {
-    clearToken();
     window.dispatchEvent(new Event("auth:logout"));
   }
 }
@@ -271,15 +247,14 @@ export async function askAssistantStream(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/ai/chat`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       },
       body: JSON.stringify({ customerId, message })
     });
@@ -308,14 +283,13 @@ export async function fetchCustomerAssessmentStream(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/ai/customers/${customerId}/assessment`, {
       method: "GET",
+      credentials: "include",
       headers: {
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       }
     });
     if (!response.ok) {
@@ -682,14 +656,13 @@ export async function streamPortfolioAssessment(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/ai/portfolio/assessment`, {
       method: "GET",
+      credentials: "include",
       headers: {
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       }
     });
     if (!response.ok) {
@@ -714,14 +687,13 @@ export async function streamTeamInsight(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/manager/insights/team`, {
       method: "POST",
+      credentials: "include",
       headers: {
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       }
     });
     if (!response.ok) {
@@ -748,14 +720,13 @@ export async function streamOwnerInsight(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/manager/insights/owner?owner=${encodeURIComponent(owner)}`, {
       method: "POST",
+      credentials: "include",
       headers: {
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       }
     });
     if (!response.ok) {
@@ -833,15 +804,14 @@ export async function streamModelTest(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/admin/settings/ai/test`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       },
       // _t 時間戳確保每次 POST 請求唯一，避免 CDN / proxy 回傳 cached response
       body: JSON.stringify({ message, model, providerId, _t: new Date().getTime() })
@@ -865,15 +835,14 @@ export async function streamModelScore(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const token = getToken();
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
     const response = await fetch(`${baseUrl}/admin/settings/ai/score`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        Accept: "text/event-stream"
       },
       body: JSON.stringify({ results })
     });

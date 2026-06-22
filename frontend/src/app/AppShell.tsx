@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { clearToken } from "../api";
 import { useVersionCheck } from "../hooks/useVersionCheck";
 import type { HealthResponse } from "../types";
 import { formatDateTime } from "../lib/format";
@@ -28,7 +27,7 @@ function HealthBadge({ health, error, onRefresh }: { health: HealthResponse | nu
  */
 function UpdateBanner() {
   function handleUpdate() {
-    clearToken();
+    // cookie 由後端管理，直接重載即可
     window.location.reload();
   }
 
