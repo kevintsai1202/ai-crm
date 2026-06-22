@@ -830,110 +830,19 @@ public class InsightService {
         return buildChatModelForProvider(provider);
     }
 
-    /**
-     * Chat Completions API 回 404 時（例如 gpt-5+ 改用 Responses API），
-     * 以 RestTemplate 直接呼叫 /v1/responses 作為備援，結果以單一 SSE chunk 回傳。
-     * Spring AI 2.0 尚未支援 Responses API，預計 2.1（2026-11）加入。
-     *
-     * @param model      模型名稱
-     * @param provider   API 憑證來源
-     * @param prompt     測試提示詞
-     * @param emitter    SSE 發送器
-     */
-    @SuppressWarnings("unchecked")
-    private void tryResponsesApiFallback(String model, com.aicrm.crm.domain.AiProvider provider,
-                                          String prompt, SseEmitter emitter) {
-        try {
-            var base = (provider.getBaseUrl() != null && !provider.getBaseUrl().isBlank())
-                    ? provider.getBaseUrl()
-                    : defaultOpenAiBaseUrl;
-            // 確保路徑正確，避免雙斜線
-            var url = base.endsWith("/") ? base + "v1/responses" : base + "/v1/responses";
-
-            var restTemplate = new org.springframework.web.client.RestTemplate();
-            var headers = new org.springframework.http.HttpHeaders();
-            headers.set("Authorization", "Bearer " + provider.getApiKey());
-            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-
-            var body = java.util.Map.of(
-                    "model", model,
-                    "input", prompt,
-                    "max_output_tokens", 1000
-            );
-
-            var response = restTemplate.postForObject(
-                    url,
-                    new org.springframework.http.HttpEntity<>(body, headers),
-                    java.util.Map.class
-            );
-
-            // 解析 Responses API 回應：output[].content[].text
-            var text = new StringBuilder();
-            if (response != null) {
-                var output = (java.util.List<java.util.Map<String, Object>>) response.get("output");
-                if (output != null) {
-                    for (var item : output) {
-                        var content = (java.util.List<java.util.Map<String, Object>>) item.get("content");
-                        if (content != null) {
-                            for (var c : content) {
-                                if ("output_text".equals(c.get("type"))) {
-                                    text.append(c.get("text"));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            var resultText = text.toString().isBlank() ? "(Responses API 無文字輸出)" : text.toString();
-            sendContent(emitter, resultText);
-
-            // 解析 Responses API 的 token 用量（欄位名稱與 Chat Completions 不同）
-            // Responses API: usage.input_tokens / output_tokens
-            if (response != null) {
-                var usage = (java.util.Map<String, Object>) response.get("usage");
-                if (usage != null) {
-                    try {
-                        var inputTokens  = usage.get("input_tokens")  instanceof Number n ? n.longValue() : 0L;
-                        var outputTokens = usage.get("output_tokens") instanceof Number n ? n.longValue() : 0L;
-                        emitter.send(SseEmitter.event().data(Map.of(
-                                "type", "tokens",
-                                "promptTokens",     inputTokens,
-                                "completionTokens", outputTokens,
-                                "totalTokens",      inputTokens + outputTokens
-                        )));
-                    } catch (Exception e) {
-                        log.warn("Responses API fallback 送 tokens SSE 失敗：{}", e.getMessage());
-                    }
-                }
-            }
-
-            sendSimpleTailAndComplete(emitter, null);
-
-        } catch (Exception e) {
-            log.warn("Responses API fallback 失敗 model={}：{}", model, e.getMessage());
-            sendContent(emitter, "⚠️ 呼叫失敗（需要 Responses API 但也失敗）：" + e.getMessage());
-            sendSimpleTailAndComplete(emitter, null);
-        }
-    }
-
     public SseEmitter streamModelTest(String model, Long providerId, String ignored) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
-        // 先取得 provider entity，供 ChatModel 建立與 Responses API fallback 共用
-        final com.aicrm.crm.domain.AiProvider resolvedProvider;
+        // 優先使用 provider 動態憑證；未指定 provider 時回退 Spring 注入的預設 ChatModel
         final ChatModel chatModel;
-
         if (providerId != null) {
-            resolvedProvider = systemSettings.findProviderById(providerId).orElse(null);
-            if (resolvedProvider == null || !resolvedProvider.isApiKeySet()) {
+            chatModel = buildChatModelForProvider(providerId);
+            if (chatModel == null) {
                 sendContent(emitter, "⚠️ Provider 不存在或 API 金鑰未設定，無法執行模型測試。");
                 sendSimpleTailAndComplete(emitter, null);
                 return emitter;
             }
-            chatModel = buildChatModelForProvider(resolvedProvider);
         } else {
-            resolvedProvider = null;
             var defaultModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
             if (defaultModel == null) {
                 sendContent(emitter, "⚠️ 未設定 API 金鑰，無法執行模型測試。");
@@ -971,17 +880,9 @@ public class InsightService {
                     if (text != null && !text.isEmpty()) sendContent(emitter, text);
                 },
                 error -> {
-                    var errMsg = error.getMessage();
-                    // 404 代表 model 需要 OpenAI Responses API（gpt-5+ 系列），
-                    // Spring AI 2.0 尚不支援，自動 fallback 至直接呼叫 /v1/responses
-                    if (errMsg != null && errMsg.contains("404") && resolvedProvider != null) {
-                        log.info("model={} Chat Completions 404，切換 Responses API fallback", testModel);
-                        tryResponsesApiFallback(testModel, resolvedProvider, prompt, emitter);
-                    } else {
-                        log.warn("模型測試串流失敗 model={}：{}", model, errMsg);
-                        sendContent(emitter, "⚠️ 呼叫失敗：" + errMsg);
-                        sendSimpleTailAndComplete(emitter, null);
-                    }
+                    log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());
+                    sendContent(emitter, "⚠️ 呼叫失敗：" + error.getMessage());
+                    sendSimpleTailAndComplete(emitter, null);
                 },
                 () -> {
                     // 串流完成：擷取 token 用量並送出，再送 [DONE]
