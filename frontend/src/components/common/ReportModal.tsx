@@ -2,11 +2,26 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AiBadge } from "./AiBadge";
 import { FeedbackButtons } from "./FeedbackButtons";
+import { AiThinkingIndicator } from "./AiThinkingIndicator";
 
 /**
  * 整體評估報告 Modal：渲染 AI 產出的 Markdown 報告（單客戶 360° 或 Portfolio 共用）。
+ * 函式級註解：loading=true 等待首字；streaming=true 串流進行中；兩者皆 false 為完成狀態。
  */
-export function ReportModal({ report, onClose }: { report: { title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null }; onClose: () => void }) {
+export function ReportModal({ report, onClose }: {
+  report: {
+    title: string;
+    loading: boolean;
+    /** 串流中（有內容但尚未完成）。 */
+    streaming?: boolean;
+    markdown: string;
+    meta?: string;
+    callId?: number | null;
+  };
+  onClose: () => void;
+}) {
+  const isStreaming = report.streaming ?? false;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content report-modal" onClick={(e) => e.stopPropagation()}>
@@ -19,15 +34,18 @@ export function ReportModal({ report, onClose }: { report: { title: string; load
         </div>
         <div className="report-body">
           {report.loading ? (
-            <p className="chat-typing">AI 正在綜合分析<span>…</span></p>
+            /* 等待首字 */
+            <AiThinkingIndicator label="AI 正在綜合分析" />
           ) : (
-            <div className="markdown-body">
+            /* 串流中或完成：顯示 Markdown 內容 */
+            <div className={isStreaming ? "markdown-body ai-streaming-body" : "markdown-body"}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{report.markdown}</ReactMarkdown>
+              {isStreaming && <span className="ai-stream-cursor" />}
             </div>
           )}
         </div>
         <div className="report-footer">
-          {!report.loading ? <FeedbackButtons callId={report.callId} /> : null}
+          {!report.loading && !isStreaming ? <FeedbackButtons callId={report.callId} /> : null}
           <button type="button" onClick={onClose}>關閉</button>
         </div>
       </div>

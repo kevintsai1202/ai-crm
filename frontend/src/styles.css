@@ -1258,6 +1258,71 @@ button {
   50% { opacity: 1; }
 }
 
+/* ===== AI 等待首字：跳動三顆點 ===== */
+.ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+}
+
+.ai-thinking__label {
+  font-size: 14px;
+  color: #0f766e;
+  font-weight: 500;
+}
+
+.ai-thinking__dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.ai-thinking__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #0f766e;
+  animation: ai-dot-bounce 1.4s ease-in-out infinite;
+  opacity: 0.4;
+}
+
+.ai-thinking__dot:nth-child(2) { animation-delay: 0.18s; }
+.ai-thinking__dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes ai-dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-7px); opacity: 1; }
+}
+
+/* ===== AI 串流中：左側搏動邊框 ===== */
+.ai-streaming-body {
+  border-left: 3px solid #0f766e;
+  padding-left: 12px;
+  animation: ai-stream-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ai-stream-pulse {
+  0%, 100% { border-color: #0f766e; }
+  50% { border-color: #5eead4; }
+}
+
+/* 游標閃爍：串流中文末加在 inline-block 上 */
+.ai-stream-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: #0f766e;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: ai-cursor-blink 0.9s step-end infinite;
+}
+
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* ===== AI 歷程 Modal：呼叫歷史清單 ===== */
 .ai-history-section {
   margin: 18px 0 8px;

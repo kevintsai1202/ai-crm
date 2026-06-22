@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { AiBadge } from "../../../components/common/AiBadge";
+import { AiThinkingIndicator } from "../../../components/common/AiThinkingIndicator";
 import { FeedbackButtons } from "../../../components/common/FeedbackButtons";
 import type { ChatMessage } from "../useAiChat";
 
@@ -21,11 +22,12 @@ export function ChatBubble({ msg }: { msg: ChatMessage }) {
       <span className="chat-author"><AiBadge /> AI 助理</span>
       <div className="chat-bubble">
         {msg.content ? (
-          <div className="markdown-body">
+          <div className={msg.pending ? "markdown-body ai-streaming-body" : "markdown-body"}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            {msg.pending && <span className="ai-stream-cursor" />}
           </div>
         ) : (
-          <p className="chat-typing">AI 正在查詢資料庫<span>…</span></p>
+          <AiThinkingIndicator label="AI 正在查詢資料庫" />
         )}
         {hasRisk ? (
           <div className="chat-risk">

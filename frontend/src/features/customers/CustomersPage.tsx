@@ -69,7 +69,7 @@ export function CustomersPage() {
   const [editingOpportunity, setEditingOpportunity] = useState<OpportunityResponse | null>(null);
   // 編輯互動對象（null 表示未開啟）
   const [editingInteraction, setEditingInteraction] = useState<InteractionResponse | null>(null);
-  const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
+  const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; streaming?: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
   // AI 歷程 Modal：open 控制開關、loading 載入中、calls 為該客戶歷次 AI 呼叫
   const [aiHistory, setAiHistory] = useState<{ open: boolean; loading: boolean; calls: AiCallHistoryItem[] } | null>(null);
 
@@ -291,24 +291,24 @@ export function CustomersPage() {
     if (!selected) return;
     const name = selected.customer.name;
     const title = `整體評估 — ${name}`;
-    setReport({ open: true, title, loading: true, markdown: "" });
-    let acc = ""; // 累積的報告 Markdown
+    setReport({ open: true, title, loading: true, streaming: true, markdown: "" });
+    let acc = "";
     fetchCustomerAssessmentStream(
       selected.customer.id,
       (chunk) => {
         if (chunk.type === "content" && chunk.delta) {
           acc += chunk.delta;
-          setReport((r) => (r ? { ...r, loading: false, markdown: acc } : r));
+          setReport((r) => (r ? { ...r, loading: false, streaming: true, markdown: acc } : r));
         } else if (chunk.type === "risk" && chunk.risk) {
           setReport((r) => (r ? { ...r, meta: `流失風險 ${chunk.risk.churnRisk} · 續約延遲 ${chunk.risk.renewalDelayRisk}` } : r));
         } else if (chunk.type === "callId") {
           setReport((r) => (r ? { ...r, callId: chunk.callId } : r));
         }
       },
-      () => setReport((r) => (r ? { ...r, loading: false } : r)),
+      () => setReport((r) => (r ? { ...r, loading: false, streaming: false } : r)),
       (e) => {
         console.error("客戶整體評估失敗:", e);
-        setReport((r) => (r ? { ...r, loading: false, markdown: acc || "⚠️ 產生評估失敗，請稍後再試。" } : r));
+        setReport((r) => (r ? { ...r, loading: false, streaming: false, markdown: acc || "⚠️ 產生評估失敗，請稍後再試。" } : r));
       }
     );
   }

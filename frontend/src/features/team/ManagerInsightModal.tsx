@@ -12,6 +12,7 @@ import {
 import type { ManagerInsightResponse, AiCallHistoryItem } from "../../types";
 import { formatDateTime } from "../../lib/format";
 import { AiBadge } from "../../components/common/AiBadge";
+import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 
 /**
@@ -109,15 +110,22 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
           </div>
           <div className="report-body">
             {loading ? (
-              <p className="chat-typing">載入中<span>…</span></p>
+              <AiThinkingIndicator label="載入分析中" />
             ) : err ? (
               <p className="trace-empty">{err}</p>
             ) : insight ? (
-              <div className="markdown-body">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{insight.content}</ReactMarkdown>
+              /* generating 為 true 時：有內容但仍在串流 */
+              <div className={generating && insight.content ? "markdown-body ai-streaming-body" : "markdown-body"}>
+                {!insight.content && generating
+                  ? <AiThinkingIndicator label="AI 正在分析" />
+                  : <ReactMarkdown remarkPlugins={[remarkGfm]}>{insight.content}</ReactMarkdown>
+                }
+                {generating && insight.content && <span className="ai-stream-cursor" />}
               </div>
             ) : (
-              <p className="trace-empty">尚未產生分析，點「重新分析」由 AI 產出。</p>
+              generating
+                ? <AiThinkingIndicator label="AI 正在分析" />
+                : <p className="trace-empty">尚未產生分析，點「重新分析」由 AI 產出。</p>
             )}
           </div>
           <div className="report-footer">

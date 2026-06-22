@@ -33,7 +33,7 @@ export function DashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [reports, setReports] = useState<DashboardReports | null>(null);
   const [drilldown, setDrilldown] = useState<{ open: boolean; loading: boolean; title: string; data: DrilldownResponse | null } | null>(null);
-  const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
+  const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; streaming?: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
   const [rfm, setRfm] = useState<RfmResponse[] | null>(null);
   const [sentiment, setSentiment] = useState<SentimentRadarResponse | null>(null);
   const [usage, setUsage] = useState<UsageSummaryResponse | null>(null);
@@ -161,25 +161,21 @@ export function DashboardPage() {
   /** 開啟 Portfolio 全公司整體評估報告（SSE 串流版）。 */
   function openPortfolioAssessment() {
     // 立即顯示 modal（loading=true），第一個 token 到達後轉為逐字渲染
-    setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: true, markdown: "" });
+    setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: true, streaming: true, markdown: "" });
     streamPortfolioAssessment(
       (chunk) => {
         if (chunk.type === "content" && chunk.delta) {
-          // 第一個 token 時關掉 loading spinner，改為逐字顯示
           setReport((prev) => prev
-            ? { ...prev, loading: false, markdown: (prev.markdown ?? "") + chunk.delta }
+            ? { ...prev, loading: false, streaming: true, markdown: (prev.markdown ?? "") + chunk.delta }
             : prev);
         } else if (chunk.type === "callId" && chunk.callId) {
           setReport((prev) => prev ? { ...prev, callId: chunk.callId } : prev);
         }
       },
-      () => {
-        // 串流完成：確保 loading 已關閉
-        setReport((prev) => prev ? { ...prev, loading: false } : prev);
-      },
+      () => setReport((prev) => prev ? { ...prev, loading: false, streaming: false } : prev),
       (err) => {
         console.error("Portfolio 整體評估串流失敗:", err);
-        setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
+        setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: false, streaming: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
       }
     );
   }
