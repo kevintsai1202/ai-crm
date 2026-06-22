@@ -218,15 +218,19 @@ public class SystemSettingService {
         try {
             if (!StringUtils.hasText(json)) return List.of();
             return objectMapper.readValue(json, new TypeReference<List<Dtos.ModelOptionItem>>() {});
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             log.warn("模型清單 JSON 解析失敗，回空清單：{}", e.getMessage());
             return List.of();
         }
     }
 
-    /** 序列化 ModelOptionItem 清單為 JSON 字串。 */
+    /** 序列化 ModelOptionItem 清單為 JSON 字串；序列化失敗包成 IllegalStateException 拋出。 */
     private String serializeModelOptions(List<Dtos.ModelOptionItem> options) {
-        return objectMapper.writeValueAsString(options);
+        try {
+            return objectMapper.writeValueAsString(options);
+        } catch (Exception e) {
+            throw new IllegalStateException("模型清單序列化失敗", e);
+        }
     }
 
     /** upsert 單一設定鍵。 */
