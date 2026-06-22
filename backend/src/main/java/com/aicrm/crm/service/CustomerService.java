@@ -87,27 +87,12 @@ public class CustomerService {
                                                                   LocalDate renewalFrom, LocalDate renewalTo) {
         int pageIdx = Math.max(page, 0);
         int pageSize = Math.min(Math.max(size, 1), 50);
-        var spec = buildSpec(keyword, industry, owner, status, renewalFrom, renewalTo);
-
-        // 純 DB 欄位條件 → 走資料庫分頁(高效);toSummary 的 LAZY 關聯由 default_batch_fetch_size 批次載入。
-        if (!StringUtils.hasText(riskLevel)) {
-            var pageable = PageRequest.of(pageIdx, pageSize, Sort.by("id").ascending());
-            var result = customers.findAll(spec, pageable);
-            var items = result.getContent().stream().map(mapper::toSummary).toList();
-            return new Dtos.PageResponse<>(items, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
-        }
-
-        // 含「風險等級」這種衍生值(由互動/續約日推算,非 DB 欄位)時:先以 DB 條件取全集,
-        // 算出風險後過濾,再以記憶體分頁。其餘 DB 條件已先收斂集合,成本可控。
-        var filtered = customers.findAll(spec, Sort.by("id").ascending()).stream()
-                .map(mapper::toSummary)
-                .filter(s -> riskLevel.equalsIgnoreCase(s.riskLevel()))
-                .toList();
-        int total = filtered.size();
-        int from = Math.min(pageIdx * pageSize, total);
-        int to = Math.min(from + pageSize, total);
-        int totalPages = (int) Math.ceil((double) total / pageSize);
-        return new Dtos.PageResponse<>(filtered.subList(from, to), pageIdx, pageSize, total, totalPages);
+        // risk_level 已為 DB 欄位(V13)，所有條件（含 riskLevel）皆可走 DB 層分頁，不需記憶體全撈。
+        var spec = buildSpec(keyword, industry, owner, status, riskLevel, renewalFrom, renewalTo);
+        var pageable = PageRequest.of(pageIdx, pageSize, Sort.by("id").ascending());
+        var result = customers.findAll(spec, pageable);
+        var items = result.getContent().stream().map(mapper::toSummary).toList();
+        return new Dtos.PageResponse<>(items, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     /**
@@ -271,15 +256,16 @@ public class CustomerService {
      * @return JPA Specification
      */
     private Specification<Customer> buildSpec(String keyword, String industry, String owner,
-                                              CustomerStatus status, LocalDate renewalFrom, LocalDate renewalTo) {
+                                              CustomerStatus status, String riskLevel,
+                                              LocalDate renewalFrom, LocalDate renewalTo) {
         return (root, query, cb) -> {
             if (query != null) {
                 query.distinct(true);
             }
-            // 以 AND 動態累加各條件;欄位有值才加入,組出彈性查詢
+            // 以 AND 動態累加各條件；欄位有值才加入，組出彈性查詢
             var predicate = cb.conjunction();
             if (StringUtils.hasText(keyword)) {
-                // 關鍵字擴大:名稱 / Email / 電話 / 統編 任一符合(OR LIKE)
+                // 關鍵字擴大：名稱 / Email / 電話 / 統編 任一符合(OR LIKE)
                 var kw = "%" + keyword.toLowerCase() + "%";
                 predicate = cb.and(predicate, cb.or(
                         cb.like(cb.lower(root.get("name")), kw),
@@ -297,7 +283,11 @@ public class CustomerService {
             if (status != null) {
                 predicate = cb.and(predicate, cb.equal(root.get("status"), status));
             }
-            // 續約到期日區間(between;單邊有值也支援)
+            // risk_level 為 DB 欄位(V13 落地)，直接加 WHERE 條件走索引
+            if (StringUtils.hasText(riskLevel)) {
+                predicate = cb.and(predicate, cb.equal(cb.upper(root.get("riskLevel")), riskLevel.toUpperCase()));
+            }
+            // 續約到期日區間(between；單邊有值也支援)
             if (renewalFrom != null) {
                 predicate = cb.and(predicate, cb.greaterThanOrEqualTo(root.<LocalDate>get("renewalDueDate"), renewalFrom));
             }
