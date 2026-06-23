@@ -849,6 +849,7 @@ export async function streamModelTest(
  */
 export async function streamModelScore(
   results: import("./types").ModelResultItem[],
+  sessionId: string,
   onChunk: (chunk: SseChunk) => void,
   onDone: () => void,
   onError: (err: any) => void
@@ -862,7 +863,7 @@ export async function streamModelScore(
         Accept: "text/event-stream",
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ results })
+      body: JSON.stringify({ results, sessionId })
     });
     if (!response.ok) {
       handleStreamUnauthorized(response);
@@ -877,5 +878,18 @@ export async function streamModelScore(
 /** 取得模型評分 AI 歷程（MODEL_EVAL）。 */
 export async function fetchModelScoreCalls() {
   const { data } = await apiClient.get<AiCallHistoryItem[]>("/admin/settings/ai/score/calls");
+  return data;
+}
+
+/** 儲存單一模型競速測試結果到後端（MODEL_TEST 紀錄）。 */
+export async function logModelTest(req: import("./types").AiTestLogRequest): Promise<void> {
+  await apiClient.post("/admin/settings/ai/test/log", req);
+}
+
+/** 取得指定模型的 MODEL_TEST 歷程（新到舊）。 */
+export async function fetchModelTestCalls(model: string): Promise<AiCallHistoryItem[]> {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/admin/settings/ai/test/calls", {
+    params: { model }
+  });
   return data;
 }

@@ -401,3 +401,13 @@ export interface ModelResultItem {
   totalTokens: number;
   content: string;
 }
+
+/** 儲存單一模型測試結果的請求（對應後端 Dtos.AiTestLogRequest）。 */
+export interface AiTestLogRequest {
+  model: string;
+  sessionId: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  answer: string;
+}
