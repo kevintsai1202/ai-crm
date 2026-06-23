@@ -5,6 +5,7 @@ import {
   fetchAiSettings, saveAiSettings, streamModelTest,
   streamModelScore, fetchModelScoreCalls,
   createAiProvider, updateAiProvider, deleteAiProvider,
+  logModelTest, fetchModelTestCalls,
 } from "../../api";
 import type {
   AiSettingsResponse, AiCallHistoryItem, ModelResultItem,
@@ -76,6 +77,12 @@ export default function AdminSettingsPage() {
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(false);
   const [scoreCalls, setScoreCalls] = useState<AiCallHistoryItem[]>([]);
   const [scoreCallsLoading, setScoreCallsLoading] = useState(false);
+  /** 個別模型歷程 Modal 狀態（null 代表關閉）。 */
+  const [modelHistoryState, setModelHistoryState] = useState<{
+    open: boolean; model: string; calls: import("../../types").AiCallHistoryItem[]; loading: boolean;
+  } | null>(null);
+  /** 當前競速批次的 sessionId（startRace 時產生，startScore 時傳遞）。 */
+  const [currentSessionId, setCurrentSessionId] = useState<string>("");
 
   if (user?.role !== "ADMIN") return <Navigate to="/dashboard" replace />;
 
@@ -242,17 +249,26 @@ export default function AdminSettingsPage() {
     setRaceResults(init);
     startTimeRef.current = {};
 
+    const sessionId = crypto.randomUUID();
+    setCurrentSessionId(sessionId);
+
     let doneCount = 0;
     const total = activeOptions.length;
 
     activeOptions.forEach((opt) => {
       const t0 = performance.now();
       startTimeRef.current[opt.model] = t0;
+      /** 此模型的串流內容累積（用於測試完成後儲存至後端）。 */
+      let accContent = "";
+      let accPromptTokens = 0;
+      let accCompletionTokens = 0;
+      let accTotalTokens = 0;
 
       streamModelTest(
         "", opt.model, opt.providerId ?? null,
         (chunk: any) => {
           if (chunk.type === "content" && chunk.delta) {
+            accContent += chunk.delta;
             const now = performance.now();
             setRaceResults((prev) => {
               const cur = prev[opt.model] ?? {
@@ -270,7 +286,9 @@ export default function AdminSettingsPage() {
               };
             });
           } else if (chunk.type === "tokens") {
-            // 後端串流完成後送出的 token 用量
+            accPromptTokens = chunk.promptTokens ?? 0;
+            accCompletionTokens = chunk.completionTokens ?? 0;
+            accTotalTokens = chunk.totalTokens ?? 0;
             setRaceResults((prev) => ({
               ...prev,
               [opt.model]: {
@@ -288,6 +306,15 @@ export default function AdminSettingsPage() {
             ...prev,
             [opt.model]: { ...prev[opt.model], status: "done", totalMs }
           }));
+          // 非同步儲存測試結果至後端（fire-and-forget，不阻斷 UI）
+          logModelTest({
+            model: opt.model,
+            sessionId,
+            promptTokens: accPromptTokens,
+            completionTokens: accCompletionTokens,
+            totalTokens: accTotalTokens,
+            answer: accContent,
+          }).catch(err => console.warn("logModelTest 失敗：", err));
           doneCount++;
           if (doneCount >= total) setRacing(false);
         },
@@ -323,6 +350,7 @@ export default function AdminSettingsPage() {
 
     streamModelScore(
       doneResults,
+      currentSessionId,
       (chunk: any) => {
         if (chunk.type === "content" && chunk.delta) {
           setScoreReport((prev) => prev
@@ -355,6 +383,17 @@ export default function AdminSettingsPage() {
       setScoreCalls([]);
     } finally {
       setScoreCallsLoading(false);
+    }
+  }
+
+  /** 開啟指定模型的歷程 Modal（載入 MODEL_TEST 歷史記錄）。 */
+  async function openModelHistory(model: string) {
+    setModelHistoryState({ open: true, model, calls: [], loading: true });
+    try {
+      const calls = await fetchModelTestCalls(model);
+      setModelHistoryState(prev => prev ? { ...prev, calls, loading: false } : null);
+    } catch {
+      setModelHistoryState(prev => prev ? { ...prev, calls: [], loading: false } : null);
     }
   }
 
@@ -684,7 +723,16 @@ export default function AdminSettingsPage() {
                             </div>
                             {/* 完成後顯示下載按鈕 */}
                             {r.status === "done" && r.content && (
-                              <div style={{ padding: "6px 12px", borderTop: "1px solid #f1f5f9", textAlign: "right" }}>
+                              <div style={{ padding: "6px 12px", borderTop: "1px solid #f1f5f9",
+                                display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ fontSize: 12, padding: "3px 10px" }}
+                                  onClick={() => openModelHistory(opt.model)}
+                                >
+                                  🕘 歷程
+                                </button>
                                 <button
                                   type="button"
                                   className="btn-secondary"
@@ -700,44 +748,6 @@ export default function AdminSettingsPage() {
                       })}
                     </div>
 
-                    {/* 評分按鈕（全部完成後顯示） */}
-                    {allDone && hasDoneResults && (
-                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", paddingTop: 8, borderTop: "1px solid #f1f5f9", flexWrap: "wrap" }}>
-                        <button type="button" className="btn-secondary" onClick={openScoreHistory}>🕘 評分歷程</button>
-                        {/* ZIP 下載：模型全部完成即顯示，有評分報告則一起打包 */}
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={() => {
-                            // 組裝所有模型回答（+ 評分報告若已完成）為 ZIP
-                            const ts = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
-                            const files: Record<string, string> = {};
-                            Object.entries(raceResults).forEach(([model, r]) => {
-                              if (r.content) {
-                                const safeName = model.replace(/[/\\:*?"<>|]/g, "_");
-                                files[`${safeName}.md`] = r.content;
-                              }
-                            });
-                            if (scoreReport?.markdown) {
-                              files["00_評分報告.md"] = scoreReport.markdown;
-                            }
-                            downloadZip(`競速測試_${ts}`, files);
-                          }}
-                        >
-                          📦 下載全部 ZIP
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-assess"
-                          disabled={scoring}
-                          onClick={startScore}
-                          style={{ fontWeight: 700, padding: "9px 20px", borderRadius: 8 }}
-                        >
-                          {scoring ? "評分中…" : "🏆 claude-opus-4-8 評分"}
-                        </button>
-                      </div>
-                    )}
-
                     {/* 評分進行中的提示（尚未有內容時顯示） */}
                     {scoreReport && scoring && !scoreReport.markdown && (
                       <div style={{ marginTop: 12, padding: "12px 14px", background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 10 }}>
@@ -748,6 +758,42 @@ export default function AdminSettingsPage() {
                       </div>
                     )}
                   </>
+                )}
+
+                {/* 評分相關按鈕列（永遠顯示，條件控制 disabled） */}
+                {options.length > 0 && (
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end",
+                    paddingTop: 8, borderTop: "1px solid #f1f5f9", flexWrap: "wrap", marginTop: 8 }}>
+                    <button type="button" className="btn-secondary" onClick={openScoreHistory}>📊 評分歷程</button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={!hasDoneResults}
+                      onClick={() => {
+                        const ts = new Date().toISOString().slice(0, 16).replace("T", "_").replace(":", "-");
+                        const files: Record<string, string> = {};
+                        Object.entries(raceResults).forEach(([model, r]) => {
+                          if (r.content) {
+                            const safeName = model.replace(/[/\\:*?"<>|]/g, "_");
+                            files[`${safeName}.md`] = r.content;
+                          }
+                        });
+                        if (scoreReport?.markdown) files["00_評分報告.md"] = scoreReport.markdown;
+                        downloadZip(`競速測試_${ts}`, files);
+                      }}
+                    >
+                      📦 下載全部 ZIP
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-assess"
+                      disabled={scoring || !allDone || !hasDoneResults}
+                      onClick={startScore}
+                      style={{ fontWeight: 700, padding: "9px 20px", borderRadius: 8 }}
+                    >
+                      {scoring ? "評分中…" : "🏆 claude-opus-4-8 評分"}
+                    </button>
+                  </div>
                 )}
               </>
             )}
@@ -770,6 +816,16 @@ export default function AdminSettingsPage() {
           calls={scoreCalls}
           loading={scoreCallsLoading}
           onClose={() => setScoreHistoryOpen(false)}
+        />
+      )}
+
+      {/* 個別模型歷程 Modal */}
+      {modelHistoryState?.open && (
+        <AiCallHistoryModal
+          title={`${modelHistoryState.model} 測試歷程`}
+          calls={modelHistoryState.calls}
+          loading={modelHistoryState.loading}
+          onClose={() => setModelHistoryState(null)}
         />
       )}
     </div>
