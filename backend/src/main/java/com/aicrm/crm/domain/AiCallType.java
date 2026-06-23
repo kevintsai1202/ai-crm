@@ -15,5 +15,7 @@ public enum AiCallType {
     /** 個別業務 coaching（模組 C，scope=OWNER）。 */
     OWNER_COACHING,
     /** 多模型競速測試評分（claude-opus-4-8 評審）。 */
-    MODEL_EVAL
+    MODEL_EVAL,
+    /** 多模型競速：單一模型的測試結果（儲存供歷程查詢）。 */
+    MODEL_TEST
 }

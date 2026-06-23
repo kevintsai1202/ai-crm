@@ -58,4 +58,13 @@ public interface AiCallLogRepository extends JpaRepository<AiCallLog, Long> {
      * @return 該業務歷次呼叫（新到舊）
      */
     List<AiCallLog> findByCallTypeAndSubjectOrderByCreatedAtDesc(AiCallType type, String subject);
+
+    /**
+     * 查指定類型 + 模型名稱的歷程（新到舊），供個別模型競速歷程查詢。
+     *
+     * @param type 呼叫類型（MODEL_TEST）
+     * @param model 模型名稱
+     * @return 歷次呼叫清單
+     */
+    List<AiCallLog> findByCallTypeAndModelOrderByCreatedAtDesc(AiCallType type, String model);
 }

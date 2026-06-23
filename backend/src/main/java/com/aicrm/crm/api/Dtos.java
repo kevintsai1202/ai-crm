@@ -462,6 +462,16 @@ public final class Dtos {
             int totalTokens,
             String content) {}
 
-    /** 多模型評分請求：包含所有模型的測試結果。 */
-    public record AiScoreRequest(List<ModelResultItem> results) {}
+    /** 多模型評分請求：包含所有模型的測試結果與競速 session 識別碼。 */
+    public record AiScoreRequest(List<ModelResultItem> results, String sessionId) {}
+
+    /** 儲存單一模型競速測試結果的請求 DTO（前端在每個模型測試完成後呼叫）。 */
+    public record AiTestLogRequest(
+        String model,
+        String sessionId,
+        int promptTokens,
+        int completionTokens,
+        int totalTokens,
+        String answer
+    ) {}
 }
