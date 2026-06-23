@@ -5,6 +5,8 @@ import com.aicrm.crm.service.InsightService;
 import com.aicrm.crm.service.JwtService;
 import com.aicrm.crm.service.SystemSettingService;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -178,20 +182,19 @@ public class AdminSettingController {
      * @param request 測試結果 DTO（model、sessionId 皆為必填）
      */
     @PostMapping("/ai/test/log")
-    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
-    public void logModelTest(@jakarta.validation.Valid @RequestBody Dtos.AiTestLogRequest request) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logModelTest(@Valid @RequestBody Dtos.AiTestLogRequest request) {
         aiGovernance.recordModelTest(request);
     }
 
     /**
      * 取得指定模型的 MODEL_TEST 歷程（新到舊）。
      *
-     * @param model 模型名稱（query param）
+     * @param model 模型名稱（query param，必填）
      * @return AI 呼叫歷史清單
      */
     @GetMapping("/ai/test/calls")
-    public java.util.List<Dtos.AiCallHistoryItem> modelTestCalls(
-            @org.springframework.web.bind.annotation.RequestParam String model) {
+    public List<Dtos.AiCallHistoryItem> modelTestCalls(@RequestParam String model) {
         return aiGovernance.historyByModel(model);
     }
 
