@@ -159,9 +159,9 @@ public class AiGovernanceService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordModelTest(Dtos.AiTestLogRequest req) {
         var entry = new AiCallLog(
-            null, AiCallType.MODEL_TEST, req.sessionId(), req.model(),
-            req.promptTokens(), req.completionTokens(), req.totalTokens(),
-            true, false, req.answer());
+                null, AiCallType.MODEL_TEST, req.sessionId(), req.model(),
+                req.promptTokens(), req.completionTokens(), req.totalTokens(),
+                true, false, req.answer());
         callLogRepository.save(entry);
     }
 
@@ -174,8 +174,8 @@ public class AiGovernanceService {
     @Transactional(readOnly = true)
     public java.util.List<Dtos.AiCallHistoryItem> historyByModel(String model) {
         return callLogRepository.findByCallTypeAndModelOrderByCreatedAtDesc(AiCallType.MODEL_TEST, model).stream()
-            .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
-                c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
-            .toList();
+                .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                        c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+                .toList();
     }
 }
