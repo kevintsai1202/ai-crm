@@ -43,13 +43,13 @@ public class AuthController {
     public Dtos.LoginResponse login(@Valid @RequestBody Dtos.LoginRequest request,
                                     HttpServletResponse response) {
         var result = authService.login(request);
-        // 以 response header 直接寫入 SameSite=Strict，避免 Jakarta Cookie API 版本差異
-        // SameSite=None 允許跨域攜帶 cookie（前端 ai-crm.springai.world → 後端 zeabur.app）
+        // token 改由 response body 回傳，由前端存入 sessionStorage 後以 Bearer header 傳送，
+        // 解決 iOS Safari ITP 封鎖跨域 httpOnly cookie 的問題。
+        // 同時保留 cookie 以相容既有桌面瀏覽器 session（cookie 優先於 Bearer header）。
         response.addHeader("Set-Cookie",
                 COOKIE_NAME + "=" + result.token()
                 + "; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=" + tokenTtlSeconds);
-        // body 只回傳 user 資訊，不帶明文 token
-        return new Dtos.LoginResponse(null, result.user());
+        return new Dtos.LoginResponse(result.token(), result.user());
     }
 
     /**

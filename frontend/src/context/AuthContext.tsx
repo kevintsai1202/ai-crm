@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { fetchHealth, login as apiLogin, logout as apiLogout } from "../api";
+import { fetchHealth, login as apiLogin, logout as apiLogout, TOKEN_KEY } from "../api";
 import type { HealthResponse, UserResponse } from "../types";
 
 /** Auth 與 health 全域狀態介面。 */
@@ -13,7 +13,7 @@ interface AuthContextValue {
   refreshHealth: () => Promise<void>;
 }
 
-/** sessionStorage key：存放非敏感 user 資訊，供頁面重整後還原 UI（token 在 httpOnly cookie）。 */
+/** sessionStorage key：存放非敏感 user 資訊，供頁面重整後還原 UI。 */
 const USER_KEY = "ai-crm-user";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,20 +40,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /** 登入：後端設 httpOnly cookie，前端只存 user 資訊至 sessionStorage。 */
+  /** 登入：將 token 存入 sessionStorage（供 axios 攔截器自動加 Bearer header），並存 user 資訊供 UI 使用。 */
   async function login(username: string, password: string) {
     const result = await apiLogin(username, password);
+    if (result.token) {
+      sessionStorage.setItem(TOKEN_KEY, result.token);
+    }
     sessionStorage.setItem(USER_KEY, JSON.stringify(result.user));
     setUser(result.user);
   }
 
-  /** 登出：呼叫後端清除 cookie，清除 sessionStorage 與 UI 狀態。 */
+  /** 登出：清除 token 與 user 資訊，呼叫後端清除 cookie（相容舊 cookie session）。 */
   async function logout() {
     try {
       await apiLogout();
     } catch {
-      // 登出失敗仍清除前端狀態（防止 cookie 過期但 UI 卡住）
+      // 登出失敗仍清除前端狀態
     }
+    sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     setUser(null);
   }
@@ -71,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     const onLogout = () => {
+      sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(USER_KEY);
       setUser(null);
     };

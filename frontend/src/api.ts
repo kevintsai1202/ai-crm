@@ -26,14 +26,32 @@ import type {
   UsageSummaryResponse
 } from "./types";
 
+/** sessionStorage key：存放 JWT，由 axios 攔截器自動加入 Authorization header。 */
+export const TOKEN_KEY = "ai-crm-token";
+
 /**
- * 共用 Axios client：baseURL 預設 /api（Caddy 代理至後端），
- * withCredentials 讓瀏覽器隨請求帶上 httpOnly cookie。
+ * 共用 Axios client：baseURL 預設 /api。
+ * 不使用 withCredentials，改以 Bearer token（sessionStorage）做跨域認證，
+ * 避免 iOS Safari ITP 封鎖第三方 httpOnly cookie。
  */
 export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
-  timeout: 30000,
-  withCredentials: true
+  timeout: 30000
+});
+
+/** 從 sessionStorage 讀取 JWT，回傳含 Authorization header 的物件（無 token 則空物件）。 */
+function getAuthHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// 請求攔截器：自動將 sessionStorage 的 JWT 加入 Authorization header
+apiClient.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 /**
@@ -251,10 +269,10 @@ export async function askAssistantStream(
   try {
     const response = await fetch(`${baseUrl}/ai/chat`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       },
       body: JSON.stringify({ customerId, message })
     });
@@ -287,9 +305,9 @@ export async function fetchCustomerAssessmentStream(
   try {
     const response = await fetch(`${baseUrl}/ai/customers/${customerId}/assessment`, {
       method: "GET",
-      credentials: "include",
       headers: {
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       }
     });
     if (!response.ok) {
@@ -660,9 +678,9 @@ export async function streamPortfolioAssessment(
   try {
     const response = await fetch(`${baseUrl}/ai/portfolio/assessment`, {
       method: "GET",
-      credentials: "include",
       headers: {
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       }
     });
     if (!response.ok) {
@@ -691,9 +709,9 @@ export async function streamTeamInsight(
   try {
     const response = await fetch(`${baseUrl}/manager/insights/team`, {
       method: "POST",
-      credentials: "include",
       headers: {
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       }
     });
     if (!response.ok) {
@@ -724,9 +742,9 @@ export async function streamOwnerInsight(
   try {
     const response = await fetch(`${baseUrl}/manager/insights/owner?owner=${encodeURIComponent(owner)}`, {
       method: "POST",
-      credentials: "include",
       headers: {
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       }
     });
     if (!response.ok) {
@@ -808,10 +826,10 @@ export async function streamModelTest(
   try {
     const response = await fetch(`${baseUrl}/admin/settings/ai/test`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       },
       // _t 時間戳確保每次 POST 請求唯一，避免 CDN / proxy 回傳 cached response
       body: JSON.stringify({ message, model, providerId, _t: new Date().getTime() })
@@ -839,10 +857,10 @@ export async function streamModelScore(
   try {
     const response = await fetch(`${baseUrl}/admin/settings/ai/score`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
-        Accept: "text/event-stream"
+        Accept: "text/event-stream",
+        ...getAuthHeaders()
       },
       body: JSON.stringify({ results })
     });
