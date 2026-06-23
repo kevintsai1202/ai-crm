@@ -467,8 +467,8 @@ public final class Dtos {
 
     /** 儲存單一模型競速測試結果的請求 DTO（前端在每個模型測試完成後呼叫）。 */
     public record AiTestLogRequest(
-            String model,
-            String sessionId,
+            @jakarta.validation.constraints.NotBlank String model,
+            @jakarta.validation.constraints.NotBlank String sessionId,
             int promptTokens,
             int completionTokens,
             int totalTokens,

@@ -172,6 +172,29 @@ public class AdminSettingController {
         return aiGovernance.historyByType(com.aicrm.crm.domain.AiCallType.MODEL_EVAL);
     }
 
+    /**
+     * 儲存單一模型競速測試結果（前端測試完成後非同步呼叫）。
+     *
+     * @param request 測試結果 DTO（model、sessionId 皆為必填）
+     */
+    @PostMapping("/ai/test/log")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logModelTest(@jakarta.validation.Valid @RequestBody Dtos.AiTestLogRequest request) {
+        aiGovernance.recordModelTest(request);
+    }
+
+    /**
+     * 取得指定模型的 MODEL_TEST 歷程（新到舊）。
+     *
+     * @param model 模型名稱（query param）
+     * @return AI 呼叫歷史清單
+     */
+    @GetMapping("/ai/test/calls")
+    public java.util.List<Dtos.AiCallHistoryItem> modelTestCalls(
+            @org.springframework.web.bind.annotation.RequestParam String model) {
+        return aiGovernance.historyByModel(model);
+    }
+
     /** 從認證主體解析登入帳號；無法解析時回 "unknown"。 */
     private String resolveUsername(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof JwtService.AuthPrincipal principal) {
