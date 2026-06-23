@@ -103,6 +103,9 @@ public class InsightService {
      */
     private final String defaultOpenAiBaseUrl;
 
+    /** 預設 OpenAI API key（用於手動建立 ChatModel）。 */
+    private final String defaultOpenAiApiKey;
+
     public InsightService(CustomerService customers,
                           KnowledgeDocumentRepository knowledgeDocuments,
                           EmbeddingClient embeddingClient,
@@ -123,6 +126,7 @@ public class InsightService {
         this.systemSettings = systemSettings;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
         this.defaultOpenAiBaseUrl = defaultOpenAiBaseUrl;
+        this.defaultOpenAiApiKey = openAiApiKey;
     }
 
     /**
@@ -884,7 +888,12 @@ public class InsightService {
         var spec = ChatClient.create(chatModel).prompt().system(testSystemPrompt).user(prompt);
         var testModel = (model != null && !model.isBlank()) ? model : null;
         if (testModel != null) {
-            spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder().model(testModel));
+            // Spring AI 2.0 的 ChatClient.options() 接受 Builder（非 built object）；
+            // 明確帶 maxCompletionTokens，避免 Spring AI 合併後回退送廢棄的 max_tokens（gpt-5.4+ 拒絕此參數）
+            spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder()
+                    .model(testModel)
+                    .maxTokens((Integer) null)        // 明確清除，防止 merge 時帶入 base 的 maxTokens
+                    .maxCompletionTokens(2000));
         } else {
             var opts = systemSettings.resolveChatOptions();
             if (opts != null) spec = spec.options(opts);

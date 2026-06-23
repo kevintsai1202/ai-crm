@@ -1,6 +1,7 @@
 server:
   port: 18080
 
+
 spring:
   application:
     name: ai-crm-backend
@@ -37,9 +38,12 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:}
-      # base-url 取自 .env 的 BASE_URL，可指向 OpenAI 相容的第三方閘道（如 Zeabur AI Hub）；
-      # 未設定時用 OpenAI 官方端點。Spring AI 會在其後接 /v1/chat/completions。
-      base-url: ${BASE_URL:https://api.openai.com}
+      # base-url 取自 .env 的 BASE_URL，可指向 OpenAI 相容的第三方閘道（如 Zeabur AI Hub）。
+      # Spring AI 2.0 的 calculateBaseUrl 邏輯：若 base-url 非空則直接使用（不自動加 /v1）；
+      # 若為空才 fallback 至預設 "https://api.openai.com/v1"。
+      # 因此必須明確帶 /v1，否則 SDK 會打 https://api.openai.com/chat/completions → 404。
+      # BASE_URL 環境變數（如 Zeabur AI Hub）應已含 /v1（如 https://hnd1.aihub.zeabur.ai/v1）。
+      base-url: ${BASE_URL:https://api.openai.com/v1}
       chat:
         model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
         temperature: 0.3
@@ -77,6 +81,12 @@ spring:
     url: jdbc:h2:file:./data/ai-crm;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
     username: sa
     password:
+  flyway:
+    # pgvector extension（V5 migration）在 H2 不支援，停用 Flyway 改由 Hibernate DDL 建表
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
   h2:
     console:
       enabled: true
