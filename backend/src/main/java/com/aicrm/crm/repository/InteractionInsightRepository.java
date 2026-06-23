@@ -56,13 +56,13 @@ public interface InteractionInsightRepository extends JpaRepository<InteractionI
      * @param since 起算時間（含），早於此者不計
      * @return 月情緒趨勢列
      */
-    @Query(value = "select to_char(i.occurred_at, 'YYYY-MM') as month, "
+    @Query(value = "select to_char(i.occurred_at, 'YYYY-MM') as yr_month, "
             + "count(*) filter (where ins.sentiment = 'POSITIVE') as positive, "
             + "count(*) filter (where ins.sentiment = 'NEUTRAL') as neutral, "
             + "count(*) filter (where ins.sentiment = 'NEGATIVE') as negative "
             + "from interaction_insights ins join interactions i on i.id = ins.interaction_id "
             + "where i.occurred_at >= :since "
-            + "group by to_char(i.occurred_at, 'YYYY-MM') order by month",
+            + "group by to_char(i.occurred_at, 'YYYY-MM') order by yr_month",
             nativeQuery = true)
     List<Object[]> sentimentTrendSince(@org.springframework.data.repository.query.Param("since") java.time.LocalDateTime since);
 
