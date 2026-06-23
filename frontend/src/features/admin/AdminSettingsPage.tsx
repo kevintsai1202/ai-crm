@@ -96,18 +96,34 @@ export default function AdminSettingsPage() {
   useEffect(() => { load(); }, []);
 
   /**
-   * 選取模型，同時更新對應的 provider ID。
-   * 若再次點擊已選模型則取消選取。
+   * 選取模型，同時更新對應的 provider ID，並立即儲存至後端。
+   * 若再次點擊已選模型則取消選取（model 設為空字串）。
    */
-  function selectModel(m: string, pid: number | null) {
-    if (currentModel === m) {
-      setCurrentModel("");
-      setCurrentProviderId(null);
-    } else {
-      setCurrentModel(m);
-      setCurrentProviderId(pid);
-    }
+  async function selectModel(m: string, pid: number | null) {
+    const newModel = currentModel === m ? "" : m;
+    const newPid = currentModel === m ? null : pid;
+    setCurrentModel(newModel);
+    setCurrentProviderId(newPid);
     setActionMsg(null);
+    setSaving(true);
+    setSettingError(null);
+    try {
+      const data = await saveAiSettings(newModel, newPid, options);
+      setSettings(data);
+      setCurrentModel(data.currentModel);
+      setCurrentProviderId(data.currentProviderId);
+      setOptions(data.modelOptions);
+      setProviders(data.providers);
+      const msg = data.currentModel
+        ? `✓ 已設定 ${data.currentModel} 為默認模型`
+        : "✓ 已清除默認模型，改用環境變數預設";
+      setActionMsg(msg);
+      setTimeout(() => setActionMsg(null), 3000);
+    } catch (e) {
+      setSettingError(e instanceof Error ? e.message : "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
   }
 
   /** 新增候選模型（含供應商關聯）。 */
@@ -488,13 +504,14 @@ export default function AdminSettingsPage() {
                 return (
                   <div
                     key={`${opt.model}-${opt.providerId ?? "none"}`}
-                    onClick={() => selectModel(opt.model, opt.providerId ?? null)}
+                    onClick={() => { if (!saving) selectModel(opt.model, opt.providerId ?? null); }}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "10px 14px",
                       background: isSelected ? "#f0fdf4" : "#f8fafc",
                       border: `1.5px solid ${isSelected ? "#4ade80" : "#e2e8f0"}`,
-                      borderRadius: 8, cursor: "pointer",
+                      borderRadius: 8, cursor: saving ? "not-allowed" : "pointer",
+                      opacity: saving ? 0.7 : 1,
                       transition: "border-color 0.15s, background 0.15s",
                     }}
                   >
@@ -556,16 +573,6 @@ export default function AdminSettingsPage() {
               </button>
             </div>
 
-            {/* 儲存 */}
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={saving}
-              onClick={save}
-              style={{ width: "100%", padding: "11px", fontSize: 15, fontWeight: 700, borderRadius: 10 }}
-            >
-              {saving ? "儲存中…" : "儲存設定"}
-            </button>
           </div>
 
           {/* ── 多模型競速測試卡片 ── */}
