@@ -1034,7 +1034,8 @@ public class InsightService {
                     Integer pt = usage == null ? null : usage.getPromptTokens();
                     Integer ct = usage == null ? null : usage.getCompletionTokens();
                     Integer tt = usage == null ? null : usage.getTotalTokens();
-                    var saved = aiGovernance.record(AiCallType.MODEL_EVAL, null, null, usedModel, pt, ct, tt, true, true, answer);
+                    // subject 存 sessionId，供未來關聯同批次 MODEL_TEST 記錄（sessionId 可為 null，向後相容）
+                    var saved = aiGovernance.record(AiCallType.MODEL_EVAL, null, request.sessionId(), usedModel, pt, ct, tt, true, true, answer);
                     SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
                 });
         return emitter;
