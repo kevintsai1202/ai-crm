@@ -1,7 +1,9 @@
 package com.aicrm.crm.service;
 
 import com.aicrm.crm.api.Dtos;
+import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.repository.InteractionInsightRepository;
+import org.springframework.cache.annotation.Cacheable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -49,17 +51,19 @@ public class SentimentService {
     }
 
     /**
-     * 產出情緒意圖雷達 5 區塊。
+     * 產出情緒意圖雷達 5 區塊；churnRadar 先算一次，供 priorityCare 複用，避免重複查詢。
      *
      * @return 雷達聚合結果
      */
+    @Cacheable(CacheConfig.CACHE_DASHBOARD_SENTIMENT)
     public Dtos.SentimentRadarResponse radar() {
+        var churn = churnRadar();
         return new Dtos.SentimentRadarResponse(
                 intentDistribution(),
                 sentimentTrend(),
                 highRiskInteractions(),
-                churnRadar(),
-                priorityCare()
+                churn,
+                priorityCareFrom(churn)
         );
     }
 
@@ -156,12 +160,13 @@ public class SentimentService {
     }
 
     /**
-     * 優先關懷 top 10：取流失雷達分數最高者，附中文關懷理由。
+     * 優先關懷 top 10：取傳入的 churnRadar 結果（最高分者），附中文關懷理由。
+     * 不重複呼叫 DB；由 radar() 傳入已算好的結果。
      *
+     * @param radar 流失雷達清單（已依分數降冪排序）
      * @return 優先關懷清單
      */
-    private List<Dtos.PriorityCareItem> priorityCare() {
-        var radar = churnRadar();
+    private List<Dtos.PriorityCareItem> priorityCareFrom(List<Dtos.ChurnRadarItem> radar) {
         var result = new ArrayList<Dtos.PriorityCareItem>();
         for (var item : radar) {
             if (result.size() >= PRIORITY_CARE_LIMIT) {
