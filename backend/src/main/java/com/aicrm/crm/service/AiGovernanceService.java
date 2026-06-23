@@ -150,4 +150,32 @@ public class AiGovernanceService {
                         c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
                 .toList();
     }
+
+    /**
+     * 記錄單一模型競速測試結果（MODEL_TEST），以 sessionId 作為 subject 關聯同批次的評分記錄。
+     *
+     * @param req 測試結果請求 DTO
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordModelTest(Dtos.AiTestLogRequest req) {
+        var entry = new AiCallLog(
+            null, AiCallType.MODEL_TEST, req.sessionId(), req.model(),
+            req.promptTokens(), req.completionTokens(), req.totalTokens(),
+            true, false, req.answer());
+        callLogRepository.save(entry);
+    }
+
+    /**
+     * 查詢指定模型的 MODEL_TEST 歷程（新到舊）。
+     *
+     * @param model 模型名稱
+     * @return 歷次測試紀錄 DTO 清單
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<Dtos.AiCallHistoryItem> historyByModel(String model) {
+        return callLogRepository.findByCallTypeAndModelOrderByCreatedAtDesc(AiCallType.MODEL_TEST, model).stream()
+            .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+            .toList();
+    }
 }
