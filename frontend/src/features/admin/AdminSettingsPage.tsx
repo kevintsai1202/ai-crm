@@ -137,7 +137,7 @@ export default function AdminSettingsPage() {
     }
   }
 
-  /** 新增候選模型（含供應商關聯）。 */
+  /** 新增候選模型（含供應商關聯）；僅加入清單，不自動選取為默認模型。 */
   function addModel() {
     const m = newModel.trim();
     if (!m) return;
@@ -145,8 +145,6 @@ export default function AdminSettingsPage() {
       setOptions(prev => [...prev, { model: m, providerId: newModelProviderId }]);
       setRaceModels(prev => new Set([...prev, m]));
     }
-    setCurrentModel(m);
-    setCurrentProviderId(newModelProviderId);
     setNewModel("");
     setNewModelProviderId(null);
     setActionMsg(null);
