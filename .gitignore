@@ -23,6 +23,9 @@ frontend/dist/
 *.iml
 .vscode/
 
+# === H2 本機資料庫（僅開發用，不入版控）===
+backend/data/
+
 # === 作業系統 ===
 Thumbs.db
 .DS_Store
