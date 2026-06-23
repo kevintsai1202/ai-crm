@@ -64,6 +64,10 @@ export default function AdminSettingsPage() {
   /* ── 測試區狀態 ─────────────────────────────── */
   const [raceResults, setRaceResults] = useState<Record<string, ModelRaceResult>>({});
   const [racing, setRacing] = useState(false);
+  /** 勾選加入競速的模型名稱集合（初始為全部勾選）。 */
+  const [raceModels, setRaceModels] = useState<Set<string>>(
+    () => new Set(options.map(o => o.model))
+  );
   const startTimeRef = useRef<Record<string, number>>({});
 
   /* ── 評分區狀態 ─────────────────────────────── */
@@ -132,6 +136,7 @@ export default function AdminSettingsPage() {
     if (!m) return;
     if (!options.find(o => o.model === m)) {
       setOptions(prev => [...prev, { model: m, providerId: newModelProviderId }]);
+      setRaceModels(prev => new Set([...prev, m]));
     }
     setCurrentModel(m);
     setCurrentProviderId(newModelProviderId);
@@ -143,6 +148,7 @@ export default function AdminSettingsPage() {
   /** 從候選清單移除指定模型。 */
   function removeModel(m: string) {
     setOptions(prev => prev.filter(o => o.model !== m));
+    setRaceModels(prev => { const s = new Set(prev); s.delete(m); return s; });
     if (currentModel === m) {
       setCurrentModel("");
       setCurrentProviderId(null);
@@ -223,11 +229,13 @@ export default function AdminSettingsPage() {
   /* ── 競速測試方法 ─────────────────────────────── */
   function startRace() {
     if (options.length === 0 || racing) return;
+    const activeOptions = options.filter(o => raceModels.has(o.model));
+    if (activeOptions.length === 0) return;
     setRacing(true);
     setScoreReport(null); // 清空上次評分
 
     const init: Record<string, ModelRaceResult> = {};
-    options.forEach((opt) => {
+    activeOptions.forEach((opt) => {
       init[opt.model] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null,
                   promptTokens: null, completionTokens: null, totalTokens: null };
     });
@@ -235,9 +243,9 @@ export default function AdminSettingsPage() {
     startTimeRef.current = {};
 
     let doneCount = 0;
-    const total = options.length;
+    const total = activeOptions.length;
 
-    options.forEach((opt) => {
+    activeOptions.forEach((opt) => {
       const t0 = performance.now();
       startTimeRef.current[opt.model] = t0;
 
@@ -516,14 +524,22 @@ export default function AdminSettingsPage() {
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{
-                        width: 16, height: 16, borderRadius: "50%",
-                        border: `2px solid ${isSelected ? "#16a34a" : "#cbd5e1"}`,
-                        background: isSelected ? "#16a34a" : "transparent",
-                        flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center"
-                      }}>
-                        {isSelected && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
-                      </div>
+                      {/* checkbox 控制是否加入競速，stopPropagation 避免觸發 selectModel */}
+                      <input
+                        type="checkbox"
+                        checked={raceModels.has(opt.model)}
+                        onChange={e => {
+                          e.stopPropagation();
+                          setRaceModels(prev => {
+                            const s = new Set(prev);
+                            e.target.checked ? s.add(opt.model) : s.delete(opt.model);
+                            return s;
+                          });
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }}
+                        title="勾選加入競速比較"
+                      />
                       <span style={{ fontFamily: "monospace", fontSize: 14, color: "#122232" }}>{opt.model}</span>
                       {isSelected && (
                         <span style={{ fontSize: 11, color: "#166534", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>使用中</span>
@@ -618,7 +634,7 @@ export default function AdminSettingsPage() {
                       gap: 12,
                       marginBottom: 16
                     }}>
-                      {options.map((opt) => {
+                      {options.filter(o => raceResults[o.model] !== undefined).map((opt) => {
                         const r = raceResults[opt.model];
                         if (!r) return null;
                         const statusColor = { idle: "#94a3b8", waiting: "#f59e0b", streaming: "#3b82f6", done: "#16a34a", error: "#dc2626" }[r.status];
