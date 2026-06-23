@@ -11,7 +11,7 @@
 |---|------|------|
 | 1 | 默認模型點選即儲存 | 移除「儲存設定」按鈕，selectModel() 內部直接儲存 |
 | 2 | Checkbox 勾選競速參與模型 | checkbox ≠ 默認模型選取，兩功能分離 |
-| 3 | 評分歷程按鈕常駐 | 不依賴測試完成才顯示；ZIP 移至歷程 Modal |
+| 3 | 評分歷程按鈕常駐 | 評分歷程 + ZIP 按鈕常駐；ZIP 下載當前 session 的模型結果 |
 | 4 | 個別模型歷程 | MODEL_TEST 類型儲存到 ai_call_log；card 加歷程按鈕 |
 
 ---
@@ -80,17 +80,12 @@ const activeOptions = options.filter(o => raceModels.has(o.model));
 
 ```
 /* 測試區下方固定按鈕列（永遠顯示，options.length > 0 即可） */
-[📊 評分歷程]          [🏆 Claude 評分（allDone && hasDoneResults 才啟用）]
+[📊 評分歷程]  [📦 下載全部 ZIP（hasDoneResults 才啟用）]  [🏆 Claude 評分（allDone && hasDoneResults 才啟用）]
 ```
 
 - 「📊 評分歷程」：永遠顯示，點擊開啟 AiCallHistoryModal（現有行為不變）
-- 「🏆 Claude 評分」：條件 `allDone && hasDoneResults` 才 **非 disabled**（按鈕本身常駐）
-- 「📦 下載全部 ZIP」：**移除**此獨立按鈕，改至評分歷程 Modal 內每筆記錄旁顯示
-
-### 評分歷程 Modal ZIP 入口
-
-`AiCallHistoryModal` 收到 `onDownloadZip?: (callId: number) => void` prop（可選）；
-當傳入時，每筆歷史記錄旁顯示「📦 ZIP」按鈕。
+- 「📦 下載全部 ZIP」：永遠顯示；`hasDoneResults` 時才可點擊，下載**當前 session** 的所有模型結果 + 評分報告（ZIP 邏輯與現有相同，只是從條件內移出）
+- 「🏆 Claude 評分」：永遠顯示；條件 `allDone && hasDoneResults` 才 **非 disabled**
 
 ---
 
@@ -136,31 +131,18 @@ List<AiCallLog> findByCallTypeAndModelOrderByCreatedAtDesc(AiCallType type, Stri
 
 #### AdminSettingController.java 新增端點
 
-| Method | Path | 說明 |
-|--------|------|------|
-| `POST` | `/api/admin/settings/ai/test/log` | 儲存 MODEL_TEST 記錄 |
-| `GET` | `/api/admin/settings/ai/test/calls?model=xxx` | 查該模型歷程 |
-| `GET` | `/api/admin/settings/ai/score/{callId}/zip` | 下載 ZIP（評分 + 同 sessionId 的模型結果） |
+| Method | Path                                          | 說明                  |
+|--------|-----------------------------------------------|-----------------------|
+| `POST` | `/api/admin/settings/ai/test/log`             | 儲存 MODEL_TEST 記錄  |
+| `GET`  | `/api/admin/settings/ai/test/calls?model=xxx` | 查該模型歷程          |
 
-ZIP 端點實作：
-1. 查 MODEL_EVAL by `callId`（取得 subject = sessionId）
-2. 查 `MODEL_TEST` by `subject = sessionId`（各模型結果）
-3. 組裝 ZIP（用 `java.util.zip.ZipOutputStream`）：`{model}.md` + `00_評分報告.md`
-4. 回傳 `ResponseEntity<byte[]>`，Content-Type `application/zip`
-
-#### InsightService.streamModelScore() 修改
-
-- 接收 sessionId 參數，存入 MODEL_EVAL 記錄的 `subject` 欄位（復用現有 subject）
-
-### sessionId 流程
+#### sessionId 流程（用於 MODEL_TEST 關聯，無 ZIP 端點需求）
 
 ```
 race 開始 → 前端生成 sessionId（crypto.randomUUID()）
     每個模型完成 → POST /ai/test/log（含 sessionId, answer, tokens）
-startScore() → 帶 sessionId 進 body
-    MODEL_EVAL 儲存時 subject = sessionId
-ZIP 下載 → GET /ai/score/{callId}/zip
-    → 查 MODEL_EVAL.subject → 查同 subject 的 MODEL_TEST → 組 ZIP
+    MODEL_TEST 儲存時 subject = sessionId（供未來擴展，MVP 不查詢 sessionId）
+ZIP 下載 → 純前端，組裝當前 raceResults + scoreReport（現有邏輯不變）
 ```
 
 ### 前端新增
