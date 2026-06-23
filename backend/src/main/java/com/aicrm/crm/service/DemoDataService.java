@@ -1,5 +1,6 @@
 package com.aicrm.crm.service;
 
+import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.domain.AppUser;
 import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
@@ -21,6 +22,8 @@ import java.util.Map;
 import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -206,6 +209,12 @@ public class DemoDataService {
      * @param customers 欲生成的客戶數
      * @return 生成統計（客戶數 / 互動數 / 分析筆數）
      */
+    @Caching(evict = {
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_SUMMARY),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_REPORTS),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_RFM),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_SENTIMENT)
+    })
     public DemoStats generate(int customers) {
         var random = new Random(SEED);
         // 確保示範業務皆有對應 SALES 帳號，客戶以正規關聯指派給帳號

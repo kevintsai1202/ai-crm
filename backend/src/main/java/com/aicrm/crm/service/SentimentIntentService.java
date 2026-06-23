@@ -1,5 +1,6 @@
 package com.aicrm.crm.service;
 
+import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.domain.Intent;
 import com.aicrm.crm.domain.InteractionInsight;
 import com.aicrm.crm.domain.Sentiment;
@@ -12,6 +13,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -199,6 +201,7 @@ public class SentimentIntentService {
      * @param useLlm 是否允許走真實 LLM（批次預設應傳 false）
      * @return 本次分析筆數
      */
+    @CacheEvict(CacheConfig.CACHE_DASHBOARD_SENTIMENT)
     public int analyzeMissing(boolean useLlm) {
         // 一次撈出待分析互動的 [id, customerId, content]，避免逐筆查詢與 LAZY 關聯
         var rows = insights.findInteractionsWithoutInsight();
