@@ -1,11 +1,13 @@
 package com.aicrm.crm.service;
 
 import com.aicrm.crm.api.Dtos;
+import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.repository.CustomerRepository;
 import java.math.BigDecimal;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,7 @@ public class DashboardService {
      *
      * @return Dashboard 統計 DTO
      */
+    @Cacheable(CacheConfig.CACHE_DASHBOARD_SUMMARY)
     @Transactional(readOnly = true)
     public Dtos.DashboardSummary dashboardSummary() {
         var all = allCustomersWithDetail();
@@ -52,6 +55,7 @@ public class DashboardService {
      *
      * @return Dashboard 報表 DTO
      */
+    @Cacheable(CacheConfig.CACHE_DASHBOARD_REPORTS)
     @Transactional(readOnly = true)
     public Dtos.DashboardReports dashboardReports() {
         var all = allCustomersWithDetail();

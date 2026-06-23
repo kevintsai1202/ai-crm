@@ -1,6 +1,7 @@
 package com.aicrm.crm.service;
 
 import com.aicrm.crm.api.Dtos;
+import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.OpportunityStage;
 import java.math.BigDecimal;
@@ -8,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,6 +75,7 @@ public class RfmService {
      *
      * @return 每位客戶的 RFM 結果清單
      */
+    @Cacheable(CacheConfig.CACHE_DASHBOARD_RFM)
     @Transactional(readOnly = true)
     public List<Dtos.RfmResponse> computeRfm() {
         var today = LocalDate.now();
