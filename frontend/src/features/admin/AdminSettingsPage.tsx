@@ -79,7 +79,7 @@ export default function AdminSettingsPage() {
   const [scoreCallsLoading, setScoreCallsLoading] = useState(false);
   /** 個別模型歷程 Modal 狀態（null 代表關閉）。 */
   const [modelHistoryState, setModelHistoryState] = useState<{
-    open: boolean; model: string; calls: import("../../types").AiCallHistoryItem[]; loading: boolean;
+    open: boolean; model: string; calls: AiCallHistoryItem[]; loading: boolean;
   } | null>(null);
   /** 當前競速批次的 sessionId（startRace 時產生，startScore 時傳遞）。 */
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
