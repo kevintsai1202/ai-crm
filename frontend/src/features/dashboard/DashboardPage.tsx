@@ -64,18 +64,20 @@ export function DashboardPage() {
   const layoutRef = useRef<Layout>([]);
   useEffect(() => { layoutRef.current = layout; }, [layout]);
 
-  /** 載入儀表板全部資料（摘要、報表、RFM、情緒雷達），供進頁與示範資料生成後重載共用。 */
-  async function loadDashboardData() {
-    const [summary, reportResult, rfmResult, sentimentResult] = await Promise.all([
-      fetchDashboard(),
-      fetchDashboardReports(),
-      fetchRfm(),
-      fetchSentimentRadar()
-    ]);
-    setDashboard(summary);
-    setReports(reportResult);
-    setRfm(rfmResult);
-    setSentiment(sentimentResult);
+  /** 載入儀表板全部資料；各 API 獨立回來即 setState，不相互阻塞。 */
+  function loadDashboardData() {
+    fetchDashboard()
+      .then(setDashboard)
+      .catch((e) => console.error("摘要載入失敗:", e));
+    fetchDashboardReports()
+      .then(setReports)
+      .catch((e) => console.error("報表載入失敗:", e));
+    fetchRfm()
+      .then(setRfm)
+      .catch((e) => console.error("RFM 載入失敗:", e));
+    fetchSentimentRadar()
+      .then(setSentiment)
+      .catch((e) => console.error("情緒雷達載入失敗:", e));
   }
 
   // 進頁載入摘要、報表、RFM 分群與情緒雷達
@@ -194,12 +196,12 @@ export function DashboardPage() {
     }
   }
 
-  /** 產生示範資料（ADMIN）：生成 200 位客戶樣本後重新載入儀表板資料。 */
+  /** 產生示範資料（ADMIN）：生成 200 位客戶樣本後觸發儀表板各區塊逐一更新。 */
   async function handleGenerateDemo() {
     setGeneratingDemo(true);
     try {
       await generateDemoData(200);
-      await loadDashboardData();
+      loadDashboardData();
     } catch (e) {
       console.error("產生示範資料失敗:", e);
     } finally {
