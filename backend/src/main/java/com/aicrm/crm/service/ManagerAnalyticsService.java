@@ -52,11 +52,21 @@ public class ManagerAnalyticsService {
                 .collect(Collectors.groupingBy(InteractionInsight::getCustomerId,
                         Collectors.averagingInt(InteractionInsight::getSentimentScore)));
 
-        // 以 ownerName 分組（與既有 leaderboard / 我的工作台一致）
-        var byOwner = all.stream().collect(Collectors.groupingBy(Customer::getOwnerName));
+        // 混合口徑：客戶層級指標按「客戶 owner」分組、商機層級指標按「商機 owner」分組，業務名單取兩者聯集。
+        // 回填後商機 owner = 客戶 owner，故切換當下與舊口徑等價；僅商機改派他人時才分歧。
+        var customersByOwner = all.stream().collect(Collectors.groupingBy(Customer::getOwnerName));
+        var oppsByOwner = all.stream().flatMap(c -> c.getOpportunities().stream())
+                .filter(o -> o.getOwnerName() != null)
+                .collect(Collectors.groupingBy(Opportunity::getOwnerName));
+        var ownerNames = new java.util.TreeSet<String>();
+        ownerNames.addAll(customersByOwner.keySet());
+        ownerNames.addAll(oppsByOwner.keySet());
 
-        var owners = byOwner.entrySet().stream()
-                .map(entry -> buildOwnerStats(entry.getKey(), entry.getValue(), today, avgScoreByCustomer))
+        var owners = ownerNames.stream()
+                .map(name -> buildOwnerStats(name,
+                        customersByOwner.getOrDefault(name, List.of()),
+                        oppsByOwner.getOrDefault(name, List.of()),
+                        today, avgScoreByCustomer))
                 .sorted((a, b) -> b.wonAmount().compareTo(a.wonAmount()))
                 .toList();
 
@@ -72,16 +82,18 @@ public class ManagerAnalyticsService {
      * @param avgScoreByCustomer 每客戶情緒平均
      * @return 該業務的統計
      */
-    private Dtos.OwnerStats buildOwnerStats(String ownerName, List<Customer> ownerCustomers, LocalDate today,
-                                            Map<Long, Double> avgScoreByCustomer) {
-        // ownerId 取組內第一個有正規關聯的客戶（供前端/模組 C 參考）
+    private Dtos.OwnerStats buildOwnerStats(String ownerName, List<Customer> ownerCustomers, List<Opportunity> opps,
+                                            LocalDate today, Map<Long, Double> avgScoreByCustomer) {
+        // ownerId 先取客戶端正規關聯，無則退而取商機端 owner（純商機 owner 情況）
         Long ownerId = ownerCustomers.stream()
                 .map(c -> c.getOwner() == null ? null : c.getOwner().getId())
                 .filter(Objects::nonNull)
                 .findFirst()
-                .orElse(null);
-
-        var opps = ownerCustomers.stream().flatMap(c -> c.getOpportunities().stream()).toList();
+                .orElseGet(() -> opps.stream()
+                        .map(o -> o.getOwner() == null ? null : o.getOwner().getId())
+                        .filter(Objects::nonNull)
+                        .findFirst()
+                        .orElse(null));
         var pipelineAmount = opps.stream()
                 .filter(o -> o.getStage() != OpportunityStage.CLOSED_WON && o.getStage() != OpportunityStage.CLOSED_LOST)
                 .map(Opportunity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
