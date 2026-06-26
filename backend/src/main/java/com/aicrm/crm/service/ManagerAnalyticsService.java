@@ -15,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,11 +55,13 @@ public class ManagerAnalyticsService {
 
         // 混合口徑：客戶層級指標按「客戶 owner」分組、商機層級指標按「商機 owner」分組，業務名單取兩者聯集。
         // 回填後商機 owner = 客戶 owner，故切換當下與舊口徑等價；僅商機改派他人時才分歧。
+        // 兩側 ownerName 皆恆非空：customer.owner_name 為 schema NOT NULL；商機 owner_name 由 V18 自 customer.owner_name 回填。
+        // 商機側 filter 僅為防禦（理論上不丟任何商機，等價性成立）。
         var customersByOwner = all.stream().collect(Collectors.groupingBy(Customer::getOwnerName));
         var oppsByOwner = all.stream().flatMap(c -> c.getOpportunities().stream())
                 .filter(o -> o.getOwnerName() != null)
                 .collect(Collectors.groupingBy(Opportunity::getOwnerName));
-        var ownerNames = new java.util.TreeSet<String>();
+        var ownerNames = new TreeSet<String>();
         ownerNames.addAll(customersByOwner.keySet());
         ownerNames.addAll(oppsByOwner.keySet());
 
@@ -77,7 +80,8 @@ public class ManagerAnalyticsService {
      * 聚合單一業務的績效。
      *
      * @param ownerName 業務顯示名稱
-     * @param ownerCustomers 該業務負責的客戶
+     * @param ownerCustomers 該業務（依客戶 owner）負責的客戶
+     * @param opps 該業務（依商機 owner）經手的商機
      * @param today 基準日
      * @param avgScoreByCustomer 每客戶情緒平均
      * @return 該業務的統計
