@@ -53,11 +53,42 @@ public class Opportunity extends AuditableEntity {
     @Column(nullable = false)
     private OpportunityType type;
 
+    /** 負責業務帳號（正規關聯）。 */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private AppUser owner;
+
+    /** 負責業務顯示名稱（去正規化快取，與 owner.displayName 同步）。 */
+    @Column(name = "owner_name")
+    private String ownerName;
+
+    /** 商機來源。 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lead_source", nullable = false)
+    private LeadSource leadSource = LeadSource.OUTBOUND;
+
+    /** 成交機率（0–100），加權預測用。 */
+    @Column
+    private Integer probability;
+
+    /** 結案（輸/贏）原因；僅 CLOSED_* 時填。 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "close_reason")
+    private CloseReason closeReason;
+
+    /** 結案補充說明。 */
+    @Column(name = "close_reason_note")
+    private String closeReasonNote;
+
+    /** 實際成交/結案日。 */
+    @Column(name = "actual_close_date")
+    private LocalDate actualCloseDate;
+
     protected Opportunity() {
     }
 
     /**
-     * 建立商機（供示範資料生成器使用），並維護與客戶的雙向關聯。
+     * 建立商機（向後相容六參數版，委派至完整建構子）。
      *
      * @param customer 所屬客戶
      * @param name 商機名稱
@@ -68,12 +99,32 @@ public class Opportunity extends AuditableEntity {
      */
     public Opportunity(Customer customer, String name, OpportunityStage stage, BigDecimal amount,
                        LocalDate expectedCloseDate, OpportunityType type) {
+        this(customer, name, stage, amount, expectedCloseDate, type, LeadSource.OUTBOUND, null);
+    }
+
+    /**
+     * 完整建構子（SP8）：含來源與成交機率。
+     *
+     * @param customer 所屬客戶
+     * @param name 商機名稱
+     * @param stage 商機階段
+     * @param amount 商機金額
+     * @param expectedCloseDate 預計成交日
+     * @param type 商機類型
+     * @param leadSource 商機來源
+     * @param probability 成交機率（0–100）
+     */
+    public Opportunity(Customer customer, String name, OpportunityStage stage, BigDecimal amount,
+                       LocalDate expectedCloseDate, OpportunityType type,
+                       LeadSource leadSource, Integer probability) {
         this.customer = customer;
         this.name = name;
         this.stage = stage;
         this.amount = amount;
         this.expectedCloseDate = expectedCloseDate;
         this.type = type;
+        this.leadSource = leadSource;
+        this.probability = probability;
     }
 
     public Long getId() { return id; }
@@ -83,6 +134,49 @@ public class Opportunity extends AuditableEntity {
     public LocalDate getExpectedCloseDate() { return expectedCloseDate; }
     public OpportunityType getType() { return type; }
     public Customer getCustomer() { return customer; }
+    public AppUser getOwner() { return owner; }
+    public String getOwnerName() { return ownerName; }
+    public LeadSource getLeadSource() { return leadSource; }
+    public Integer getProbability() { return probability; }
+    public CloseReason getCloseReason() { return closeReason; }
+    public String getCloseReasonNote() { return closeReasonNote; }
+    public LocalDate getActualCloseDate() { return actualCloseDate; }
+
+    /**
+     * 指派負責業務並同步去正規化的 ownerName。
+     *
+     * @param owner 負責業務帳號
+     */
+    public void assignOwner(AppUser owner) {
+        this.owner = owner;
+        this.ownerName = owner == null ? null : owner.getDisplayName();
+    }
+
+    /**
+     * 設定來源與機率（新增/編輯共用）。
+     *
+     * @param leadSource 商機來源
+     * @param probability 成交機率（0–100）
+     */
+    public void applySalesFields(LeadSource leadSource, Integer probability) {
+        this.leadSource = leadSource;
+        this.probability = probability;
+    }
+
+    /**
+     * 結案：設定階段 + 輸贏原因 + 實際成交日。
+     *
+     * @param stage 結案階段（CLOSED_WON 或 CLOSED_LOST）
+     * @param closeReason 結案原因
+     * @param note 結案補充說明
+     * @param actualCloseDate 實際成交/結案日
+     */
+    public void closeWith(OpportunityStage stage, CloseReason closeReason, String note, LocalDate actualCloseDate) {
+        this.stage = stage;
+        this.closeReason = closeReason;
+        this.closeReasonNote = note;
+        this.actualCloseDate = actualCloseDate;
+    }
 
     /**
      * 更新商機階段（供 Kanban 拖拽使用）。
