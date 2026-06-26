@@ -1,7 +1,9 @@
 package com.aicrm.crm.api;
 
+import com.aicrm.crm.domain.CloseReason;
 import com.aicrm.crm.domain.CustomerStatus;
 import com.aicrm.crm.domain.InteractionType;
+import com.aicrm.crm.domain.LeadSource;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.OpportunityType;
 import com.aicrm.crm.domain.Role;
@@ -183,7 +185,14 @@ public final class Dtos {
             OpportunityStage stage,
             BigDecimal amount,
             LocalDate expectedCloseDate,
-            OpportunityType type
+            OpportunityType type,
+            Long ownerId,
+            String ownerName,
+            LeadSource leadSource,
+            Integer probability,
+            CloseReason closeReason,
+            String closeReasonNote,
+            LocalDate actualCloseDate
     ) {}
 
     /**
@@ -198,7 +207,10 @@ public final class Dtos {
             @NotBlank String name,
             @NotNull @PositiveOrZero BigDecimal amount,
             LocalDate expectedCloseDate,
-            @NotNull OpportunityType type
+            @NotNull OpportunityType type,
+            Long ownerId,
+            LeadSource leadSource,
+            Integer probability
     ) {}
 
     public record DashboardSummary(long customerCount, long activeOpportunityCount, BigDecimal opportunityAmount, long highRiskCount) {}
@@ -345,7 +357,12 @@ public final class Dtos {
 
     public record RiskResponse(@PositiveOrZero int churnRisk, @PositiveOrZero int renewalDelayRisk, List<String> reasons) {}
 
-    public record UpdateStageRequest(@NotNull OpportunityStage stage) {}
+    public record UpdateStageRequest(
+            @NotNull OpportunityStage stage,
+            CloseReason closeReason,
+            String closeReasonNote,
+            LocalDate actualCloseDate
+    ) {}
 
     /**
      * 新增商機請求。
@@ -363,7 +380,10 @@ public final class Dtos {
             @NotNull OpportunityStage stage,
             @NotNull @PositiveOrZero BigDecimal amount,
             LocalDate expectedCloseDate,
-            @NotNull OpportunityType type
+            @NotNull OpportunityType type,
+            Long ownerId,
+            LeadSource leadSource,
+            Integer probability
     ) {}
 
     public record AgentTraceResponse(Long customerId, String route, String finalRecommendation, List<AgentStepResponse> steps) {}

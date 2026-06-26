@@ -72,7 +72,11 @@ public class CustomerMapper {
                         })
                         .toList(),
                 customer.getOpportunities().stream()
-                        .map(o -> new Dtos.OpportunityResponse(o.getId(), o.getName(), o.getStage(), o.getAmount(), o.getExpectedCloseDate(), o.getType()))
+                        .map(o -> new Dtos.OpportunityResponse(o.getId(), o.getName(), o.getStage(), o.getAmount(),
+                                o.getExpectedCloseDate(), o.getType(),
+                                o.getOwner() == null ? null : o.getOwner().getId(), o.getOwnerName(),
+                                o.getLeadSource(), o.getProbability(), o.getCloseReason(),
+                                o.getCloseReasonNote(), o.getActualCloseDate()))
                         .toList()
         );
     }
