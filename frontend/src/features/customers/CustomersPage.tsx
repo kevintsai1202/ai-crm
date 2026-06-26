@@ -183,7 +183,7 @@ export function CustomersPage() {
   }
 
   /** 新增商機後重載詳情。 */
-  async function handleAddOpportunity(data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string }) {
+  async function handleAddOpportunity(data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string; leadSource: string; probability: number | null }) {
     if (!selected) return;
     await createOpportunity({ customerId: selected.customer.id, ...data });
     setShowAddOpportunity(false);
@@ -240,7 +240,7 @@ export function CustomersPage() {
   }
 
   /** 編輯商機後重載詳情。 */
-  async function handleUpdateOpportunity(data: { name: string; amount: number; expectedCloseDate: string | null; type: string }) {
+  async function handleUpdateOpportunity(data: { name: string; amount: number; expectedCloseDate: string | null; type: string; leadSource: string; probability: number | null }) {
     if (!editingOpportunity) return;
     await updateOpportunity(editingOpportunity.id, data);
     setEditingOpportunity(null);

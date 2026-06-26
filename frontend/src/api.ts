@@ -414,7 +414,7 @@ export async function deleteContact(id: number) {
  */
 export async function updateOpportunity(
   id: number,
-  data: { name: string; amount: number; expectedCloseDate: string | null; type: string }
+  data: { name: string; amount: number; expectedCloseDate: string | null; type: string; leadSource?: string; probability?: number | null }
 ) {
   const { data: result } = await apiClient.put<OpportunityResponse>(`/opportunities/${id}`, data);
   return result;
@@ -514,6 +514,8 @@ export async function createOpportunity(payload: {
   amount: number;
   expectedCloseDate: string | null;
   type: string;
+  leadSource?: string;
+  probability?: number | null;
 }) {
   const { data } = await apiClient.post<OpportunityResponse>(`/opportunities`, payload);
   return data;

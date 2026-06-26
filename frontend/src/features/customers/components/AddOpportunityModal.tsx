@@ -15,7 +15,7 @@ export function AddOpportunityModal({
   onClose
 }: {
   customerName: string;
-  onSubmit: (data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string }) => void;
+  onSubmit: (data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string; leadSource: string; probability: number | null }) => void;
   onClose: () => void;
 }) {
   /** 解析表單並回傳資料;金額轉數字,預計成交日空字串轉 null。 */
@@ -23,13 +23,17 @@ export function AddOpportunityModal({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const closeDate = String(fd.get("expectedCloseDate") || "");
+    const prob = String(fd.get("probability") || "");
     onSubmit({
       name: String(fd.get("name")),
       stage: String(fd.get("stage")),
       amount: Number(fd.get("amount")),
       // date input 空值送 null,避免後端解析空字串失敗
       expectedCloseDate: closeDate ? closeDate : null,
-      type: String(fd.get("type"))
+      type: String(fd.get("type")),
+      leadSource: String(fd.get("leadSource")),
+      // 機率留空時送 null，由後端依階段帶預設
+      probability: prob ? Number(prob) : null
     });
   }
   return (
@@ -54,6 +58,14 @@ export function AddOpportunityModal({
             <option value="RENEWAL">續約</option>
           </select>
         </label>
+        <label>來源
+          <select name="leadSource" required defaultValue="OUTBOUND">
+            <option value="OUTBOUND">業務開發</option>
+            <option value="INBOUND">主動上門</option>
+            <option value="REFERRAL">推薦轉介</option>
+          </select>
+        </label>
+        <label>成交機率(%) <input name="probability" type="number" min="0" max="100" placeholder="留空則依階段預設" /></label>
         <div className="modal-actions">
           <button type="submit">新增</button>
           <button type="button" onClick={onClose}>取消</button>
