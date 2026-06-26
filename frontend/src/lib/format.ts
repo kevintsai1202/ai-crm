@@ -66,3 +66,24 @@ export function stageLabel(stage: string) {
   };
   return labels[stage] || stage;
 }
+
+/**
+ * 將商機來源（leadSource）轉成中文標籤。
+ */
+export function leadSourceLabel(source: string) {
+  const labels: Record<string, string> = { INBOUND: "主動上門", OUTBOUND: "業務開發", REFERRAL: "推薦轉介" };
+  return labels[source] || source;
+}
+
+/**
+ * 將結案原因（closeReason enum 名）轉成中文標籤；null 回傳「未填」。
+ */
+export function closeReasonLabel(reason: string | null) {
+  if (!reason) return "未填";
+  const labels: Record<string, string> = {
+    WON_PRICE: "贏-價格", WON_FEATURE: "贏-功能", WON_RELATIONSHIP: "贏-關係", WON_TIMING: "贏-時機",
+    LOST_PRICE: "輸-價格", LOST_COMPETITOR: "輸-競品", LOST_NO_BUDGET: "輸-無預算",
+    LOST_NO_DECISION: "輸-未決策", LOST_NO_RESPONSE: "輸-無回應"
+  };
+  return labels[reason] || reason;
+}

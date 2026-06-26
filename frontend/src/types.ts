@@ -93,6 +93,20 @@ export interface OpportunityResponse {
   amount: number;
   expectedCloseDate: string | null;
   type: string;
+  /** 負責業務帳號 id（SP8）。 */
+  ownerId: number | null;
+  /** 負責業務顯示名稱（SP8）。 */
+  ownerName: string | null;
+  /** 商機來源（SP8）。 */
+  leadSource: "INBOUND" | "OUTBOUND" | "REFERRAL";
+  /** 成交機率 0–100（SP8）。 */
+  probability: number | null;
+  /** 結案原因 enum 名（SP8；未結案為 null）。 */
+  closeReason: string | null;
+  /** 結案補充說明（SP8）。 */
+  closeReasonNote: string | null;
+  /** 實際成交/結案日（SP8）。 */
+  actualCloseDate: string | null;
 }
 
 export interface CustomerDetail {
@@ -118,6 +132,14 @@ export interface StageReport {
 export interface MoneyChartPoint {
   label: string;
   amount: number;
+  count: number;
+}
+
+/** 月營收預測點：總額 pipeline 與機率加權預測（SP8）。 */
+export interface ForecastPoint {
+  label: string;
+  totalAmount: number;
+  weightedAmount: number;
   count: number;
 }
 
@@ -165,7 +187,7 @@ export interface DrilldownResponse {
 
 export interface DashboardReports {
   pipelineByStage: StageReport[];
-  monthlyForecast: MoneyChartPoint[];
+  monthlyForecast: ForecastPoint[];
   industryBreakdown: MoneyChartPoint[];
   riskBreakdown: ChartPoint[];
   ownerLeaderboard: OwnerReport[];
