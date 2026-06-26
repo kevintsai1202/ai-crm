@@ -44,7 +44,7 @@ const FUNNEL_STAGE_ORDER = ["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "CLOSED_
  */
 function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByStage"]; onDrill: DrillFn }) {
   // 來源切換:""=全部、INBOUND=主動上門、OUTBOUND=業務開發；非全部時 fetch 該來源的漏斗子集
-  const [source, setSource] = useState<"" | "INBOUND" | "OUTBOUND">("");
+  const [source, setSource] = useState<"" | "INBOUND" | "OUTBOUND" | "REFERRAL">("");
   const [stageData, setStageData] = useState(data);
   // props data 變動（重新載入）時同步
   useEffect(() => { setStageData(data); }, [data]);
@@ -81,7 +81,7 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
       </div>
       {/* 來源切換:全部 / 主動上門 / 業務開發 */}
       <div className="funnel-source-tabs">
-        {([["", "全部"], ["INBOUND", "主動上門"], ["OUTBOUND", "業務開發"]] as const).map(([v, label]) => (
+        {([["", "全部"], ["INBOUND", "主動上門"], ["OUTBOUND", "業務開發"], ["REFERRAL", "推薦轉介"]] as const).map(([v, label]) => (
           <button
             type="button"
             key={v}
