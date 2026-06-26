@@ -9,7 +9,7 @@
 
 ## 目前進度
 
-> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 儀表板版面 UX 完成 ✅**　｜　最後完成：SP7（固定高度+清單分頁、下鑽麵包屑、區塊拖拉/關閉/抽屜，個人帳號偏好落後端）
+> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 儀表板版面 UX 完成 ✅；追加 SP8 商機資料模型強化 設計中 🟡**　｜　目前：SP8 spec 已落、待展開 plan 與實作
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|
@@ -24,6 +24,8 @@
 相依性 + 投報比 + 使用者明確需求：SP1 自足且零後端相依、是使用者點名需求；SP2 在改後端前織測試網；SP3 是 AI 可信度根本；SP4 商用治理；SP5 後端拆分與 CRM 增值；SP6 旗艦差異化。
 
 ## 變更紀錄
+
+- 2026-06-26：建立 SP8 spec（商機資料模型強化）。緣起為使用者檢視銷售漏斗發現形狀不合理，追查確認根因（快照計數 / CLOSED_WON 吸收態 / 缺來源維度），並盤點出「AI 層豐富、銷售資料層單薄」。SP8 補 `Opportunity` 四欄：owner（FK+去正規化快取，績效口徑改商機 owner，回填保證等價零差異）、leadSource（INBOUND/OUTBOUND/REFERRAL，回填 OUTBOUND）、probability（依階段預設，修月營收 Forecast 未加權失真，保留總額+新增加權線）、closeReason+actualCloseDate（結案必填，歷史留 NULL 不假造）。單一 V18 migration 含加欄位+回填（子查詢版相容 H2/PG，生產與示範環境部署時自動套用），DemoDataService 同步補新欄位。spec：`docs/superpowers/specs/2026-06-26-sp8-opportunity-sales-model-design.md`。狀態：設計中 🟡，待展開 plan 與實作。
 
 - 2026-06-20：客戶頁篩選下拉改列完整清單（依使用者回饋「篩選業務時必須列出所有帳號」）。原業務篩選只取「當前頁客戶」的 owner 名（`new Set(customers.map(c=>c.ownerName))`）→ 只列本頁出現過的業務；產業篩選則寫死 4 個。改為進頁呼叫 `/customers/options` 取完整清單：業務＝所有啟用 SALES 帳號（以 displayName 為篩選值，對應後端 owner_name 字串查詢）、產業＝所有不重複產業。前端 tsc/build 綠、`e2e/customer-owner-filter.spec.ts` 驗證業務選項 = 14（全部業務＋13 帳號）、add-customer-form/sp1-smoke 回歸通過。
 - 2026-06-19：負責業務正規化為帳號關聯（依使用者回饋「業務報表/篩選可選多個業務，但帳號只有一個，沒做關聯」）。原 `customers.owner_name` 為自由文字、與 `app_users` 零關聯（示範資料用 8 個虛構業務名，登入帳號只有 3 個）。確認採「加 owner_id 外鍵」方案：`V11__add_customer_owner_fk.sql`（customers 加 owner_id → app_users + index）；`Customer` 加 `@ManyToOne owner`＋`assignOwner()`（同步去正規化的 owner_name 顯示快取，讓既有字串彙總報表免改）；`SalesTeamInitializer`（@Order(2) ApplicationRunner）啟動時為每個既有 owner_name 建立對應 SALES 帳號（以 displayName 比對、冪等）並回填所有 owner_id；`DemoDataService` 改注入 AppUserRepository/PasswordEncoder，生成時確保 8 個示範業務有帳號並以正規關聯指派；`CustomerService.create` 改收 ownerId 解析帳號（同步 owner+owner_name）、`getFormOptions` 改回傳啟用中的 SALES 帳號（OwnerOption{id,displayName}）；`Dtos`（CreateCustomerRequest.ownerName→ownerId、CustomerOptionsResponse.owners→OwnerOption[]）；`AppUserRepository.findByRole`。前端：`AddCustomerModal` 負責業務下拉改用帳號 id、預設帶登入者本人（user.id）；api/types 對應調整。實機驗證：啟動回填「新建 12 個 SALES 帳號、231 筆客戶全回填 owner_id（0 null）、owner_name 與 displayName 零不一致」；options 回 13 個 SALES 帳號、建立客戶 ownerId 後 owner_name 自動同步、業務排行榜的名字現皆為真實登入帳號；前端 tsc/build 綠、E2E（add-customer-form/admin-users/sp7）通過。
