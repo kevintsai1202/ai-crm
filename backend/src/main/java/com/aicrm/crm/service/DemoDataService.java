@@ -2,9 +2,11 @@ package com.aicrm.crm.service;
 
 import com.aicrm.crm.config.CacheConfig;
 import com.aicrm.crm.domain.AppUser;
+import com.aicrm.crm.domain.CloseReason;
 import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.InteractionType;
+import com.aicrm.crm.domain.LeadSource;
 import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.OpportunityType;
@@ -310,7 +312,24 @@ public class DemoDataService {
         var amount = BigDecimal.valueOf((10 + random.nextInt(500)) * 10_000L);
         var expectedClose = LocalDate.now().plusDays(random.nextInt(180));
         var name = customer.getName() + (type == OpportunityType.RENEWAL ? "續約案" : "新案");
-        return new Opportunity(customer, name, stage, amount, expectedClose, type);
+        // 來源隨機；機率依階段預設（與 V18 回填一致）
+        var leadSource = pick(random, LeadSource.values());
+        int probability = switch (stage) {
+            case QUALIFICATION -> 20;
+            case PROPOSAL -> 50;
+            case NEGOTIATION -> 75;
+            case CLOSED_WON -> 100;
+            case CLOSED_LOST -> 0;
+        };
+        var opp = new Opportunity(customer, name, stage, amount, expectedClose, type, leadSource, probability);
+        opp.assignOwner(customer.getOwner());
+        // 結案案子帶輸贏原因與實際成交日（示範資料）
+        if (stage == OpportunityStage.CLOSED_WON) {
+            opp.closeWith(stage, CloseReason.WON_PRICE, "示範：價格優勢", expectedClose);
+        } else if (stage == OpportunityStage.CLOSED_LOST) {
+            opp.closeWith(stage, CloseReason.LOST_COMPETITOR, "示範：輸給競品", expectedClose);
+        }
+        return opp;
     }
 
     /**
