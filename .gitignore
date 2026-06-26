@@ -26,8 +26,8 @@ frontend/dist/
 # === H2 本機資料庫（僅開發用，不入版控）===
 backend/data/
 
-# === Spring AI / Maven 解壓暫存目錄 ===
-com/
+# === Spring AI / Maven 解壓暫存目錄（僅排除 repo 根，避免誤傷 src/**/com/ 來源檔） ===
+/com/
 
 # === 作業系統 ===
 Thumbs.db
