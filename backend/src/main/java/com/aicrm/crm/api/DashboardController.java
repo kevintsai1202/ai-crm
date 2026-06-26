@@ -47,8 +47,10 @@ public class DashboardController {
      * @return Dashboard 報表資料
      */
     @GetMapping("/reports")
-    public Dtos.DashboardReports reports() {
-        return dashboardService.dashboardReports();
+    public Dtos.DashboardReports reports(@RequestParam(required = false) String leadSource) {
+        return leadSource == null
+                ? dashboardService.dashboardReports()
+                : dashboardService.dashboardReports(leadSource);
     }
 
     /**

@@ -58,9 +58,33 @@ public class DashboardService {
     @Cacheable(CacheConfig.CACHE_DASHBOARD_REPORTS)
     @Transactional(readOnly = true)
     public Dtos.DashboardReports dashboardReports() {
+        return buildReports(null);
+    }
+
+    /**
+     * 產生報表並可依商機來源過濾漏斗與預測；leadSource 為 null 表全部（切片查詢，不快取）。
+     *
+     * @param leadSource 商機來源（INBOUND/OUTBOUND/REFERRAL）；null 為不過濾
+     * @return Dashboard 報表 DTO
+     */
+    @Transactional(readOnly = true)
+    public Dtos.DashboardReports dashboardReports(String leadSource) {
+        return buildReports(leadSource);
+    }
+
+    /**
+     * 組裝報表內容；opportunities 依 leadSource 過濾（影響漏斗與月營收預測），
+     * 客戶層級報表（產業/業務/續約）不受來源過濾。
+     *
+     * @param leadSource 商機來源；null 為不過濾
+     * @return Dashboard 報表 DTO
+     */
+    private Dtos.DashboardReports buildReports(String leadSource) {
         var all = allCustomersWithDetail();
         var summaries = all.stream().map(mapper::toSummary).toList();
-        var opportunities = all.stream().flatMap(customer -> customer.getOpportunities().stream()).toList();
+        var opportunities = all.stream().flatMap(customer -> customer.getOpportunities().stream())
+                .filter(opp -> leadSource == null || opp.getLeadSource().name().equals(leadSource))
+                .toList();
 
         var pipelineByStage = java.util.Arrays.stream(OpportunityStage.values())
                 .map(stage -> {
