@@ -9,7 +9,7 @@
 
 ## 目前進度
 
-> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 儀表板版面 UX 完成 ✅；追加 SP8 商機資料模型強化 設計中 🟡**　｜　目前：SP8 spec 已落、待展開 plan 與實作
+> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅；追加 SP8 商機資料模型強化 完成 ✅**　｜　最後完成：SP8（owner/leadSource/probability/closeReason 四欄 + V18 回填 + Forecast 加權 + 漏斗來源切片 + 績效混合口徑；後端 96 測試綠、前端 tsc/build 綠；於 worktree 完成，待 merge）
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|
@@ -24,6 +24,8 @@
 相依性 + 投報比 + 使用者明確需求：SP1 自足且零後端相依、是使用者點名需求；SP2 在改後端前織測試網；SP3 是 AI 可信度根本；SP4 商用治理；SP5 後端拆分與 CRM 增值；SP6 旗艦差異化。
 
 ## 變更紀錄
+
+- 2026-06-26：SP8 實作完成（subagent-driven，於 worktree `sp8-opportunity-sales-model`，待 merge）。後端：LeadSource/CloseReason enum、Opportunity 七欄（owner FK + 去正規化 ownerName + leadSource/probability/closeReason/closeReasonNote/actualCloseDate）、V18 migration + 回填、商機 API（owner 預設客戶 owner、probability 依階段預設、結案分流、無效 ownerId 回 404、重開清除結案欄位）、Forecast 加權（ForecastPoint：總額 + 排除失單×機率）、漏斗依 leadSource 切片、ManagerAnalytics 混合口徑（商機指標按商機 owner、客戶指標按客戶 owner；回填使切換等價）、DemoDataService 帶新欄位。前端：型別/標籤、Add/Edit Modal 來源+機率、結案原因 Modal、漏斗來源切換、Forecast 雙線。**後端 96 測試全綠（Testcontainers 真 PG）、前端 tsc+build 綠。** 順帶修 `.gitignore` 的 `com/`→`/com/`（原誤傷 src/**/com/ 來源檔）。煙霧 E2E 待 merge 後於 dev 驗證（避免測試時將 V18 套上 dev DB）。
 
 - 2026-06-26：建立 SP8 spec（商機資料模型強化）。緣起為使用者檢視銷售漏斗發現形狀不合理，追查確認根因（快照計數 / CLOSED_WON 吸收態 / 缺來源維度），並盤點出「AI 層豐富、銷售資料層單薄」。SP8 補 `Opportunity` 四欄：owner（FK+去正規化快取，績效口徑改商機 owner，回填保證等價零差異）、leadSource（INBOUND/OUTBOUND/REFERRAL，回填 OUTBOUND）、probability（依階段預設，修月營收 Forecast 未加權失真，保留總額+新增加權線）、closeReason+actualCloseDate（結案必填，歷史留 NULL 不假造）。單一 V18 migration 含加欄位+回填（子查詢版相容 H2/PG，生產與示範環境部署時自動套用），DemoDataService 同步補新欄位。spec：`docs/superpowers/specs/2026-06-26-sp8-opportunity-sales-model-design.md`。狀態：設計中 🟡，待展開 plan 與實作。
 
