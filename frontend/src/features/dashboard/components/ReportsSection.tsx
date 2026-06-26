@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import type { DashboardReports, DrilldownSource } from "../../../types";
 import { formatCompactMoney, formatDateTime, riskLabel, stageLabel } from "../../../lib/format";
+import { fetchDashboardReports } from "../../../api";
 import type { DashboardBlock } from "../blockTypes";
 import { LoadingCard } from "../blockTypes";
 
@@ -41,9 +43,23 @@ const FUNNEL_STAGE_ORDER = ["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "CLOSED_
  * 各層寬度由 CSS 階梯固定(funnel-layer-N),金額大小以橫向漸層填充比例直觀呈現。
  */
 function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByStage"]; onDrill: DrillFn }) {
+  // 來源切換:""=全部、INBOUND=主動上門、OUTBOUND=業務開發；非全部時 fetch 該來源的漏斗子集
+  const [source, setSource] = useState<"" | "INBOUND" | "OUTBOUND">("");
+  const [stageData, setStageData] = useState(data);
+  // props data 變動（重新載入）時同步
+  useEffect(() => { setStageData(data); }, [data]);
+  // 切換來源:全部用 props data，其餘 fetch /dashboard/reports?leadSource= 取 pipelineByStage
+  useEffect(() => {
+    if (!source) { setStageData(data); return; }
+    let cancelled = false;
+    fetchDashboardReports(source).then((r) => { if (!cancelled) setStageData(r.pipelineByStage); }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source]);
+
   // 僅保留漏斗階段並依「資格評估→提案→議價→已成交」由上而下排序(排除已流失)
   const funnelData = FUNNEL_STAGE_ORDER
-    .map((stage) => data.find((item) => item.stage === stage))
+    .map((stage) => stageData.find((item) => item.stage === stage))
     .filter((item): item is DashboardReports["pipelineByStage"][number] => Boolean(item));
 
   // 取得漏斗各階段中的最大金額以作為比例計算基準，最小設為 1 避免除以零
@@ -62,6 +78,17 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
       <div className="panel-title">
         <h3>銷售漏斗 Pipeline</h3>
         <span>機會(上)→ 成交(下)</span>
+      </div>
+      {/* 來源切換:全部 / 主動上門 / 業務開發 */}
+      <div className="funnel-source-tabs">
+        {([["", "全部"], ["INBOUND", "主動上門"], ["OUTBOUND", "業務開發"]] as const).map(([v, label]) => (
+          <button
+            type="button"
+            key={v}
+            className={`source-tab ${source === v ? "active" : ""}`}
+            onClick={() => setSource(v)}
+          >{label}</button>
+        ))}
       </div>
       <div className="funnel-container">
         {funnelData.map((item, index) => {
@@ -102,40 +129,37 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
  * 月度營收預測折線圖。
  */
 function MonthlyForecastChart({ data, onDrill }: { data: DashboardReports["monthlyForecast"]; onDrill: DrillFn }) {
-  const max = Math.max(...data.map((item) => item.amount), 1);
-  const points = data.map((item, index) => {
-    const x = 24 + (index * 320) / Math.max(data.length - 1, 1);
-    const y = 150 - (item.amount / max) * 110;
-    return `${x},${y}`;
-  }).join(" ");
+  // 以總額為比例基準（總額 >= 加權，確保兩條線都在繪圖範圍內）
+  const max = Math.max(...data.map((item) => item.totalAmount), 1);
+  const xOf = (index: number) => 24 + (index * 320) / Math.max(data.length - 1, 1);
+  const yOf = (value: number) => 150 - (value / max) * 110;
+  const totalPoints = data.map((item, i) => `${xOf(i)},${yOf(item.totalAmount)}`).join(" ");
+  const weightedPoints = data.map((item, i) => `${xOf(i)},${yOf(item.weightedAmount)}`).join(" ");
   return (
     <article className="panel report-card wide" data-promo-chart="forecast">
-      <div className="panel-title"><h3>月度營收 Forecast</h3><span>點擊月份查看商機</span></div>
+      <div className="panel-title"><h3>月度營收 Forecast</h3><span>實線=總額 · 虛線=加權預測</span></div>
       <svg className="line-chart" viewBox="0 0 368 180" role="img" aria-label="月度營收預測折線圖">
-        <polyline points={points} fill="none" stroke="#0f766e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        {data.map((item, index) => {
-          const x = 24 + (index * 320) / Math.max(data.length - 1, 1);
-          const y = 150 - (item.amount / max) * 110;
-          return <circle key={item.label} cx={x} cy={y} r="5" fill="#102b40" />;
-        })}
-        {data.map((item, index) => {
-          const x = 24 + (index * 320) / Math.max(data.length - 1, 1);
-          return <text key={item.label} x={x} y="172" textAnchor="middle">{item.label.slice(5)}</text>;
-        })}
+        {/* 總額 pipeline（實線） */}
+        <polyline points={totalPoints} fill="none" stroke="#0f766e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        {/* 機率加權預測（橘色虛線） */}
+        <polyline points={weightedPoints} fill="none" stroke="#f59e0b" strokeWidth="3" strokeDasharray="6 4" strokeLinecap="round" strokeLinejoin="round" />
+        {data.map((item, index) => (
+          <circle key={item.label} cx={xOf(index)} cy={yOf(item.totalAmount)} r="5" fill="#102b40" />
+        ))}
+        {data.map((item, index) => (
+          <text key={item.label} x={xOf(index)} y="172" textAnchor="middle">{item.label.slice(5)}</text>
+        ))}
         {/* 透明點擊熱區：每月一條，方便點選下鑽 */}
-        {data.map((item, index) => {
-          const x = 24 + (index * 320) / Math.max(data.length - 1, 1);
-          return (
-            <rect
-              key={`hit-${item.label}`}
-              className="chart-hit"
-              x={x - 16} y="0" width="32" height="180"
-              onClick={() => onDrill("forecastMonth", item.label, `月度營收 · ${item.label}`)}
-            >
-              <title>{`點擊查看 ${item.label} 預計成交商機`}</title>
-            </rect>
-          );
-        })}
+        {data.map((item, index) => (
+          <rect
+            key={`hit-${item.label}`}
+            className="chart-hit"
+            x={xOf(index) - 16} y="0" width="32" height="180"
+            onClick={() => onDrill("forecastMonth", item.label, `月度營收 · ${item.label}`)}
+          >
+            <title>{`點擊查看 ${item.label} 預計成交商機`}</title>
+          </rect>
+        ))}
       </svg>
     </article>
   );

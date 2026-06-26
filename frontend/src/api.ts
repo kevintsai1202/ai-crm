@@ -150,8 +150,8 @@ export async function fetchDashboard() {
 /**
  * 讀取 CRM 經典圖表報表資料。
  */
-export async function fetchDashboardReports() {
-  const { data } = await apiClient.get<DashboardReports>("/dashboard/reports");
+export async function fetchDashboardReports(leadSource?: string) {
+  const { data } = await apiClient.get<DashboardReports>("/dashboard/reports", leadSource ? { params: { leadSource } } : undefined);
   return data;
 }
 
