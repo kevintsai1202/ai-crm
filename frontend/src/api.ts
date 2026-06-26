@@ -496,8 +496,12 @@ export async function addInteraction(customerId: number, data: { type: string; o
  * @param stage 新階段
  * @returns 更新後的商機資料
  */
-export async function updateOpportunityStage(id: number, stage: string) {
-  const { data } = await apiClient.put<OpportunityResponse>(`/opportunities/${id}/stage`, { stage });
+export async function updateOpportunityStage(
+  id: number,
+  stage: string,
+  close?: { closeReason: string; closeReasonNote: string; actualCloseDate: string }
+) {
+  const { data } = await apiClient.put<OpportunityResponse>(`/opportunities/${id}/stage`, { stage, ...close });
   return data;
 }
 
