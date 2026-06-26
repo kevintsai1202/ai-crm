@@ -77,10 +77,19 @@ public class DashboardService {
                         java.util.TreeMap::new,
                         java.util.stream.Collectors.toList()))
                 .entrySet().stream()
-                .map(entry -> new Dtos.MoneyChartPoint(
-                        entry.getKey().toString().substring(0, 7),
-                        entry.getValue().stream().map(opp -> opp.getAmount()).reduce(BigDecimal.ZERO, BigDecimal::add),
-                        entry.getValue().size()))
+                .map(entry -> {
+                    // 總額含所有商機；加權預測排除已失單並依成交機率折算
+                    var total = entry.getValue().stream()
+                            .map(Opportunity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+                    var weighted = entry.getValue().stream()
+                            .filter(opp -> opp.getStage() != OpportunityStage.CLOSED_LOST)
+                            .map(opp -> opp.getAmount().multiply(BigDecimal.valueOf(
+                                    opp.getProbability() == null ? 0 : opp.getProbability()))
+                                    .divide(BigDecimal.valueOf(100)))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return new Dtos.ForecastPoint(entry.getKey().toString().substring(0, 7),
+                            total, weighted, entry.getValue().size());
+                })
                 .toList();
 
         var industryBreakdown = all.stream()

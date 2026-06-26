@@ -217,7 +217,7 @@ public final class Dtos {
 
     public record DashboardReports(
             List<StageReport> pipelineByStage,
-            List<MoneyChartPoint> monthlyForecast,
+            List<ForecastPoint> monthlyForecast,
             List<MoneyChartPoint> industryBreakdown,
             List<ChartPoint> riskBreakdown,
             List<OwnerReport> ownerLeaderboard,
@@ -228,6 +228,9 @@ public final class Dtos {
     public record StageReport(String stage, long count, BigDecimal amount) {}
 
     public record MoneyChartPoint(String label, BigDecimal amount, long count) {}
+
+    /** 月營收預測點：總額 pipeline 與機率加權預測（SP8）。 */
+    public record ForecastPoint(String label, BigDecimal totalAmount, BigDecimal weightedAmount, long count) {}
 
     public record ChartPoint(String label, long value) {}
 
