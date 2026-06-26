@@ -179,12 +179,16 @@ public class Opportunity extends AuditableEntity {
     }
 
     /**
-     * 更新商機階段（供 Kanban 拖拽使用）。
+     * 更新商機階段（Kanban 切換非結案階段用）。切回非結案階段視為重開，
+     * 清除既有結案資訊（closeReason/closeReasonNote/actualCloseDate），避免殘留 stale 資料。
      *
      * @param stage 新的商機階段
      */
     public void updateStage(OpportunityStage stage) {
         this.stage = stage;
+        this.closeReason = null;
+        this.closeReasonNote = null;
+        this.actualCloseDate = null;
     }
 
     /**

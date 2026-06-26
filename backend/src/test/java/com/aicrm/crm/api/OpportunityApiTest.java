@@ -65,4 +65,13 @@ class OpportunityApiTest extends PostgresTestBase {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.probability").value(75));
     }
+
+    /** 建立商機時帶不存在的 ownerId，應回 404（與 customer 無效時一致），而非靜默清除 owner。 */
+    @Test
+    void create_withInvalidOwnerId_returns404() throws Exception {
+        var payload = String.format("{\"customerId\":%d,\"name\":\"壞owner\",\"stage\":\"PROPOSAL\",\"amount\":100000,\"type\":\"NEW_BUSINESS\",\"ownerId\":99999999}", customerId);
+        mockMvc().perform(post("/api/opportunities").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isNotFound());
+    }
 }

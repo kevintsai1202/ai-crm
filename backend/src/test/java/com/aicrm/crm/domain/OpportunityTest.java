@@ -43,4 +43,16 @@ class OpportunityTest {
     void constructor_keepsProbability() {
         assertThat(newOpp(OpportunityStage.PROPOSAL).getProbability()).isEqualTo(50);
     }
+
+    /** 測試結案後切回非結案階段（重開）會清除 stale 結案欄位。 */
+    @Test
+    void updateStage_reopenClearsCloseFields() {
+        var opp = newOpp(OpportunityStage.NEGOTIATION);
+        opp.closeWith(OpportunityStage.CLOSED_WON, CloseReason.WON_PRICE, "備註", LocalDate.of(2026, 3, 1));
+        opp.updateStage(OpportunityStage.NEGOTIATION);
+        assertThat(opp.getStage()).isEqualTo(OpportunityStage.NEGOTIATION);
+        assertThat(opp.getCloseReason()).isNull();
+        assertThat(opp.getCloseReasonNote()).isNull();
+        assertThat(opp.getActualCloseDate()).isNull();
+    }
 }

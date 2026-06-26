@@ -91,7 +91,8 @@ public class OpportunityController {
                 request.amount(), request.expectedCloseDate(), request.type(), leadSource, probability);
         // 指派負責業務：優先採請求中指定的 ownerId，否則沿用客戶負責人
         var owner = request.ownerId() != null
-                ? users.findById(request.ownerId()).orElse(null)
+                ? users.findById(request.ownerId())
+                        .orElseThrow(() -> new EntityNotFoundException("查無此帳號：" + request.ownerId()))
                 : customer.getOwner();
         opportunity.assignOwner(owner);
         opportunityRepository.save(opportunity);
@@ -116,7 +117,8 @@ public class OpportunityController {
                 request.leadSource() == null ? opportunity.getLeadSource() : request.leadSource(),
                 request.probability() == null ? opportunity.getProbability() : request.probability());
         if (request.ownerId() != null) {
-            opportunity.assignOwner(users.findById(request.ownerId()).orElse(null));
+            opportunity.assignOwner(users.findById(request.ownerId())
+                    .orElseThrow(() -> new EntityNotFoundException("查無此帳號：" + request.ownerId())));
         }
         opportunityRepository.save(opportunity);
         return toResponse(opportunity);
