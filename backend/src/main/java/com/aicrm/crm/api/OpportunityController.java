@@ -34,12 +34,17 @@ public class OpportunityController {
     /** 帳號資料存取介面：指派負責業務時使用。 */
     private final AppUserRepository users;
 
+    /** 擁有權守衛：強制 SALES 僅能操作自己負責客戶的商機。 */
+    private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
+
     public OpportunityController(OpportunityRepository opportunityRepository,
                                  CustomerRepository customerRepository,
-                                 AppUserRepository users) {
+                                 AppUserRepository users,
+                                 com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
         this.opportunityRepository = opportunityRepository;
         this.customerRepository = customerRepository;
         this.users = users;
+        this.ownershipGuard = ownershipGuard;
     }
 
     /**
@@ -85,6 +90,8 @@ public class OpportunityController {
         // 解析所屬客戶，查無則回 404 語意
         var customer = customerRepository.findById(request.customerId())
                 .orElseThrow(() -> new EntityNotFoundException("查無此客戶：" + request.customerId()));
+        // SALES 僅能為自己負責的客戶建立商機（防越權指派他人客戶）
+        ownershipGuard.assertCanAccessOwner(customer.getOwnerName());
         var leadSource = request.leadSource() == null ? LeadSource.OUTBOUND : request.leadSource();
         var probability = request.probability() == null ? defaultProbability(request.stage()) : request.probability();
         var opportunity = new com.aicrm.crm.domain.Opportunity(customer, request.name(), request.stage(),
@@ -111,6 +118,8 @@ public class OpportunityController {
     public Dtos.OpportunityResponse update(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateOpportunityRequest request) {
         var opportunity = opportunityRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + id));
+        // SALES 僅能編輯自己負責客戶的商機
+        ownershipGuard.assertCanAccessOwner(opportunity.getCustomer().getOwnerName());
         opportunity.updateDetails(request.name(), request.amount(), request.expectedCloseDate(), request.type());
         // 更新銷售欄位：若請求未帶則維持原值
         opportunity.applySalesFields(
@@ -133,7 +142,11 @@ public class OpportunityController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void delete(@PathVariable Long id) {
-        opportunityRepository.deleteById(id);
+        // 先載入並驗證擁有權，避免 SALES 刪除他人客戶的商機
+        var opportunity = opportunityRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + id));
+        ownershipGuard.assertCanAccessOwner(opportunity.getCustomer().getOwnerName());
+        opportunityRepository.delete(opportunity);
     }
 
     /**
@@ -148,6 +161,8 @@ public class OpportunityController {
     public Dtos.OpportunityResponse updateStage(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateStageRequest request) {
         var opportunity = opportunityRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + id));
+        // SALES 僅能變更自己負責客戶的商機階段
+        ownershipGuard.assertCanAccessOwner(opportunity.getCustomer().getOwnerName());
         // 結案階段走 closeWith，一般階段走 updateStage
         if (request.stage() == OpportunityStage.CLOSED_WON || request.stage() == OpportunityStage.CLOSED_LOST) {
             var closeDate = request.actualCloseDate() == null ? java.time.LocalDate.now() : request.actualCloseDate();

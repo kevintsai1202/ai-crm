@@ -32,10 +32,14 @@ class AiFallbackIntegrationTest extends PostgresTestBase {
         return MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
     }
 
-    /** 每個測試前以 sales 帳號登入取得 token。 */
+    /**
+     * 每個測試前以 admin 帳號登入取得 token。
+     * 客戶存取已加上擁有權守衛（SALES 僅能存取自己負責客戶）；本測試聚焦 AI fallback 內容、
+     * 與擁有權無關，故以 ADMIN 登入（可存取任一既有客戶，繞過業務歸屬限制）。
+     */
     @BeforeEach
     void loginFirst() throws Exception {
-        var body = "{\"username\":\"sales@aurora.local\",\"password\":\"password123\"}";
+        var body = "{\"username\":\"admin@aurora.local\",\"password\":\"password123\"}";
         var json = mockMvc().perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andReturn().getResponse().getContentAsString();
         token = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json).get("token").asText();
