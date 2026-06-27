@@ -6,7 +6,6 @@ import { ManagerRoute } from "./app/ManagerRoute";
 import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { CustomersPage } from "./features/customers/CustomersPage";
-import { MyWorkspacePage } from "./features/my-workspace/MyWorkspacePage";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
 import AdminSettingsPage from "./features/admin/AdminSettingsPage";
 import { TeamAnalyticsPage } from "./features/team/TeamAnalyticsPage";
@@ -22,7 +21,8 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/my-work" element={<MyWorkspacePage />} />
+          {/* 我的工作台已併入客戶工作台；舊連結導向客戶工作台 */}
+          <Route path="/my-work" element={<Navigate to="/customers" replace />} />
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomersPage />} />
           <Route element={<ManagerRoute />}>

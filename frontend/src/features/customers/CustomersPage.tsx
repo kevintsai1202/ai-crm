@@ -27,6 +27,7 @@ import { EditInteractionModal } from "./components/EditInteractionModal";
 import { AiHistoryModal } from "./components/AiHistoryModal";
 import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
 import { ChatWindow } from "../ai-assistant/components/ChatWindow";
+import { WorkspaceAiModal } from "../my-workspace/WorkspaceAiModal";
 
 /**
  * 操作頁（做事）：搜尋/篩選 + 客戶列表 + 詳情 + 商機看板 + 互動 + AI 助理。
@@ -58,6 +59,7 @@ export function CustomersPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showAddInteraction, setShowAddInteraction] = useState(false);
   const [showAddOpportunity, setShowAddOpportunity] = useState(false);
@@ -383,6 +385,7 @@ export function CustomersPage() {
       </section>
 
       <div className="action-bar">
+        <button type="button" className="btn-assess" onClick={() => setAiModalOpen(true)}>✨ AI 工作建議</button>
         <button type="button" onClick={() => setShowAddCustomer(true)}>+ 新增客戶</button>
         {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>+ 新增互動</button> : null}
         {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
@@ -423,6 +426,7 @@ export function CustomersPage() {
           onClose={() => setChatOpen(false)}
         />
       ) : null}
+      {aiModalOpen ? <WorkspaceAiModal onClose={() => setAiModalOpen(false)} /> : null}
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
       {aiHistory?.open && selected ? <AiHistoryModal customerName={selected.customer.name} calls={aiHistory.calls} trace={trace} loading={aiHistory.loading} onClose={() => setAiHistory(null)} /> : null}
       {showAddCustomer ? <AddCustomerModal currentUserId={user?.id ?? 0} onSubmit={handleCreateCustomer} onClose={() => setShowAddCustomer(false)} /> : null}

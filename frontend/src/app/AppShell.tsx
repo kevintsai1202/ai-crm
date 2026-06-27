@@ -65,7 +65,6 @@ export function AppShell() {
         </div>
         <nav className="side-nav">
           <NavLink to="/dashboard" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>📊 儀表板</NavLink>
-          <NavLink to="/my-work" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>🧑‍💼 我的工作台</NavLink>
           <NavLink to="/customers" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>👥 客戶工作台</NavLink>
           {user?.role === "MANAGER" || user?.role === "ADMIN" ? (
             <NavLink to="/team" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>📈 業務分析</NavLink>
