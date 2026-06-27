@@ -5,14 +5,29 @@ import remarkGfm from "remark-gfm";
 import {
   fetchWorkspaceRecommendation,
   streamWorkspaceRecommendation,
+  streamWorkspaceChat,
+  fetchWorkspaceHistory,
   createOpportunity,
   type SseChunk
 } from "../../api";
-import type { WorkspaceTodoItem, SuggestedOpportunityDraft } from "../../types";
+import type {
+  WorkspaceTodoItem,
+  SuggestedOpportunityDraft,
+  AiCallHistoryItem,
+  CustomerSummary
+} from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { AiBadge } from "../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
+import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { AddOpportunityModal } from "../customers/components/AddOpportunityModal";
+
+/** 工作檯問答訊息。 */
+interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+  pending?: boolean;
+}
 
 /** 待辦類型對應的中文標籤與色票。 */
 const TODO_META: Record<string, { label: string; cls: string }> = {
@@ -26,7 +41,7 @@ const TODO_META: Record<string, { label: string; cls: string }> = {
  * 函式級註解：SALES 僅能看自己；MANAGER/ADMIN 顯示「自己 / 全部」範圍切換。
  * 待辦由後端 DB 規則即時計算（可點跳客戶詳情）；AI 總結以待辦接地、逐字串流。
  */
-export function WorkspaceAiPanel() {
+export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSummary[] }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   // MANAGER/ADMIN 可切換範圍；SALES 強制自己
@@ -40,6 +55,17 @@ export function WorkspaceAiPanel() {
   const [model, setModel] = useState<string | null>(null);
   // 正在以哪一筆草稿開啟新增商機 Modal（null 為未開）
   const [draftFor, setDraftFor] = useState<SuggestedOpportunityDraft | null>(null);
+
+  // 個人問答狀態
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [question, setQuestion] = useState("");
+  const [chatCustomerId, setChatCustomerId] = useState<number | null>(null); // null=總覽
+  const [chatSending, setChatSending] = useState(false);
+
+  // AI 歷程狀態
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
+  const [callsLoading, setCallsLoading] = useState(false);
 
   // 進區塊 / 切換範圍：讀上次總結 + 即時待辦
   useEffect(() => {
@@ -74,6 +100,54 @@ export function WorkspaceAiPanel() {
     streamWorkspaceRecommendation(scope, onChunk, onDone, onError);
   }
 
+  /** 送出個人問答：以 SSE 串流逐字填入最後一則 AI 訊息。 */
+  function handleAsk() {
+    const q = question.trim();
+    if (!q || chatSending) return;
+    setChatSending(true);
+    setQuestion("");
+    // 先放入使用者訊息與一則 pending 的 AI 訊息
+    setMessages((prev) => [...prev, { role: "user", content: q }, { role: "assistant", content: "", pending: true }]);
+
+    const onChunk = (chunk: SseChunk) => {
+      if (chunk.type === "content" && chunk.delta) {
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant") next[next.length - 1] = { ...last, content: last.content + chunk.delta };
+          return next;
+        });
+      }
+    };
+    const finish = () => {
+      setMessages((prev) => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last && last.role === "assistant") next[next.length - 1] = { ...last, pending: false };
+        return next;
+      });
+      setChatSending(false);
+    };
+    streamWorkspaceChat(scope, chatCustomerId, q, onChunk, finish, (e) => {
+      console.error("個人問答失敗:", e);
+      finish();
+    });
+  }
+
+  /** 開啟 AI 歷程。 */
+  async function openHistory() {
+    setHistoryOpen(true);
+    setCallsLoading(true);
+    try {
+      setCalls(await fetchWorkspaceHistory());
+    } catch (e) {
+      console.error("讀取 AI 歷程失敗:", e);
+      setCalls([]);
+    } finally {
+      setCallsLoading(false);
+    }
+  }
+
   return (
     <section className="panel workspace-ai-panel">
       <div className="workspace-ai-header">
@@ -85,6 +159,7 @@ export function WorkspaceAiPanel() {
               <option value="all">全部</option>
             </select>
           ) : null}
+          <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
           <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
             {generating ? "產生中…" : "產生我的工作建議"}
           </button>
@@ -142,6 +217,50 @@ export function WorkspaceAiPanel() {
         </div>
       ) : null}
 
+      {/* 個人問答：總覽或深入單一客戶 */}
+      <div className="workspace-chat">
+        <div className="workspace-chat-head">
+          <h4>個人問答</h4>
+          <select
+            value={chatCustomerId ?? ""}
+            onChange={(e) => setChatCustomerId(e.target.value ? Number(e.target.value) : null)}
+            aria-label="問答範圍"
+          >
+            <option value="">全部我的客戶（總覽）</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="workspace-chat-messages">
+          {messages.length === 0 ? (
+            <p className="trace-empty">可詢問「哪些客戶該優先跟進？」等問題；選客戶可深入單一客戶。</p>
+          ) : (
+            messages.map((m, i) => (
+              <div key={i} className={`chat-bubble ${m.role}`}>
+                {m.pending && !m.content ? (
+                  <AiThinkingIndicator label="思考中" />
+                ) : m.role === "assistant" ? (
+                  <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown></div>
+                ) : (
+                  <span>{m.content}</span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        <div className="workspace-chat-input">
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAsk(); }}
+            placeholder="輸入問題後按 Enter"
+            disabled={chatSending}
+          />
+          <button type="button" disabled={chatSending} onClick={handleAsk}>{chatSending ? "回覆中…" : "送出"}</button>
+        </div>
+      </div>
+
       {/* AI 草稿 → 預填新增商機 Modal；確認後走既有建立流程 */}
       {draftFor ? (
         <AddOpportunityModal
@@ -158,6 +277,16 @@ export function WorkspaceAiPanel() {
               console.error("建立商機失敗:", e);
             }
           }}
+        />
+      ) : null}
+
+      {/* AI 歷程彈窗 */}
+      {historyOpen ? (
+        <AiCallHistoryModal
+          title="我的工作檯 AI 歷程"
+          calls={calls}
+          loading={callsLoading}
+          onClose={() => setHistoryOpen(false)}
         />
       ) : null}
     </section>

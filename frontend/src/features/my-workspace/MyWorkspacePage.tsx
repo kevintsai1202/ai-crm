@@ -109,8 +109,8 @@ export function MyWorkspacePage() {
             <div className="kpi-card"><span className="kpi-label">本週續約到期</span><span className="kpi-value">{kpis.weekRenewals}</span></div>
           </div>
 
-          {/* 個人 AI 助理：待辦 + 工作建議 + 商機草稿 + 問答 */}
-          <WorkspaceAiPanel />
+          {/* 個人 AI 助理：待辦 + 工作建議 + 商機草稿 + 問答（傳入客戶取樣供深入問答下拉） */}
+          <WorkspaceAiPanel customers={sample} />
 
           {/* 我的客戶列表(點選沿用既有詳情頁) */}
           <div className="mywork-list">
