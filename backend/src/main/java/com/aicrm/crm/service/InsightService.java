@@ -1062,11 +1062,16 @@ public class InsightService {
         final String scoreSystemPrompt = "你是一位客觀的 AI 模型效能評審員，專精 B2B CRM 應用場景。" +
                 "\n<!-- eval-run:" + java.util.UUID.randomUUID() + " -->";
 
-        // 固定使用 claude-opus-4-8 作為評審
+        // 固定使用 claude-opus-4-8 作為評審；評分報告較長（表格+逐模型評語+排名），
+        // 須提高 max_completion_tokens，否則會被 base 設定(2000)截斷成半截報告。
+        int scoreMaxTokens = systemSettings.getMaxCompletionTokens().orElse(modelTestMaxCompletionTokens);
         var spec = ChatClient.create(chatModel).prompt()
                 .system(scoreSystemPrompt)
                 .user(scorePrompt)
-                .options(org.springframework.ai.openai.OpenAiChatOptions.builder().model("claude-opus-4-8"));
+                .options(org.springframework.ai.openai.OpenAiChatOptions.builder()
+                        .model("claude-opus-4-8")
+                        .maxTokens((Integer) null)
+                        .maxCompletionTokens(scoreMaxTokens));
 
         var fullAnswer = new StringBuilder();
         var lastResp = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
