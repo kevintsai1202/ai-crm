@@ -410,15 +410,31 @@ button {
 .risk-chip {
   min-height: 118px;
   border-radius: 8px;
-  padding: 14px;
+  padding: 14px 8px;
   display: grid;
+  /* 固定三列（標籤 / 數值 / 百分比），確保三張子卡的數字與百分比水平對齊 */
+  grid-template-rows: 20px 1fr 18px;
   align-content: center;
+  justify-items: center;
   gap: 6px;
   text-align: center;
 }
 
+.risk-chip strong {
+  /* 標籤一律單行，避免「高風險/低風險/中風險」換行行數不同造成數字歪斜 */
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 20px;
+}
+
 .risk-chip b {
-  font-size: 34px;
+  font-size: 32px;
+  line-height: 1;
+  align-self: center;
+}
+
+.risk-chip small {
+  line-height: 18px;
 }
 
 .risk-chip.low {
@@ -2234,3 +2250,77 @@ button.renewal-bar.clickable:hover {
 .ai-insight-meta { color: var(--muted, #6b7280); }
 .row-selected { background: var(--row-selected, #eef2ff); }
 .report-markdown { line-height: 1.7; }
+
+/* ===== 我的工作檯個人 AI 區塊 (SP9-B) ===== */
+.workspace-ai-panel { margin: 18px 0; }
+.workspace-ai-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.workspace-ai-header h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
+.workspace-ai-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.workspace-ai-actions select {
+  padding: 7px 10px; border: 1px solid #d8dee9; border-radius: 8px;
+  background: #fff; color: #334155; font-size: 13px;
+}
+
+.workspace-ai-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;
+}
+@media (max-width: 900px) { .workspace-ai-grid { grid-template-columns: 1fr; } }
+.workspace-col { min-width: 0; }
+.workspace-col-title {
+  margin: 0 0 10px; font-size: 13px; font-weight: 600; color: #64748b;
+  text-transform: none; letter-spacing: .02em;
+}
+.workspace-empty { color: #94a3b8; font-size: 14px; padding: 8px 0; }
+
+/* 待辦清單 */
+.workspace-todos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.workspace-todos .todo-item {
+  width: 100%; text-align: left; border: 1px solid #eceff4; border-left-width: 4px;
+  border-radius: 10px; background: #fbfcfe; padding: 10px 12px; cursor: pointer;
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  gap: 2px 10px; transition: transform .12s ease, box-shadow .12s ease;
+}
+.workspace-todos .todo-item:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(15,23,42,.08); }
+.todo-item .todo-tag {
+  grid-row: 1 / span 2; align-self: center; font-size: 12px; font-weight: 700;
+  padding: 4px 8px; border-radius: 999px; white-space: nowrap;
+}
+.todo-item .todo-customer { font-weight: 600; color: #1f2937; }
+.todo-item .todo-reason { font-size: 12.5px; color: #6b7280; }
+.todo-item.sev-high { border-left-color: #e5484d; }
+.todo-item.sev-high .todo-tag { background: #ffe2e2; color: #b42318; }
+.todo-item.sev-medium { border-left-color: #f5a623; }
+.todo-item.sev-medium .todo-tag { background: #fff3cd; color: #9a6700; }
+
+/* AI 總結 */
+.workspace-ai-summary {
+  background: #f8fafc; border: 1px solid #eceff4; border-radius: 10px;
+  padding: 14px; min-height: 90px;
+}
+.workspace-ai-summary .markdown-body { font-size: 14px; line-height: 1.7; }
+.workspace-ai-model { display: block; margin-top: 8px; color: #94a3b8; font-size: 12px; }
+
+/* AI 建議商機 */
+.workspace-drafts { margin-top: 16px; }
+.workspace-drafts ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.draft-card {
+  border: 1px solid #e3e8f0; border-radius: 10px; padding: 10px 12px; background: #fff;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.draft-card .draft-main { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.draft-card .draft-main strong { color: #1f2937; }
+.draft-card .draft-main span { font-size: 13px; color: #475569; }
+.draft-card .draft-rationale { font-size: 12.5px; color: #6b7280; }
+.draft-card .draft-create { align-self: flex-start; margin-top: 4px; }
+
+/* 個人問答列 */
+.workspace-chat-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e5e9f0; font-size: 13px; color: #64748b;
+}
+.workspace-chat-bar select {
+  padding: 7px 10px; border: 1px solid #d8dee9; border-radius: 8px; background: #fff; color: #334155; font-size: 13px;
+}

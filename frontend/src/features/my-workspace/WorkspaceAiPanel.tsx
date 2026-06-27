@@ -21,30 +21,28 @@ import { AiBadge } from "../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { AddOpportunityModal } from "../customers/components/AddOpportunityModal";
+import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
+import { ChatWindow } from "../ai-assistant/components/ChatWindow";
+import type { ChatMessage } from "../ai-assistant/useAiChat";
 
-/** 工作檯問答訊息。 */
-interface ChatMsg {
-  role: "user" | "assistant";
-  content: string;
-  pending?: boolean;
-}
-
-/** 待辦類型對應的中文標籤與色票。 */
+/** 待辦類型對應的中文標籤與色票 class。 */
 const TODO_META: Record<string, { label: string; cls: string }> = {
-  HIGH_RISK: { label: "高風險", cls: "sev-high" },
-  RENEWAL_DUE: { label: "即將續約", cls: "sev-medium" },
-  STALE_OPPORTUNITY: { label: "停滯商機", cls: "sev-medium" }
+  HIGH_RISK: { label: "高風險", cls: "high" },
+  RENEWAL_DUE: { label: "即將續約", cls: "medium" },
+  STALE_OPPORTUNITY: { label: "停滯商機", cls: "medium" }
 };
+
+/** 總覽問答的合成客戶物件（id=0 代表跨「我的所有客戶」總覽，非真實客戶）。 */
+const OVERVIEW_TARGET = { id: 0, name: "我的客戶組合（總覽）" } as CustomerSummary;
 
 /**
  * 我的工作檯「個人 AI 助理」區塊：待辦清單 + AI 工作建議（逐字串流）+ AI 建議商機草稿。
+ * 個人問答沿用全站一致的浮動對話視窗（ChatWindow/ChatLauncher）。
  * 函式級註解：SALES 僅能看自己；MANAGER/ADMIN 顯示「自己 / 全部」範圍切換。
- * 待辦由後端 DB 規則即時計算（可點跳客戶詳情）；AI 總結以待辦接地、逐字串流。
  */
 export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSummary[] }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // MANAGER/ADMIN 可切換範圍；SALES 強制自己
   const canSwitchScope = user?.role !== "SALES";
   const [scope, setScope] = useState<"self" | "all">("self");
 
@@ -53,16 +51,16 @@ export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSumma
   const [summary, setSummary] = useState("");
   const [generating, setGenerating] = useState(false);
   const [model, setModel] = useState<string | null>(null);
-  // 正在以哪一筆草稿開啟新增商機 Modal（null 為未開）
   const [draftFor, setDraftFor] = useState<SuggestedOpportunityDraft | null>(null);
 
-  // 個人問答狀態
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [question, setQuestion] = useState("");
-  const [chatCustomerId, setChatCustomerId] = useState<number | null>(null); // null=總覽
+  // 個人問答（沿用全站浮動對話視窗）
+  const [chatOpen, setChatOpen] = useState(false);
   const [chatSending, setChatSending] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 問答對象：OVERVIEW_TARGET（總覽）或某真實客戶
+  const [chatTarget, setChatTarget] = useState<CustomerSummary>(OVERVIEW_TARGET);
 
-  // AI 歷程狀態
+  // AI 歷程
   const [historyOpen, setHistoryOpen] = useState(false);
   const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
   const [callsLoading, setCallsLoading] = useState(false);
@@ -92,43 +90,31 @@ export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSumma
       else if (chunk.type === "drafts") setDrafts((chunk.items as SuggestedOpportunityDraft[]) ?? []);
       else if (chunk.type === "content" && chunk.delta) setSummary((prev) => prev + chunk.delta);
     };
-    const onDone = () => setGenerating(false);
-    const onError = (e: any) => {
+    streamWorkspaceRecommendation(scope, onChunk, () => setGenerating(false), (e) => {
       console.error("產生工作建議失敗:", e);
       setGenerating(false);
-    };
-    streamWorkspaceRecommendation(scope, onChunk, onDone, onError);
+    });
   }
 
-  /** 送出個人問答：以 SSE 串流逐字填入最後一則 AI 訊息。 */
-  function handleAsk() {
-    const q = question.trim();
-    if (!q || chatSending) return;
+  /** 送出個人問答：以 SSE 串流逐字填入最後一則 AI 訊息（沿用 ChatMessage / ChatBubble）。 */
+  function handleSend(text: string) {
+    if (chatSending) return;
     setChatSending(true);
-    setQuestion("");
-    // 先放入使用者訊息與一則 pending 的 AI 訊息
-    setMessages((prev) => [...prev, { role: "user", content: q }, { role: "assistant", content: "", pending: true }]);
-
-    const onChunk = (chunk: SseChunk) => {
-      if (chunk.type === "content" && chunk.delta) {
-        setMessages((prev) => {
-          const next = [...prev];
-          const last = next[next.length - 1];
-          if (last && last.role === "assistant") next[next.length - 1] = { ...last, content: last.content + chunk.delta };
-          return next;
-        });
-      }
-    };
-    const finish = () => {
+    setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "", pending: true }]);
+    const patchLast = (fn: (m: ChatMessage) => ChatMessage) => {
       setMessages((prev) => {
         const next = [...prev];
-        const last = next[next.length - 1];
-        if (last && last.role === "assistant") next[next.length - 1] = { ...last, pending: false };
+        const i = next.length - 1;
+        if (i >= 0 && next[i].role === "assistant") next[i] = fn(next[i]);
         return next;
       });
-      setChatSending(false);
     };
-    streamWorkspaceChat(scope, chatCustomerId, q, onChunk, finish, (e) => {
+    const onChunk = (chunk: SseChunk) => {
+      if (chunk.type === "content" && chunk.delta) patchLast((m) => ({ ...m, content: m.content + chunk.delta, pending: false }));
+    };
+    const finish = () => { patchLast((m) => ({ ...m, pending: false })); setChatSending(false); };
+    const customerId = chatTarget.id === 0 ? null : chatTarget.id;
+    streamWorkspaceChat(scope, customerId, text, onChunk, finish, (e) => {
       console.error("個人問答失敗:", e);
       finish();
     });
@@ -155,111 +141,104 @@ export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSumma
         <div className="workspace-ai-actions">
           {canSwitchScope ? (
             <select value={scope} onChange={(e) => setScope(e.target.value as "self" | "all")} aria-label="資料範圍">
-              <option value="self">自己</option>
-              <option value="all">全部</option>
+              <option value="self">範圍：自己</option>
+              <option value="all">範圍：全部</option>
             </select>
           ) : null}
           <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
           <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
-            {generating ? "產生中…" : "產生我的工作建議"}
+            {generating ? "產生中…" : "✨ 產生我的工作建議"}
           </button>
         </div>
       </div>
 
-      {/* 待辦清單（可點跳客戶詳情） */}
-      <div className="workspace-todos">
-        {todos.length === 0 ? (
-          <p className="trace-empty">目前沒有待辦事項。</p>
-        ) : (
-          <ul>
-            {todos.map((t, i) => {
-              const meta = TODO_META[t.type] ?? { label: t.type, cls: "sev-medium" };
-              return (
-                <li key={i} className={`todo-item ${meta.cls}`} onClick={() => navigate(`/customers/${t.customerId}`)}>
-                  <span className="todo-tag">{meta.label}</span>
-                  <span className="todo-customer">{t.customerName}</span>
-                  <span className="todo-reason">{t.reason}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* AI 總結 */}
-      <div className="workspace-ai-summary">
-        {!summary && generating ? (
-          <AiThinkingIndicator label="AI 正在分析" />
-        ) : summary ? (
-          <div className={generating ? "markdown-body ai-streaming-body" : "markdown-body"}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
-            {generating && <span className="ai-stream-cursor" />}
-            {!generating && model ? <small className="workspace-ai-model">（{model}）</small> : null}
-          </div>
-        ) : (
-          <p className="trace-empty">點「產生我的工作建議」由 AI 依待辦給出今日優先建議。</p>
-        )}
-      </div>
-
-      {/* AI 建議商機草稿（Task 9 接預填建立） */}
-      {drafts.length > 0 ? (
-        <div className="workspace-drafts">
-          <h4>AI 建議商機</h4>
-          <ul>
-            {drafts.map((d, i) => (
-              <li key={i} className="draft-card">
-                <div><strong>{d.customerName}</strong>｜{d.name}</div>
-                <div className="draft-rationale">{d.rationale}</div>
-                <button type="button" className="btn-secondary" onClick={() => setDraftFor(d)}>建立</button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {/* 個人問答：總覽或深入單一客戶 */}
-      <div className="workspace-chat">
-        <div className="workspace-chat-head">
-          <h4>個人問答</h4>
-          <select
-            value={chatCustomerId ?? ""}
-            onChange={(e) => setChatCustomerId(e.target.value ? Number(e.target.value) : null)}
-            aria-label="問答範圍"
-          >
-            <option value="">全部我的客戶（總覽）</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="workspace-chat-messages">
-          {messages.length === 0 ? (
-            <p className="trace-empty">可詢問「哪些客戶該優先跟進？」等問題；選客戶可深入單一客戶。</p>
+      <div className="workspace-ai-grid">
+        {/* 左：待辦清單 */}
+        <div className="workspace-col">
+          <h4 className="workspace-col-title">今日待辦</h4>
+          {todos.length === 0 ? (
+            <p className="workspace-empty">目前沒有待辦事項 🎉</p>
           ) : (
-            messages.map((m, i) => (
-              <div key={i} className={`chat-bubble ${m.role}`}>
-                {m.pending && !m.content ? (
-                  <AiThinkingIndicator label="思考中" />
-                ) : m.role === "assistant" ? (
-                  <div className="markdown-body"><ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown></div>
-                ) : (
-                  <span>{m.content}</span>
-                )}
-              </div>
-            ))
+            <ul className="workspace-todos">
+              {todos.map((t, i) => {
+                const meta = TODO_META[t.type] ?? { label: t.type, cls: "medium" };
+                return (
+                  <li key={i}>
+                    <button type="button" className={`todo-item sev-${meta.cls}`} onClick={() => navigate(`/customers/${t.customerId}`)}>
+                      <span className="todo-tag">{meta.label}</span>
+                      <span className="todo-customer">{t.customerName}</span>
+                      <span className="todo-reason">{t.reason}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-        <div className="workspace-chat-input">
-          <input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAsk(); }}
-            placeholder="輸入問題後按 Enter"
-            disabled={chatSending}
-          />
-          <button type="button" disabled={chatSending} onClick={handleAsk}>{chatSending ? "回覆中…" : "送出"}</button>
+
+        {/* 右：AI 總結 + 建議商機 */}
+        <div className="workspace-col">
+          <h4 className="workspace-col-title">AI 工作建議</h4>
+          <div className="workspace-ai-summary">
+            {!summary && generating ? (
+              <AiThinkingIndicator label="AI 正在分析" />
+            ) : summary ? (
+              <div className={generating ? "markdown-body ai-streaming-body" : "markdown-body"}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
+                {generating && <span className="ai-stream-cursor" />}
+                {!generating && model ? <small className="workspace-ai-model">（{model}）</small> : null}
+              </div>
+            ) : (
+              <p className="workspace-empty">點右上「產生我的工作建議」由 AI 依待辦給出今日優先順序。</p>
+            )}
+          </div>
+
+          {drafts.length > 0 ? (
+            <div className="workspace-drafts">
+              <h4 className="workspace-col-title">AI 建議商機</h4>
+              <ul>
+                {drafts.map((d, i) => (
+                  <li key={i} className="draft-card">
+                    <div className="draft-main"><strong>{d.customerName}</strong><span>{d.name}</span></div>
+                    <div className="draft-rationale">{d.rationale}</div>
+                    <button type="button" className="btn-secondary draft-create" onClick={() => setDraftFor(d)}>＋ 建立商機</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {/* 個人問答對象選擇（總覽 / 深入單客戶）；對話本身用全站浮動視窗 */}
+      <div className="workspace-chat-bar">
+        <span>個人問答對象：</span>
+        <select
+          value={chatTarget.id}
+          onChange={(e) => {
+            const id = Number(e.target.value);
+            setChatTarget(id === 0 ? OVERVIEW_TARGET : (customers.find((c) => c.id === id) ?? OVERVIEW_TARGET));
+            setMessages([]); // 切換對象清空對話
+          }}
+          aria-label="問答對象"
+        >
+          <option value={0}>全部我的客戶（總覽）</option>
+          {customers.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+        </select>
+        <button type="button" className="btn-secondary" onClick={() => setChatOpen(true)}>💬 開啟對話</button>
+      </div>
+
+      {/* 浮動對話視窗 + 啟動鈕（與客戶頁一致） */}
+      <ChatLauncher open={chatOpen} unread={messages.length} customerName={chatTarget.name} onOpen={() => setChatOpen(true)} />
+      {chatOpen ? (
+        <ChatWindow
+          customer={chatTarget}
+          messages={messages}
+          sending={chatSending}
+          onSend={handleSend}
+          onClose={() => setChatOpen(false)}
+        />
+      ) : null}
 
       {/* AI 草稿 → 預填新增商機 Modal；確認後走既有建立流程 */}
       {draftFor ? (
@@ -270,7 +249,6 @@ export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSumma
           onSubmit={async (data) => {
             try {
               await createOpportunity({ customerId: draftFor.customerId, ...data });
-              // 建立成功後關閉並移除該草稿
               setDrafts((prev) => prev.filter((x) => x !== draftFor));
               setDraftFor(null);
             } catch (e) {
@@ -282,12 +260,7 @@ export function WorkspaceAiPanel({ customers = [] }: { customers?: CustomerSumma
 
       {/* AI 歷程彈窗 */}
       {historyOpen ? (
-        <AiCallHistoryModal
-          title="我的工作檯 AI 歷程"
-          calls={calls}
-          loading={callsLoading}
-          onClose={() => setHistoryOpen(false)}
-        />
+        <AiCallHistoryModal title="我的工作檯 AI 歷程" calls={calls} loading={callsLoading} onClose={() => setHistoryOpen(false)} />
       ) : null}
     </section>
   );

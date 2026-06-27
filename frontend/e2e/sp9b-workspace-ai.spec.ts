@@ -32,15 +32,16 @@ test("我的工作檯個人 AI：產生建議 + 個人問答", async ({ page }) 
     }, { timeout: 60_000, intervals: [1000] })
     .toBeTruthy();
 
-  // 4) 個人問答（總覽）：送出問題，等待 AI 回覆氣泡出現內容
-  const chat = panel.locator(".workspace-chat");
-  await chat.locator('input').fill("我有哪些客戶該優先跟進？");
-  await chat.getByRole("button", { name: /送出|回覆中/ }).click();
+  // 4) 個人問答：開啟全站浮動對話視窗，送出問題，等待 AI 回覆氣泡出現內容
+  await panel.getByRole("button", { name: /開啟對話/ }).click();
+  const chat = page.locator(".chat-window");
+  await expect(chat).toBeVisible();
+  await chat.locator("textarea").fill("我有哪些客戶該優先跟進？");
+  await chat.getByRole("button", { name: /送出|回應中/ }).click();
   await expect
     .poll(async () => {
-      const assistant = chat.locator(".chat-bubble.assistant");
-      const count = await assistant.count();
-      if (count === 0) return 0;
+      const assistant = chat.locator(".chat-msg.assistant .markdown-body");
+      if (await assistant.count() === 0) return 0;
       return (await assistant.last().innerText()).trim().length;
     }, { timeout: 60_000, intervals: [1000] })
     .toBeGreaterThan(0);
