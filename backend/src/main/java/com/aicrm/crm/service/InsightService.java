@@ -919,6 +919,8 @@ public class InsightService {
             var lower = testModel.toLowerCase();
             if (lower.startsWith("gpt-5") || lower.startsWith("o1") || lower.startsWith("o3")) {
                 optsBuilder.reasoningEffort(reasoningEffort);
+                // 推理模型僅支援預設 temperature=1；明確覆蓋，避免 base 設定(0.3)被合併進去而回 400
+                optsBuilder.temperature(1.0);
             }
             spec = spec.options(optsBuilder);
         } else {

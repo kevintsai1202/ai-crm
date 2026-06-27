@@ -780,8 +780,10 @@ export default function AdminSettingsPage() {
                                     {r.reasoningTokens ? `（可見 ${r.visibleOutputTokens ?? "–"} + 推理 ${r.reasoningTokens}）` : ""}
                                   </span>
                                 )}
-                                {r.finishReason && r.finishReason !== "STOP" && (
-                                  <span style={{ fontSize: 11, color: "#d97706" }}>⚑ {r.finishReason}</span>
+                                {/* 只在真正異常時標示：LENGTH=被 max tokens 截斷、CONTENT_FILTER=內容過濾；
+                                    _UNKNOWN/STOP 等（gateway 未回標準 finish_reason）有內容即正常，不標示避免誤解 */}
+                                {r.finishReason && /LENGTH|CONTENT_FILTER/i.test(r.finishReason) && (
+                                  <span style={{ fontSize: 11, color: "#d97706" }} title="回應因此原因結束">⚑ {r.finishReason}</span>
                                 )}
                               </div>
                             </div>

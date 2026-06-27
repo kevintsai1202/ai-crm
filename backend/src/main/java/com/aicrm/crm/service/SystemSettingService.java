@@ -144,7 +144,17 @@ public class SystemSettingService {
         }
         var b = OpenAiChatOptions.builder();
         model.ifPresent(b::model);
-        temperature.ifPresent(b::temperature);
+        // 推理模型（gpt-5 / o1 / o3 系）僅支援 temperature=1，套用自訂溫度會回 400；故強制 1.0，
+        // 非推理模型才套用使用者設定的溫度。
+        boolean isReasoning = model.map(m -> {
+            var l = m.toLowerCase();
+            return l.startsWith("gpt-5") || l.startsWith("o1") || l.startsWith("o3");
+        }).orElse(false);
+        if (isReasoning) {
+            b.temperature(1.0);
+        } else {
+            temperature.ifPresent(b::temperature);
+        }
         maxTokens.ifPresent(mt -> { b.maxTokens((Integer) null); b.maxCompletionTokens(mt); });
         reasoning.ifPresent(b::reasoningEffort);
         return b;
