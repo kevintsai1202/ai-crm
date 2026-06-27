@@ -64,4 +64,13 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
         assertThat(todos).anyMatch(t -> "RENEWAL_DUE".equals(t.type()) && "艾美高風險客".equals(t.customerName()));
         assertThat(todos).anyMatch(t -> "STALE_OPPORTUNITY".equals(t.type()) && "艾美逾期客".equals(t.customerName()));
     }
+
+    @Test
+    void recommendationFallback_containsTodoCustomers() {
+        var todos = workspaceAiService.computeTodos(sales, "self");
+        String fallback = workspaceAiService.deterministicRecommendation(sales, todos);
+        // 接地：fallback 文字應列出待辦客戶，且提到「待辦」
+        assertThat(fallback).contains("艾美高風險客");
+        assertThat(fallback).contains("待辦");
+    }
 }
