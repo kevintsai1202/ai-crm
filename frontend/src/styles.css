@@ -2251,8 +2251,14 @@ button.renewal-bar.clickable:hover {
 .row-selected { background: var(--row-selected, #eef2ff); }
 .report-markdown { line-height: 1.7; }
 
-/* ===== 我的工作檯個人 AI 區塊 (SP9-B) ===== */
-.workspace-ai-panel { margin: 18px 0; }
+/* ===== 我的工作檯個人 AI (SP9-B) ===== */
+/* AI 工作建議 Modal：較寬以容納左右兩欄 */
+.workspace-ai-modal { width: min(940px, 94vw); max-width: 94vw; }
+.workspace-ai-modal .report-body { max-height: 70vh; overflow-y: auto; }
+.workspace-modal-head-actions { display: flex; align-items: center; gap: 10px; }
+.workspace-modal-head-actions select {
+  padding: 7px 10px; border: 1px solid #d8dee9; border-radius: 8px; background: #fff; color: #334155; font-size: 13px;
+}
 .workspace-ai-header {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
