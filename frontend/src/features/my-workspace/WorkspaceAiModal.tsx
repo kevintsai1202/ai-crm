@@ -42,6 +42,10 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
   const [model, setModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draftFor, setDraftFor] = useState<SuggestedOpportunityDraft | null>(null);
+  // 一鍵建立：勾選的草稿索引（預設全選）、建立中狀態、結果訊息
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<string | null>(null);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
@@ -69,6 +73,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
     setGenerating(true);
     setSummary("");
     setDrafts([]);
+    setCreateMsg(null);
     const onChunk = (chunk: SseChunk) => {
       if (chunk.type === "todos") setTodos((chunk.items as WorkspaceTodoItem[]) ?? []);
       else if (chunk.type === "drafts") setDrafts((chunk.items as SuggestedOpportunityDraft[]) ?? []);
@@ -78,6 +83,47 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
       console.error("產生工作建議失敗:", e);
       setGenerating(false);
     });
+  }
+
+  // drafts 變動時預設全選（不在此清建立訊息，否則建立後移除草稿會把成功訊息清掉）
+  useEffect(() => {
+    setSelected(new Set(drafts.map((_, i) => i)));
+  }, [drafts]);
+
+  /** 切換某筆草稿的勾選。 */
+  function toggleSelect(i: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  }
+
+  /** 一鍵建立所有勾選的 AI 建議商機（重用既有建立流程，逐筆送出）。 */
+  async function handleCreateAll() {
+    const picks = drafts.filter((_, i) => selected.has(i));
+    if (picks.length === 0 || creating) return;
+    setCreating(true);
+    setCreateMsg(null);
+    const results = await Promise.allSettled(picks.map((d) =>
+      createOpportunity({
+        customerId: d.customerId,
+        name: d.name,
+        stage: d.suggestedStage,
+        amount: d.amount ?? 100000, // LLM 未給金額時以預設值帶入，建立後可再編輯
+        expectedCloseDate: null,
+        type: "NEW_BUSINESS",
+        leadSource: "OUTBOUND",
+        probability: null
+      })
+    ));
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fail = results.length - ok;
+    // 移除已成功建立的草稿
+    const createdSet = new Set(picks.filter((_, idx) => results[idx].status === "fulfilled"));
+    setDrafts((prev) => prev.filter((d) => !createdSet.has(d)));
+    setCreateMsg(`已建立 ${ok} 筆商機${fail > 0 ? `，${fail} 筆失敗` : ""}`);
+    setCreating(false);
   }
 
   /** 開啟 AI 歷程。 */
@@ -157,15 +203,32 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
 
+              {/* 建立結果訊息（放區塊外，草稿建立後清空仍可見） */}
+              {createMsg ? <p className="draft-create-msg">{createMsg}</p> : null}
+
               {drafts.length > 0 ? (
                 <div className="workspace-drafts">
-                  <h4 className="workspace-col-title">AI 建議商機</h4>
+                  <div className="workspace-drafts-head">
+                    <h4 className="workspace-col-title">AI 建議商機</h4>
+                    <button type="button" className="btn-assess draft-create-all" disabled={creating || selected.size === 0} onClick={handleCreateAll}>
+                      {creating ? "建立中…" : `✅ 全部建立（${selected.size}）`}
+                    </button>
+                  </div>
                   <ul>
                     {drafts.map((d, i) => (
                       <li key={i} className="draft-card">
-                        <div className="draft-main"><strong>{d.customerName}</strong><span>{d.name}</span></div>
-                        <div className="draft-rationale">{d.rationale}</div>
-                        <button type="button" className="btn-secondary draft-create" onClick={() => setDraftFor(d)}>＋ 建立商機</button>
+                        <label className="draft-check">
+                          <input type="checkbox" checked={selected.has(i)} onChange={() => toggleSelect(i)} />
+                          <div className="draft-body">
+                            <div className="draft-main">
+                              <strong>{d.customerName}</strong><span>{d.name}</span>
+                              {d.amount ? <em className="draft-amount">預估 {d.amount.toLocaleString()} 元</em> : null}
+                              <span className={`draft-stage stage-${d.suggestedStage.toLowerCase()}`}>{d.suggestedStage}</span>
+                            </div>
+                            <div className="draft-rationale">{d.rationale}</div>
+                          </div>
+                        </label>
+                        <button type="button" className="btn-secondary draft-create" onClick={() => setDraftFor(d)}>編輯後建立</button>
                       </li>
                     ))}
                   </ul>
