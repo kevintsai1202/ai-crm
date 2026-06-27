@@ -327,6 +327,36 @@ export interface AiCallHistoryItem {
   createdAt: string;
 }
 
+// ===== 我的工作檯個人 AI (SP9-B) =====
+
+/** 工作檯待辦項目（純 DB 規則計算）。type: HIGH_RISK / RENEWAL_DUE / STALE_OPPORTUNITY。 */
+export interface WorkspaceTodoItem {
+  type: string;
+  customerId: number;
+  customerName: string;
+  reason: string;
+  severity: string;
+}
+
+/** AI 建議商機草稿（使用者確認後才建立）。 */
+export interface SuggestedOpportunityDraft {
+  customerId: number;
+  customerName: string;
+  name: string;
+  suggestedStage: string;
+  amount: number | null;
+  rationale: string;
+}
+
+/** 工作推薦回應（GET 讀快取用）；summary 可能為 null（尚未產生）。 */
+export interface WorkspaceRecommendation {
+  summary: string | null;
+  model: string | null;
+  generatedAt: string | null;
+  todos: WorkspaceTodoItem[];
+  drafts: SuggestedOpportunityDraft[];
+}
+
 /** 下鑽來源（由儀表板 navigate 帶入 location state），供客戶頁麵包屑與返回定位使用（SP7）。 */
 export interface DrilldownSource {
   from: "dashboard";

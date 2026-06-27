@@ -195,7 +195,7 @@ export async function askAssistant(customerId: number, message: string) {
 }
 
 /** SSE 串流資料區段：content（內容 delta）、citations（引用）、risk（風險）、callId（呼叫紀錄 id）。 */
-export type SseChunk = { type: "content" | "citations" | "risk" | "callId"; delta?: string; citations?: any[]; risk?: any; callId?: number };
+export type SseChunk = { type: "content" | "citations" | "risk" | "callId" | "todos" | "drafts"; delta?: string; citations?: any[]; risk?: any; callId?: number; items?: any[] };
 
 /**
  * 共用：讀取一個 SSE (text/event-stream) Response 並逐塊回呼。
@@ -761,6 +761,90 @@ export async function streamOwnerInsight(
   } catch (error) {
     onError(error);
   }
+}
+
+// ===== 我的工作檯個人 AI (SP9-B) =====
+
+/**
+ * 讀取工作推薦（GET）：AI 總結（上次產生）+ 即時待辦。
+ *
+ * @param scope 範圍（self / all；SALES 後端強制 self）
+ */
+export async function fetchWorkspaceRecommendation(scope: string) {
+  const { data } = await apiClient.get<import("./types").WorkspaceRecommendation>(
+    "/workspace/recommendation", { params: { scope } });
+  return data;
+}
+
+/**
+ * 產生工作推薦（SSE 串流）：先收 todos / drafts，再逐字收 AI 總結。
+ *
+ * @param scope 範圍
+ * @param onChunk 每段資料回呼
+ * @param onDone 完成回呼
+ * @param onError 錯誤回呼
+ */
+export async function streamWorkspaceRecommendation(
+  scope: string,
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/workspace/recommendation?scope=${encodeURIComponent(scope)}`, {
+      method: "POST",
+      headers: { Accept: "text/event-stream", ...getAuthHeaders() }
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/**
+ * 個人問答（SSE 串流）。customerId 為 null 為總覽；有值為深入單客戶。
+ *
+ * @param scope 範圍
+ * @param customerId 深入的客戶 ID（null 為總覽）
+ * @param message 問題
+ * @param onChunk 每段資料回呼
+ * @param onDone 完成回呼
+ * @param onError 錯誤回呼
+ */
+export async function streamWorkspaceChat(
+  scope: string,
+  customerId: number | null,
+  message: string,
+  onChunk: (chunk: SseChunk) => void,
+  onDone: () => void,
+  onError: (err: any) => void
+) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
+  try {
+    const response = await fetch(`${baseUrl}/workspace/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...getAuthHeaders() },
+      body: JSON.stringify({ scope, customerId, message })
+    });
+    if (!response.ok) {
+      handleStreamUnauthorized(response);
+      throw new Error(`HTTP 錯誤！狀態碼：${response.status}`);
+    }
+    await readSseStream(response, onChunk, onDone);
+  } catch (error) {
+    onError(error);
+  }
+}
+
+/** 本人工作檯 AI 歷程。 */
+export async function fetchWorkspaceHistory() {
+  const { data } = await apiClient.get<AiCallHistoryItem[]>("/workspace/history");
+  return data;
 }
 
 /** 取得 AI 設定（限 ADMIN）。 */
