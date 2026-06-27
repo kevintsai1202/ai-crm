@@ -359,6 +359,36 @@ public class WorkspaceAiService {
         return sb.toString();
     }
 
+    /**
+     * 讀取工作推薦：AI 總結取自最近一筆 WORKSPACE_RECOMMENDATION 紀錄（無則 null），待辦即時重算，drafts 不快取（重新產生才有）。
+     *
+     * @param principal 認證主體
+     * @param scope 請求範圍
+     * @return 工作推薦回應
+     */
+    public Dtos.WorkspaceRecommendationResponse getRecommendation(AuthPrincipal principal, String scope) {
+        var todos = computeTodos(principal, scope);
+        var history = aiGovernance.workspaceHistory(principal.username());
+        var last = history.stream()
+                .filter(h -> AiCallType.WORKSPACE_RECOMMENDATION.name().equals(h.callType()))
+                .findFirst()
+                .orElse(null);
+        String summary = last == null ? null : last.answer();
+        String model = last == null ? null : last.model();
+        String generatedAt = last == null || last.createdAt() == null ? null : last.createdAt().toString();
+        return new Dtos.WorkspaceRecommendationResponse(summary, model, generatedAt, todos, List.of());
+    }
+
+    /**
+     * 本人工作檯 AI 歷程（WORKSPACE_RECOMMENDATION + WORKSPACE_CHAT）。
+     *
+     * @param principal 認證主體
+     * @return AI 呼叫歷程（新到舊）
+     */
+    public List<Dtos.AiCallHistoryItem> history(AuthPrincipal principal) {
+        return aiGovernance.workspaceHistory(principal.username());
+    }
+
     /** 總覽問答的 deterministic fallback。 */
     String deterministicPortfolioAnswer(List<Customer> customers) {
         long high = customers.stream().filter(c -> "HIGH".equalsIgnoreCase(c.getRiskLevel())).count();

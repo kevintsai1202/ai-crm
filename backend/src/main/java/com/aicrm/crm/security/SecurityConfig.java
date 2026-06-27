@@ -62,7 +62,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/dev/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/customers/**", "/api/opportunities/**", "/api/dashboard/**", "/api/ai/**", "/api/agent/**", "/api/me/**").authenticated()
+                        .requestMatchers("/api/customers/**", "/api/opportunities/**", "/api/dashboard/**", "/api/ai/**", "/api/agent/**", "/api/me/**", "/api/workspace/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exceptions -> exceptions

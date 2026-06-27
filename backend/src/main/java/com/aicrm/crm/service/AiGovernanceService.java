@@ -152,6 +152,21 @@ public class AiGovernanceService {
     }
 
     /**
+     * 查詢某使用者的工作檯個人 AI 歷程（WORKSPACE_RECOMMENDATION + WORKSPACE_CHAT，新到舊）。
+     *
+     * @param subject 使用者帳號（username）
+     * @return AI 呼叫歷史清單（新到舊）
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<Dtos.AiCallHistoryItem> workspaceHistory(String subject) {
+        return callLogRepository.findByCallTypeInAndSubjectOrderByCreatedAtDesc(
+                java.util.List.of(AiCallType.WORKSPACE_RECOMMENDATION, AiCallType.WORKSPACE_CHAT), subject).stream()
+                .map(c -> new Dtos.AiCallHistoryItem(c.getId(), c.getCallType().name(), c.getModel(),
+                        c.isAiEnabled(), c.getTotalTokens(), c.getAnswer(), c.getCreatedAt()))
+                .toList();
+    }
+
+    /**
      * 記錄單一模型競速測試結果（MODEL_TEST），以 sessionId 作為 subject 關聯同批次的評分記錄。
      *
      * @param req 測試結果請求 DTO
