@@ -900,13 +900,20 @@ public class InsightService {
         }
 
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
+        // 診斷用：追蹤是否吐出過任何內容、以及最後一個非空的 finishReason（gpt 系常見 LENGTH/content_filter）
+        var anyContent = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var finishReason = new java.util.concurrent.atomic.AtomicReference<String>();
 
         spec.stream().chatResponse().subscribe(
                 cr -> {
                     lastResponse.set(cr);
                     var result = cr.getResult();
+                    if (result != null && result.getMetadata() != null) {
+                        var fr = result.getMetadata().getFinishReason();
+                        if (fr != null && !fr.isBlank()) finishReason.set(fr);
+                    }
                     var text = result == null ? null : result.getOutput().getText();
-                    if (text != null && !text.isEmpty()) sendContent(emitter, text);
+                    if (text != null && !text.isEmpty()) { anyContent.set(true); sendContent(emitter, text); }
                 },
                 error -> {
                     log.warn("模型測試串流失敗 model={}：{}", model, error.getMessage());
@@ -918,17 +925,30 @@ public class InsightService {
                     var resp = lastResponse.get();
                     var meta = resp == null ? null : resp.getMetadata();
                     var usage = meta == null ? null : meta.getUsage();
-                    if (usage != null) {
-                        try {
-                            emitter.send(SseEmitter.event().data(Map.of(
-                                    "type", "tokens",
-                                    "promptTokens",     usage.getPromptTokens()     != null ? usage.getPromptTokens()     : 0,
-                                    "completionTokens", usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0,
-                                    "totalTokens",      usage.getTotalTokens()      != null ? usage.getTotalTokens()      : 0
-                            )));
-                        } catch (Exception e) {
-                            log.warn("送 tokens SSE 失敗：{}", e.getMessage());
-                        }
+                    Integer pt = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
+                    Integer ct = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
+                    Integer tt = usage != null && usage.getTotalTokens() != null ? usage.getTotalTokens() : 0;
+                    var fr = finishReason.get();
+                    // 原生 usage 明細（OpenAI 會含 completion_tokens_details.reasoning_tokens），best-effort 記錄供診斷
+                    String nativeUsage = null;
+                    try { nativeUsage = usage != null && usage.getNativeUsage() != null ? usage.getNativeUsage().toString() : null; } catch (Exception ignore) {}
+                    log.info("模型測試完成 model={} finishReason={} prompt={} completion={} total={} hadContent={} nativeUsage={}",
+                            model, fr, pt, ct, tt, anyContent.get(), nativeUsage);
+
+                    // 沒吐出任何內容：明確告知原因（最常見：finishReason=LENGTH，內容前已達 max_completion_tokens；多為推理模型）
+                    if (!anyContent.get()) {
+                        String why = "LENGTH".equalsIgnoreCase(fr)
+                                ? "在產出內容前已達 max_completion_tokens 上限（completion=" + ct + "），此模型多為推理型；可調高上限或改用非推理模型。"
+                                : ("模型回傳空內容（finishReason=" + fr + "，completion=" + ct + "）。");
+                        sendContent(emitter, "⚠️ 未取得內容：" + why);
+                    }
+                    try {
+                        emitter.send(SseEmitter.event().data(Map.of(
+                                "type", "tokens",
+                                "promptTokens", pt, "completionTokens", ct, "totalTokens", tt,
+                                "finishReason", fr != null ? fr : "")));
+                    } catch (Exception e) {
+                        log.warn("送 tokens SSE 失敗：{}", e.getMessage());
                     }
                     sendSimpleTailAndComplete(emitter, null);
                 });
