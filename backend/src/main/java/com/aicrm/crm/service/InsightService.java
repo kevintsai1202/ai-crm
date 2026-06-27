@@ -106,6 +106,13 @@ public class InsightService {
     /** 預設 OpenAI API key（用於手動建立 ChatModel）。 */
     private final String defaultOpenAiApiKey;
 
+    /**
+     * 模型測試的 max_completion_tokens 上限（可由 MODEL_TEST_MAX_COMPLETION_TOKENS 覆蓋）。
+     * 預設 8000：推理型模型（如 gpt-5-mini）會先花大量 token 在內部 reasoning，
+     * 上限太低會在輸出可見內容前就截斷（finishReason=length、content 空）。
+     */
+    private final int modelTestMaxCompletionTokens;
+
     public InsightService(CustomerService customers,
                           KnowledgeDocumentRepository knowledgeDocuments,
                           EmbeddingClient embeddingClient,
@@ -115,7 +122,8 @@ public class InsightService {
                           ChatMemoryService chatMemory,
                           SystemSettingService systemSettings,
                           @Value("${spring.ai.openai.api-key:}") String openAiApiKey,
-                          @Value("${spring.ai.openai.base-url:https://api.openai.com}") String defaultOpenAiBaseUrl) {
+                          @Value("${spring.ai.openai.base-url:https://api.openai.com}") String defaultOpenAiBaseUrl,
+                          @Value("${app.ai.model-test.max-completion-tokens:8000}") int modelTestMaxCompletionTokens) {
         this.customers = customers;
         this.knowledgeDocuments = knowledgeDocuments;
         this.embeddingClient = embeddingClient;
@@ -127,6 +135,7 @@ public class InsightService {
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
         this.defaultOpenAiBaseUrl = defaultOpenAiBaseUrl;
         this.defaultOpenAiApiKey = openAiApiKey;
+        this.modelTestMaxCompletionTokens = modelTestMaxCompletionTokens;
     }
 
     /**
@@ -893,7 +902,7 @@ public class InsightService {
             spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder()
                     .model(testModel)
                     .maxTokens((Integer) null)        // 明確清除，防止 merge 時帶入 base 的 maxTokens
-                    .maxCompletionTokens(2000));
+                    .maxCompletionTokens(modelTestMaxCompletionTokens)); // 可設定，推理模型需較高上限
         } else {
             var opts = systemSettings.resolveChatOptions();
             if (opts != null) spec = spec.options(opts);

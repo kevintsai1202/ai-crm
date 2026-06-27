@@ -82,6 +82,12 @@ app:
   # 務必以環境變數 DEMO_RESET_ENABLED=false 關閉，避免誤刪真實業務資料。
   demo:
     reset-enabled: ${DEMO_RESET_ENABLED:true}
+  # 模型測試的 max_completion_tokens 上限。推理型模型（gpt-5-mini 等）會先花大量 token 在內部
+  # reasoning，上限太低（如 2000）會在輸出可見內容前就截斷成空回應；預設 8000，可以
+  # MODEL_TEST_MAX_COMPLETION_TOKENS 調整。
+  ai:
+    model-test:
+      max-completion-tokens: ${MODEL_TEST_MAX_COMPLETION_TOKENS:8000}
 
 ---
 spring:
