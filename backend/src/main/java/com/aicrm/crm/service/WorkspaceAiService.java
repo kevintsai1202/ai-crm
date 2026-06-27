@@ -264,7 +264,10 @@ public class WorkspaceAiService {
                 + "rationale(繁中，說明『為何現在該推進』的行動方向，30-60 字)。"
                 + "不要輸出清單以外的客戶，不要捏造 customerId。");
         try {
-            var raw = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(sb.toString())
+            var draftSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(sb.toString());
+            var draftOpts = systemSettings.resolveChatOptions();
+            if (draftOpts != null) draftSpec = draftSpec.options(draftOpts);
+            var raw = draftSpec
                     .call().entity(new org.springframework.core.ParameterizedTypeReference<List<DraftSuggestion>>() {});
             if (raw == null) {
                 return fallback;

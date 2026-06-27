@@ -635,7 +635,10 @@ public class InsightService {
                     """.formatted(count, highRisk, pipeline, activeOpportunities,
                             // PII 遮罩只作用在送 LLM 的 grounding context
                             PiiMasker.mask(String.join("\n", rows)));
-            var chatResponse = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt).call().chatResponse();
+            var portfolioSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+            var portfolioOpts = systemSettings.resolveChatOptions();
+            if (portfolioOpts != null) portfolioSpec = portfolioSpec.options(portfolioOpts);
+            var chatResponse = portfolioSpec.call().chatResponse();
             var content = chatResponse == null ? null : chatResponse.getResult().getOutput().getText();
             if (content == null || content.isBlank()) {
                 log.warn("OpenAI Portfolio 評估回傳空白，改用 deterministic fallback");
