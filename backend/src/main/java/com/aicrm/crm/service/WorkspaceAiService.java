@@ -98,7 +98,16 @@ public class WorkspaceAiService {
      * @return 待辦清單
      */
     public List<Dtos.WorkspaceTodoItem> computeTodos(AuthPrincipal principal, String scope) {
-        var customers = loadScopedCustomers(principal, scope);
+        return computeTodosFrom(loadScopedCustomers(principal, scope));
+    }
+
+    /**
+     * 以既載入的客戶清單計算待辦（避免重複查 DB）。
+     *
+     * @param customers 已載入的客戶清單
+     * @return 待辦清單
+     */
+    List<Dtos.WorkspaceTodoItem> computeTodosFrom(List<Customer> customers) {
         var today = LocalDate.now();
         var todos = new ArrayList<Dtos.WorkspaceTodoItem>();
         for (var c : customers) {
@@ -177,7 +186,16 @@ public class WorkspaceAiService {
      * @return 商機草稿清單
      */
     public List<Dtos.SuggestedOpportunityDraft> computeDrafts(AuthPrincipal principal, String scope) {
-        var customers = loadScopedCustomers(principal, scope);
+        return computeDraftsFrom(loadScopedCustomers(principal, scope));
+    }
+
+    /**
+     * 規則式商機草稿（LLM 不可用時的 fallback），以既載入的客戶清單計算。
+     *
+     * @param customers 已載入的客戶清單
+     * @return 規則式草稿清單
+     */
+    List<Dtos.SuggestedOpportunityDraft> computeDraftsFrom(List<Customer> customers) {
         var today = LocalDate.now();
         var drafts = new ArrayList<Dtos.SuggestedOpportunityDraft>();
         for (var c : customers) {
@@ -200,6 +218,94 @@ public class WorkspaceAiService {
         return drafts;
     }
 
+    /** LLM 回傳的商機建議原始結構（欄位名須與 prompt 範例一致，供 Spring AI .entity 反序列化）。 */
+    record DraftSuggestion(Long customerId, String name, String suggestedStage,
+                           java.math.BigDecimal amount, String rationale) {}
+
+    /**
+     * LLM 主導的商機建議：分析 scope 內客戶（風險/續約/互動/現有商機），產出具體商機建議與行動方向。
+     * 接地防幻覺：候選客戶與 id 由 DB 提供，回傳後驗證 customerId 必須在範圍內、階段須為合法 enum；
+     * 客戶名稱一律以 DB 為準（不採信 LLM）。LLM 不可用、失敗或驗證後為空 → 回退規則式 fallback。
+     *
+     * @param customers scope 內客戶（已載入）
+     * @param chatModel ChatModel（null 表無金鑰）
+     * @param fallback 規則式草稿（LLM 不可用時回退）
+     * @return 商機建議草稿清單
+     */
+    List<Dtos.SuggestedOpportunityDraft> generateAiDrafts(List<Customer> customers, ChatModel chatModel,
+                                                          List<Dtos.SuggestedOpportunityDraft> fallback) {
+        if (chatModel == null || customers.isEmpty()) {
+            return fallback;
+        }
+        // 建 id→客戶 對照，並組候選清單 grounding
+        var byId = new java.util.HashMap<Long, Customer>();
+        var today = LocalDate.now();
+        var sb = new StringBuilder();
+        sb.append("你是資深 B2B 業務教練。以下是某業務負責的客戶（資料庫事實，customerId 不可更改）：\n");
+        for (var c : customers) {
+            byId.put(c.getId(), c);
+            long openOpps = c.getOpportunities().stream().filter(o ->
+                    o.getStage() != OpportunityStage.CLOSED_WON && o.getStage() != OpportunityStage.CLOSED_LOST).count();
+            var due = c.getRenewalDueDate();
+            sb.append("- customerId=").append(c.getId())
+              .append("｜名稱=").append(c.getName())
+              .append("｜產業=").append(c.getIndustry())
+              .append("｜風險=").append(c.getRiskLevel() == null ? "未評" : c.getRiskLevel())
+              .append("｜續約日=").append(due == null ? "未定" : due)
+              .append("｜進行中商機數=").append(openOpps).append("\n");
+        }
+        sb.append("\n今日為 ").append(today)
+          .append("。請挑出最值得「主動開立新商機」的客戶（至多 5 個，優先高風險、即將續約、或無進行中商機者），"
+                + "為每個建議一筆商機，回傳 JSON 陣列，每個物件欄位："
+                + "customerId(數字，必須取自上方清單)、"
+                + "name(商機名稱，繁中)、"
+                + "suggestedStage(僅能是 QUALIFICATION/PROPOSAL/NEGOTIATION 之一)、"
+                + "amount(預估金額，整數元，依產業與客戶規模合理估算)、"
+                + "rationale(繁中，說明『為何現在該推進』的行動方向，30-60 字)。"
+                + "不要輸出清單以外的客戶，不要捏造 customerId。");
+        try {
+            var raw = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(sb.toString())
+                    .call().entity(new org.springframework.core.ParameterizedTypeReference<List<DraftSuggestion>>() {});
+            if (raw == null) {
+                return fallback;
+            }
+            var result = new ArrayList<Dtos.SuggestedOpportunityDraft>();
+            for (var s : raw) {
+                if (s == null || s.customerId() == null) {
+                    continue;
+                }
+                var c = byId.get(s.customerId());      // 驗證：customerId 必須在範圍內，否則丟棄（防幻覺/越權）
+                if (c == null) {
+                    continue;
+                }
+                var stage = normalizeStage(s.suggestedStage());
+                var name = (s.name() == null || s.name().isBlank()) ? c.getName() + "跟進商機" : s.name().trim();
+                var amount = (s.amount() != null && s.amount().signum() > 0) ? s.amount() : null;
+                var rationale = s.rationale() == null ? "" : s.rationale().trim();
+                result.add(new Dtos.SuggestedOpportunityDraft(c.getId(), c.getName(), name, stage, amount, rationale));
+                if (result.size() >= 5) {
+                    break;
+                }
+            }
+            return result.isEmpty() ? fallback : result;
+        } catch (Exception e) {
+            log.warn("LLM 商機建議失敗，改用規則式 fallback：{}", e.getMessage());
+            return fallback;
+        }
+    }
+
+    /** 將 LLM 回傳的階段字串正規化為合法 enum 名（非法或空 → QUALIFICATION）。 */
+    private String normalizeStage(String stage) {
+        if (stage == null) {
+            return "QUALIFICATION";
+        }
+        var s = stage.trim().toUpperCase();
+        return switch (s) {
+            case "QUALIFICATION", "PROPOSAL", "NEGOTIATION" -> s;
+            default -> "QUALIFICATION";
+        };
+    }
+
     /**
      * 串流產生工作推薦：先送待辦與商機草稿，再串流 AI 總結；無金鑰/失敗走 deterministic fallback。
      * 串流回呼於另一執行緒、readOnly 交易結束後執行，故先在交易內把純值（todos/drafts/fallback）算好。
@@ -211,17 +317,26 @@ public class WorkspaceAiService {
     public SseEmitter streamRecommendation(AuthPrincipal principal, String scope) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
-        // 交易內先算好純值
-        var todos = computeTodos(principal, scope);
-        var drafts = computeDrafts(principal, scope);
+        // 交易內先載入客戶一次，算好純值（待辦、規則式 fallback、提示詞）
+        var customers = loadScopedCustomers(principal, scope);
+        var todos = computeTodosFrom(customers);
         final String fallback = deterministicRecommendation(principal, todos);
         final String userPrompt = buildRecommendationPrompt(principal, todos);
         final String subject = principal.username();
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
 
-        // 先送結構化待辦與草稿（前端即時呈現）
+        // 先送待辦（前端即時呈現）
         try {
             emitter.send(SseEmitter.event().data(Map.of("type", "todos", "items", todos)));
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+            return emitter;
+        }
+
+        // LLM 主導的商機建議（失敗回退規則式）；於交易內呼叫，僅讀已載入客戶
+        var ruleDrafts = computeDraftsFrom(customers);
+        var drafts = generateAiDrafts(customers, chatModel, ruleDrafts);
+        try {
             emitter.send(SseEmitter.event().data(Map.of("type", "drafts", "items", drafts)));
         } catch (Exception e) {
             emitter.completeWithError(e);

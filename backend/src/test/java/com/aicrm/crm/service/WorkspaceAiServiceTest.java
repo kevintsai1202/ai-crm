@@ -75,6 +75,15 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
     }
 
     @Test
+    void generateAiDrafts_whenNoAi_returnsRuleFallback() {
+        var customers = customerRepository.findByOwnerName("艾美");
+        var fallback = workspaceAiService.computeDraftsFrom(customers);
+        // 無金鑰（chatModel=null）時應原樣回退規則式草稿
+        var drafts = workspaceAiService.generateAiDrafts(customers, null, fallback);
+        assertThat(drafts).isEqualTo(fallback);
+    }
+
+    @Test
     void chatDrilldown_foreignCustomer_isRejected() {
         var foreign = customerRepository.findByOwnerName("別的業務").get(0);
         // 艾美不可深入問「別的業務」的客戶
