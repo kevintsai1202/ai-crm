@@ -497,4 +497,22 @@ public final class Dtos {
             int totalTokens,
             String answer
     ) {}
+
+    // ===== 我的工作檯個人 AI (SP9-B) =====
+
+    /** 工作檯待辦項目（純 DB 規則計算）。type: HIGH_RISK / RENEWAL_DUE / STALE_OPPORTUNITY。 */
+    public record WorkspaceTodoItem(String type, Long customerId, String customerName,
+                                    String reason, String severity) {}
+
+    /** AI 建議商機草稿（使用者確認後才建立）。 */
+    public record SuggestedOpportunityDraft(Long customerId, String customerName, String name,
+                                            String suggestedStage, BigDecimal amount, String rationale) {}
+
+    /** 工作檯問答請求（無 customerId 為總覽；有則深入單客戶）。scope: self / all。 */
+    public record WorkspaceChatRequest(String scope, Long customerId, @NotBlank String message) {}
+
+    /** 工作檯推薦的非串流回應（GET 讀快取用）。summary 可為 null（尚未產生）。 */
+    public record WorkspaceRecommendationResponse(String summary, String model, String generatedAt,
+                                                  List<WorkspaceTodoItem> todos,
+                                                  List<SuggestedOpportunityDraft> drafts) {}
 }

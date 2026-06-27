@@ -44,4 +44,12 @@ public interface CustomerRepository extends JpaRepository<Customer, Long>, JpaSp
      */
     @Query("select c.id from Customer c where c.riskLevel is null")
     List<Long> findIdsByRiskLevelIsNull();
+
+    /**
+     * 載入某業務（依去正規化 owner_name 欄位）負責的所有客戶。供工作檯個人 AI 計算待辦。
+     *
+     * @param ownerName 業務顯示名稱
+     * @return 該業務負責的客戶清單
+     */
+    List<Customer> findByOwnerName(String ownerName);
 }
