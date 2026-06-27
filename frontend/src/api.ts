@@ -857,11 +857,15 @@ export async function fetchAiSettings() {
 export async function saveAiSettings(
   model: string,
   providerId: number | null,
-  modelOptions: import("./types").ModelOptionItem[]
+  modelOptions: import("./types").ModelOptionItem[],
+  params?: { temperature: number | null; maxCompletionTokens: number | null; reasoningEffort: string | null }
 ) {
   const { data } = await apiClient.put<import("./types").AiSettingsResponse>(
     "/admin/settings/ai",
-    { model, providerId, modelOptions }
+    { model, providerId, modelOptions,
+      temperature: params?.temperature ?? null,
+      maxCompletionTokens: params?.maxCompletionTokens ?? null,
+      reasoningEffort: params?.reasoningEffort ?? null }
   );
   return data;
 }

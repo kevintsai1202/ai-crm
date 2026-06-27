@@ -25,6 +25,9 @@ interface ModelRaceResult {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  reasoningTokens: number | null;     // 推理 token（推理模型才有）
+  visibleOutputTokens: number | null; // 可見回答 token = completion - reasoning
+  finishReason?: string;
   errorMsg?: string;
 }
 
@@ -42,6 +45,10 @@ export default function AdminSettingsPage() {
   const [currentModel, setCurrentModel] = useState("");
   const [currentProviderId, setCurrentProviderId] = useState<number | null>(null);
   const [options, setOptions] = useState<ModelOptionItem[]>([]);
+  // 可編輯模型參數（以字串存供輸入框；空字串=未設定）
+  const [temperature, setTemperature] = useState("");
+  const [maxCompletionTokens, setMaxCompletionTokens] = useState("");
+  const [reasoningEffort, setReasoningEffort] = useState("");
   const [newModel, setNewModel] = useState("");
   /** 新增模型時選擇的供應商 ID */
   const [newModelProviderId, setNewModelProviderId] = useState<number | null>(null);
@@ -87,6 +94,22 @@ export default function AdminSettingsPage() {
   if (user?.role !== "ADMIN") return <Navigate to="/dashboard" replace />;
 
   /* ── 設定區方法 ─────────────────────────────── */
+  /** 將後端回傳的模型參數同步到輸入框狀態。 */
+  function syncParams(data: AiSettingsResponse) {
+    setTemperature(data.temperature != null ? String(data.temperature) : "");
+    setMaxCompletionTokens(data.maxCompletionTokens != null ? String(data.maxCompletionTokens) : "");
+    setReasoningEffort(data.reasoningEffort ?? "");
+  }
+
+  /** 由輸入框狀態組出儲存用參數（空字串→null，沿用預設）。 */
+  function paramsPayload() {
+    return {
+      temperature: temperature.trim() === "" ? null : Number(temperature),
+      maxCompletionTokens: maxCompletionTokens.trim() === "" ? null : Number(maxCompletionTokens),
+      reasoningEffort: reasoningEffort.trim() === "" ? null : reasoningEffort.trim()
+    };
+  }
+
   async function load() {
     setLoading(true);
     setSettingError(null);
@@ -97,6 +120,7 @@ export default function AdminSettingsPage() {
       setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setProviders(data.providers);
+      syncParams(data);
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "載入失敗");
     } finally {
@@ -119,12 +143,13 @@ export default function AdminSettingsPage() {
     setSaving(true);
     setSettingError(null);
     try {
-      const data = await saveAiSettings(newModel, newPid, options);
+      const data = await saveAiSettings(newModel, newPid, options, paramsPayload());
       setSettings(data);
       setCurrentModel(data.currentModel);
       setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setProviders(data.providers);
+      syncParams(data);
       const msg = data.currentModel
         ? `✓ 已設定 ${data.currentModel} 為默認模型`
         : "✓ 已清除默認模型，改用環境變數預設";
@@ -166,12 +191,13 @@ export default function AdminSettingsPage() {
     setSettingError(null);
     setActionMsg(null);
     try {
-      const data = await saveAiSettings(currentModel, currentProviderId, options);
+      const data = await saveAiSettings(currentModel, currentProviderId, options, paramsPayload());
       setSettings(data);
       setCurrentModel(data.currentModel);
       setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setProviders(data.providers);
+      syncParams(data);
       setActionMsg("已儲存，AI 呼叫即時生效。");
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "儲存失敗");
@@ -225,7 +251,7 @@ export default function AdminSettingsPage() {
       setOptions(cleanedOptions);
       setCurrentProviderId(cleanedProviderId);
       // 自動同步清理後的設定至 DB，避免孤立的 providerId 留在 model_options
-      await saveAiSettings(currentModel, cleanedProviderId, cleanedOptions);
+      await saveAiSettings(currentModel, cleanedProviderId, cleanedOptions, paramsPayload());
     } catch (e) {
       setProviderError(e instanceof Error ? e.message : "刪除失敗");
     }
@@ -242,7 +268,8 @@ export default function AdminSettingsPage() {
     const init: Record<string, ModelRaceResult> = {};
     activeOptions.forEach((opt) => {
       init[opt.model] = { status: "waiting", content: "", firstTokenMs: null, totalMs: null,
-                  promptTokens: null, completionTokens: null, totalTokens: null };
+                  promptTokens: null, completionTokens: null, totalTokens: null,
+                  reasoningTokens: null, visibleOutputTokens: null };
     });
     setRaceResults(init);
     startTimeRef.current = {};
@@ -271,7 +298,8 @@ export default function AdminSettingsPage() {
             setRaceResults((prev) => {
               const cur = prev[opt.model] ?? {
                 status: "streaming" as const, content: "", firstTokenMs: null, totalMs: null,
-                promptTokens: null, completionTokens: null, totalTokens: null
+                promptTokens: null, completionTokens: null, totalTokens: null,
+                reasoningTokens: null, visibleOutputTokens: null
               };
               return {
                 ...prev,
@@ -294,6 +322,9 @@ export default function AdminSettingsPage() {
                 promptTokens: chunk.promptTokens ?? null,
                 completionTokens: chunk.completionTokens ?? null,
                 totalTokens: chunk.totalTokens ?? null,
+                reasoningTokens: chunk.reasoningTokens ?? null,
+                visibleOutputTokens: chunk.visibleOutputTokens ?? null,
+                finishReason: chunk.finishReason ?? undefined,
               }
             }));
           }
@@ -626,6 +657,45 @@ export default function AdminSettingsPage() {
               </button>
             </div>
 
+            {/* 模型參數（留空＝用預設；套用於 AI 呼叫與模型測試） */}
+            <div style={{ paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>
+                模型參數 <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>（留空＝用預設；套用於 AI 呼叫與模型測試）</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+                  Temperature (0~2)
+                  <input type="number" step="0.1" min="0" max="2" value={temperature} placeholder="預設"
+                    onChange={e => setTemperature(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, width: 110 }} />
+                </label>
+                <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+                  Max Completion Tokens
+                  <input type="number" min="1" value={maxCompletionTokens} placeholder="如 8000"
+                    onChange={e => setMaxCompletionTokens(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, width: 150 }} />
+                </label>
+                <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
+                  Reasoning Effort（推理模型）
+                  <select value={reasoningEffort} onChange={e => setReasoningEffort(e.target.value)}
+                    style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, minWidth: 120 }}>
+                    <option value="">預設</option>
+                    <option value="minimal">minimal</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <button type="button" className="btn-assess" disabled={saving} onClick={save}
+                  style={{ padding: "9px 18px", borderRadius: 8, fontWeight: 700 }}>
+                  {saving ? "儲存中…" : "儲存參數"}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, marginBottom: 0 }}>
+                提示：推理型模型（gpt-5 系）reasoning_effort 設 low/minimal 可大幅減少思考 token 與延遲；max tokens 太低會導致空輸出。
+              </p>
+            </div>
+
           </div>
 
           {/* ── 多模型競速測試卡片 ── */}
@@ -705,7 +775,13 @@ export default function AdminSettingsPage() {
                                   <span style={{ fontSize: 11, color: "#64748b" }}>⏱ 總計 {(r.totalMs / 1000).toFixed(1)}s</span>
                                 )}
                                 {r.promptTokens !== null && (
-                                  <span style={{ fontSize: 11, color: "#8b5cf6" }}>🔢 {r.promptTokens ?? "–"} in / {r.completionTokens ?? "–"} out</span>
+                                  <span style={{ fontSize: 11, color: "#8b5cf6" }}>
+                                    🔢 {r.promptTokens ?? "–"} in / {r.completionTokens ?? "–"} out
+                                    {r.reasoningTokens ? `（可見 ${r.visibleOutputTokens ?? "–"} + 推理 ${r.reasoningTokens}）` : ""}
+                                  </span>
+                                )}
+                                {r.finishReason && r.finishReason !== "STOP" && (
+                                  <span style={{ fontSize: 11, color: "#d97706" }}>⚑ {r.finishReason}</span>
                                 )}
                               </div>
                             </div>

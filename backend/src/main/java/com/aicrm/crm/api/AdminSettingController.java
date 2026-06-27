@@ -67,7 +67,8 @@ public class AdminSettingController {
     public Dtos.AiSettingsResponse updateAiSettings(@RequestBody Dtos.AiSettingsRequest request,
                                                      Authentication authentication) {
         try {
-            systemSettings.updateAiSettings(request.model(), request.providerId(), request.modelOptions(), resolveUsername(authentication));
+            systemSettings.updateAiSettings(request.model(), request.providerId(), request.modelOptions(),
+                    request.temperature(), request.maxCompletionTokens(), request.reasoningEffort(), resolveUsername(authentication));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }

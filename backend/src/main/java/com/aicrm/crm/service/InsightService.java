@@ -113,6 +113,12 @@ public class InsightService {
      */
     private final int modelTestMaxCompletionTokens;
 
+    /**
+     * 模型測試對「推理型模型（gpt-5 / o1 / o3 系）」帶的 reasoning_effort（minimal/low/medium/high）。
+     * 預設 low，避免推理模型在測試時過度思考而 token/延遲暴增；可由 MODEL_TEST_REASONING_EFFORT 覆蓋。
+     */
+    private final String modelTestReasoningEffort;
+
     public InsightService(CustomerService customers,
                           KnowledgeDocumentRepository knowledgeDocuments,
                           EmbeddingClient embeddingClient,
@@ -123,7 +129,8 @@ public class InsightService {
                           SystemSettingService systemSettings,
                           @Value("${spring.ai.openai.api-key:}") String openAiApiKey,
                           @Value("${spring.ai.openai.base-url:https://api.openai.com}") String defaultOpenAiBaseUrl,
-                          @Value("${app.ai.model-test.max-completion-tokens:8000}") int modelTestMaxCompletionTokens) {
+                          @Value("${app.ai.model-test.max-completion-tokens:8000}") int modelTestMaxCompletionTokens,
+                          @Value("${app.ai.model-test.reasoning-effort:low}") String modelTestReasoningEffort) {
         this.customers = customers;
         this.knowledgeDocuments = knowledgeDocuments;
         this.embeddingClient = embeddingClient;
@@ -136,6 +143,7 @@ public class InsightService {
         this.defaultOpenAiBaseUrl = defaultOpenAiBaseUrl;
         this.defaultOpenAiApiKey = openAiApiKey;
         this.modelTestMaxCompletionTokens = modelTestMaxCompletionTokens;
+        this.modelTestReasoningEffort = modelTestReasoningEffort;
     }
 
     /**
@@ -899,10 +907,20 @@ public class InsightService {
         if (testModel != null) {
             // Spring AI 2.0 的 ChatClient.options() 接受 Builder（非 built object）；
             // 明確帶 maxCompletionTokens，避免 Spring AI 合併後回退送廢棄的 max_tokens（gpt-5.4+ 拒絕此參數）
-            spec = spec.options(org.springframework.ai.openai.OpenAiChatOptions.builder()
+            // 上限與 reasoning_effort 優先採用系統設定（UI 可編輯），未設定才用環境變數預設
+            int maxCompletion = systemSettings.getMaxCompletionTokens().orElse(modelTestMaxCompletionTokens);
+            String reasoningEffort = systemSettings.getReasoningEffort().orElse(modelTestReasoningEffort);
+            var optsBuilder = org.springframework.ai.openai.OpenAiChatOptions.builder()
                     .model(testModel)
                     .maxTokens((Integer) null)        // 明確清除，防止 merge 時帶入 base 的 maxTokens
-                    .maxCompletionTokens(modelTestMaxCompletionTokens)); // 可設定，推理模型需較高上限
+                    .maxCompletionTokens(maxCompletion); // 可設定，推理模型需較高上限
+            // 僅對推理型模型（gpt-5 / o1 / o3 系）帶 reasoning_effort，
+            // 避免送給非推理模型 / 不支援的 gateway 造成 400。降低過度思考的 token 與延遲。
+            var lower = testModel.toLowerCase();
+            if (lower.startsWith("gpt-5") || lower.startsWith("o1") || lower.startsWith("o3")) {
+                optsBuilder.reasoningEffort(reasoningEffort);
+            }
+            spec = spec.options(optsBuilder);
         } else {
             var opts = systemSettings.resolveChatOptions();
             if (opts != null) spec = spec.options(opts);
@@ -944,10 +962,21 @@ public class InsightService {
                     log.info("模型測試完成 model={} finishReason={} prompt={} completion={} total={} hadContent={} nativeUsage={}",
                             model, fr, pt, ct, tt, anyContent.get(), nativeUsage);
 
+                    // 從原生 usage 抽出推理 token（OpenAI: completion_tokens_details.reasoning_tokens），
+                    // 可見輸出 = completion - reasoning，讓推理模型的「out」不再誤導性地灌大。
+                    int reasoningTokens = 0;
+                    if (nativeUsage != null) {
+                        var m = java.util.regex.Pattern.compile("reasoning_?[Tt]okens[=:\\s]+(\\d+)").matcher(nativeUsage);
+                        if (m.find()) {
+                            try { reasoningTokens = Integer.parseInt(m.group(1)); } catch (Exception ignore) {}
+                        }
+                    }
+                    int visibleOut = Math.max(0, ct - reasoningTokens);
+
                     // 沒吐出任何內容：明確告知原因（最常見：finishReason=LENGTH，內容前已達 max_completion_tokens；多為推理模型）
                     if (!anyContent.get()) {
                         String why = "LENGTH".equalsIgnoreCase(fr)
-                                ? "在產出內容前已達 max_completion_tokens 上限（completion=" + ct + "），此模型多為推理型；可調高上限或改用非推理模型。"
+                                ? "在產出內容前已達 max_completion_tokens 上限（completion=" + ct + "，其中推理 " + reasoningTokens + "），此模型多為推理型；可調高上限或降低 reasoning_effort。"
                                 : ("模型回傳空內容（finishReason=" + fr + "，completion=" + ct + "）。");
                         sendContent(emitter, "⚠️ 未取得內容：" + why);
                     }
@@ -955,6 +984,7 @@ public class InsightService {
                         emitter.send(SseEmitter.event().data(Map.of(
                                 "type", "tokens",
                                 "promptTokens", pt, "completionTokens", ct, "totalTokens", tt,
+                                "reasoningTokens", reasoningTokens, "visibleOutputTokens", visibleOut,
                                 "finishReason", fr != null ? fr : "")));
                     } catch (Exception e) {
                         log.warn("送 tokens SSE 失敗：{}", e.getMessage());

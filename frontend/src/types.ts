@@ -441,6 +441,10 @@ export interface AiSettingsResponse {
   providers: AiProviderItem[];
   envDefaultModel: string;
   source: string;
+  /** 可編輯模型參數（null = 未設定，沿用預設） */
+  temperature: number | null;
+  maxCompletionTokens: number | null;
+  reasoningEffort: string | null;
 }
 
 /** 單一模型競速測試結果（供評分 API 傳送）。 */

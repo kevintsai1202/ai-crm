@@ -466,11 +466,16 @@ public final class Dtos {
         List<ModelOptionItem> modelOptions,
         List<AiProviderItem> providers,
         String envDefaultModel,
-        String source
+        String source,
+        // 可編輯模型參數（null/空 = 未設定，沿用預設）
+        Double temperature,
+        Integer maxCompletionTokens,
+        String reasoningEffort
     ) {}
 
     /** AI 設定更新請求。 */
-    public record AiSettingsRequest(String model, Long providerId, List<ModelOptionItem> modelOptions) {}
+    public record AiSettingsRequest(String model, Long providerId, List<ModelOptionItem> modelOptions,
+                                    Double temperature, Integer maxCompletionTokens, String reasoningEffort) {}
 
     /** 模型競速測試請求（providerId 指定使用哪組 API 憑證）。 */
     public record AiTestRequest(String message, String model, Long providerId) {}

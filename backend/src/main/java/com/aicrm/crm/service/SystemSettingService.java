@@ -33,6 +33,12 @@ public class SystemSettingService {
     public static final String KEY_AI_CHAT_MODEL_OPTIONS = "ai.chat.model_options";
     /** 目前選用 provider ID 設定鍵（空字串 = 未指定）。 */
     public static final String KEY_AI_CHAT_PROVIDER_ID = "ai.chat.provider_id";
+    /** 溫度設定鍵（空 = 未設定）。 */
+    public static final String KEY_AI_CHAT_TEMPERATURE = "ai.chat.temperature";
+    /** max_completion_tokens 設定鍵（空 = 未設定）。 */
+    public static final String KEY_AI_CHAT_MAX_COMPLETION_TOKENS = "ai.chat.max_completion_tokens";
+    /** reasoning_effort 設定鍵（空 = 未設定；推理模型用 minimal/low/medium/high）。 */
+    public static final String KEY_AI_CHAT_REASONING_EFFORT = "ai.chat.reasoning_effort";
 
     /** 設定資料存取。 */
     private final SystemSettingRepository repository;
@@ -91,16 +97,57 @@ public class SystemSettingService {
                 .orElseGet(List::of);
     }
 
+    /** 取得溫度設定（空/解析失敗回 empty）。 */
+    @Transactional(readOnly = true)
+    public Optional<Double> getTemperature() {
+        return getNumericSetting(KEY_AI_CHAT_TEMPERATURE, Double::valueOf);
+    }
+
+    /** 取得 max_completion_tokens 設定（空/解析失敗回 empty）。 */
+    @Transactional(readOnly = true)
+    public Optional<Integer> getMaxCompletionTokens() {
+        return getNumericSetting(KEY_AI_CHAT_MAX_COMPLETION_TOKENS, Integer::valueOf);
+    }
+
+    /** 取得 reasoning_effort 設定（空回 empty）。 */
+    @Transactional(readOnly = true)
+    public Optional<String> getReasoningEffort() {
+        return repository.findBySettingKey(KEY_AI_CHAT_REASONING_EFFORT)
+                .map(SystemSetting::getSettingValue)
+                .filter(StringUtils::hasText);
+    }
+
+    /** 共用：讀取數值型設定，解析失敗回 empty。 */
+    private <T> Optional<T> getNumericSetting(String key, java.util.function.Function<String, T> parser) {
+        return repository.findBySettingKey(key)
+                .map(SystemSetting::getSettingValue)
+                .filter(StringUtils::hasText)
+                .map(v -> {
+                    try { return parser.apply(v.strip()); } catch (Exception e) { return null; }
+                });
+    }
+
     /**
-     * 回傳目前模型對應的 ChatOptions Builder；未設定模型時回 null（呼叫端不覆蓋，沿用環境變數預設）。
+     * 回傳目前模型與參數對應的 ChatOptions Builder；模型、溫度、max_completion_tokens、reasoning_effort
+     * 任一有設定就回 builder（只設有值的欄位）；全部未設定才回 null（呼叫端沿用環境變數預設）。
      *
      * @return OpenAiChatOptions.Builder 或 null
      */
     @Transactional(readOnly = true)
     public OpenAiChatOptions.Builder resolveChatOptions() {
-        return getAiChatModel()
-                .map(m -> OpenAiChatOptions.builder().model(m))
-                .orElse(null);
+        var model = getAiChatModel();
+        var temperature = getTemperature();
+        var maxTokens = getMaxCompletionTokens();
+        var reasoning = getReasoningEffort();
+        if (model.isEmpty() && temperature.isEmpty() && maxTokens.isEmpty() && reasoning.isEmpty()) {
+            return null;
+        }
+        var b = OpenAiChatOptions.builder();
+        model.ifPresent(b::model);
+        temperature.ifPresent(b::temperature);
+        maxTokens.ifPresent(mt -> { b.maxTokens((Integer) null); b.maxCompletionTokens(mt); });
+        reasoning.ifPresent(b::reasoningEffort);
+        return b;
     }
 
     /**
@@ -188,7 +235,8 @@ public class SystemSettingService {
         var options = getModelOptions();
         var providers = getProviders();
         var source = current.isBlank() ? "ENV" : "DB";
-        return new Dtos.AiSettingsResponse(current, currentProviderId, options, providers, envDefaultModel, source);
+        return new Dtos.AiSettingsResponse(current, currentProviderId, options, providers, envDefaultModel, source,
+                getTemperature().orElse(null), getMaxCompletionTokens().orElse(null), getReasoningEffort().orElse(null));
     }
 
     /**
@@ -201,16 +249,32 @@ public class SystemSettingService {
      */
     @Transactional
     public void updateAiSettings(String model, Long providerId,
-                                 List<Dtos.ModelOptionItem> modelOptions, String username) {
+                                 List<Dtos.ModelOptionItem> modelOptions,
+                                 Double temperature, Integer maxCompletionTokens, String reasoningEffort,
+                                 String username) {
         var safeModel = model == null ? "" : model.strip();
         var safeOptions = modelOptions == null ? List.<Dtos.ModelOptionItem>of() : modelOptions;
         var modelNames = safeOptions.stream().map(Dtos.ModelOptionItem::model).toList();
         if (!safeModel.isBlank() && !modelNames.contains(safeModel)) {
             throw new IllegalArgumentException("選用模型不在候選清單內：" + safeModel);
         }
+        // 參數驗證：溫度 0~2、max_completion_tokens > 0、reasoning_effort 限定值
+        if (temperature != null && (temperature < 0 || temperature > 2)) {
+            throw new IllegalArgumentException("temperature 需介於 0~2：" + temperature);
+        }
+        if (maxCompletionTokens != null && maxCompletionTokens <= 0) {
+            throw new IllegalArgumentException("max_completion_tokens 需為正整數：" + maxCompletionTokens);
+        }
+        var safeReasoning = reasoningEffort == null ? "" : reasoningEffort.strip().toLowerCase();
+        if (!safeReasoning.isBlank() && !List.of("minimal", "low", "medium", "high").contains(safeReasoning)) {
+            throw new IllegalArgumentException("reasoning_effort 僅能為 minimal/low/medium/high：" + reasoningEffort);
+        }
         upsert(KEY_AI_CHAT_MODEL, safeModel, username);
         upsert(KEY_AI_CHAT_PROVIDER_ID, providerId != null ? providerId.toString() : "", username);
         upsert(KEY_AI_CHAT_MODEL_OPTIONS, serializeModelOptions(safeOptions), username);
+        upsert(KEY_AI_CHAT_TEMPERATURE, temperature != null ? temperature.toString() : "", username);
+        upsert(KEY_AI_CHAT_MAX_COMPLETION_TOKENS, maxCompletionTokens != null ? maxCompletionTokens.toString() : "", username);
+        upsert(KEY_AI_CHAT_REASONING_EFFORT, safeReasoning, username);
     }
 
     /** 解析 ModelOptionItem 清單 JSON；任何錯誤回空清單並記 log。 */
