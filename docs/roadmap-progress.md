@@ -9,7 +9,7 @@
 
 ## 目前進度
 
-> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅；追加 SP8 商機資料模型強化 完成 ✅**　｜　最後完成：SP8（owner/leadSource/probability/closeReason 四欄 + V18 回填 + Forecast 加權 + 漏斗來源切片 + 績效混合口徑；後端 96 測試綠、前端 tsc/build 綠；於 worktree 完成，待 merge）
+> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅、SP8 ✅、SP9-A 示範資料/漏斗 ✅、SP9-B 工作檯個人 AI ✅**　｜　最後完成：SP9-B（工作檯待辦+AI工作建議+建商機草稿+個人問答+AI歷程+SALES隔離；後端 105 測試綠、前端 tsc 綠、Playwright e2e 通過）
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|
@@ -23,8 +23,21 @@
 ## 排序理由
 相依性 + 投報比 + 使用者明確需求：SP1 自足且零後端相依、是使用者點名需求；SP2 在改後端前織測試網；SP3 是 AI 可信度根本；SP4 商用治理；SP5 後端拆分與 CRM 增值；SP6 旗艦差異化。
 
+## 待辦 Backlog（SP9 候選 — AI / UX 體驗強化）
+
+> 2026-06-26 使用者於 SP8 驗收本機環境時提出，**尚未實作**，逐項待 brainstorm → spec → plan。
+
+1. **[已釐清，非 bug] AI base-url 含 /v1 為正確設定**：Spring AI **2.0** 直接使用 base-url、**不自動補 /v1**（框架只接 `/chat/completions`），故 `BASE_URL` 必須含 `/v1`（`application.yml` line 47-51 註解已載明）。實測 base-url 維持 `https://hnd1.aihub.zeabur.ai/v1` 時 chat 正常（首 byte 2s、真 LLM 回答）。**先前誤判**：套用 auto-skill `backend-dev.md` 的 Spring AI **1.x** 舊經驗（「base-url 不可含 /v1」）→ 誤建議去掉 /v1；並把一次偶發瞬時 I/O error（20s + 雙 v1 log）誤歸因為設定。結論：base-url 無需修改；那次 20s 為 AI Hub 瞬時連線錯誤，若再偶發為外部 gateway 問題。**待辦：更新 auto-skill 經驗，標註 Spring AI 1.x↔2.0 base-url 行為相反，避免再誤導。**
+2. **AI 對話 UX：等待動畫 + 逐字顯示**：送出後至首 token 顯示 thinking/loading 動畫；回答逐字（逐塊）呈現。現況：後端 InsightService 已是 Spring AI **真串流**逐塊送 SSE delta；**base-url 修好後前端應已逐塊 append**（先驗證渲染是否已有逐字感，可能只需補等待動畫）。loading 動畫為前端新增。
+3. **對話紀錄保留與載入**：後端 `chat_messages`(V7, SP5) 已持久化每則對話，但前端**關閉/切換客戶後重開看不到歷史**。需：後端新增「取某客戶對話歷史」查詢 API + 前端載入並顯示。待確認：顯示全部或最近 N 則。
+4. **客戶詳情載入過渡畫面**：點選客戶後 `fetchCustomerDetail` 載入較久、缺過渡，體驗不佳。需前端載入中過渡（skeleton / spinner）。
+5. **銷售漏斗管理意義化**：保留真實快照各階段筆數（與看板一致，**否決累積式**），加「各階段停留時間 + 超時示警」使其有行動指引。需新資料維度：每筆商機**進入各階段的時間**。**定案（2026-06-26）：要精準停留天數 → 需完整 StageHistory（記錄每次階段轉換的時間戳），才能算各階段精確停留天數並做超時示警；既有商機無歷史、只能自導入後開始累積。** 五項中工程量最大，須獨立 spec→plan。
+6. **[防呆] BASE_URL 空字串保護**：`${BASE_URL:預設}` 的預設只在「未設」時生效；若設成空字串 `BASE_URL=`（Zeabur 等平台常見「建了變數卻留空」），Spring 會用空字串而非預設。待辦：先驗證 Spring AI 2.0 對空 base-url 是否自動 fallback 至含 /v1 預設；做法二選一（維運規則「別設空字串」 vs 啟動時把空白正規化為含 /v1 預設的小防呆）。
+
 ## 變更紀錄
 
+- 2026-06-27：SP9-B 我的工作檯個人 AI 完成（spec `2026-06-27-workspace-personal-ai-design.md`、plan `2026-06-27-workspace-personal-ai.md`，內聯執行 11 任務 TDD）。後端：`WorkspaceAiService`（computeTodos 純 DB 規則待辦＝高風險/14天內續約/逾期未結商機；streamRecommendation 待辦接地 + AI 總結串流 + deterministic fallback + 規則式商機草稿；streamChat 總覽問答／深入單客戶＋可見性驗證；scope 解析 SALES 強制自己、MANAGER/ADMIN 可切全部）、`WorkspaceController`（/api/workspace/recommendation POST(SSE)/GET、/chat、/history）、SecurityConfig 納入 `/api/workspace/**`、AiCallType 加 WORKSPACE_RECOMMENDATION/WORKSPACE_CHAT、AiGovernanceService.workspaceHistory、CustomerRepository.findByOwnerName。快取改讀 ai_call_log 最近一筆推薦（免新增 manager_insight SELF）。前端：MyWorkspacePage 加 `WorkspaceAiPanel`（待辦可點跳客戶 + AI 總結逐字 + 商機草稿一鍵預填既有 AddOpportunityModal + 個人問答總覽/深入 + AI 歷程 Modal + MANAGER/ADMIN scope 切換）。**後端 105 測試全綠（含隔離/待辦/fallback/401）、前端 tsc 綠、Playwright `e2e/sp9b-workspace-ai.spec.ts` 通過（實測王小明 10 待辦、AI 總結與問答有回應）。** 隔離經 WorkspaceAiServiceTest 驗證 SALES 帶 scope=all 仍只見自己、深入非自己客戶被擋。
+- 2026-06-27：SP9-A 示範資料清除重建 + 漏斗階段遞減完成（commit 44290eb）。根因：示範資料商機階段「均勻」隨機 → 漏斗上下一樣寬。修法：`DemoDataService.generate(customers, reset)` reset 模式依 FK 順序清業務資料（互動分析→互動→聯絡人→商機→對話記憶→客戶，保留帳號/設定/AI稽核歷程）；商機階段改加權遞減 `{35,27,18,13,7}`；業務 8→12 位；安全開關 `app.demo.reset-enabled` 預設 false（正式環境天然安全）、本機 .env `DEMO_RESET_ENABLED=true`。實測 200 客戶清除重建後漏斗 55→34→25→11（資格評估→提案→議價→成交）。全套件 99 綠（+3）。
 - 2026-06-26：SP8 實作完成（subagent-driven，於 worktree `sp8-opportunity-sales-model`，待 merge）。後端：LeadSource/CloseReason enum、Opportunity 七欄（owner FK + 去正規化 ownerName + leadSource/probability/closeReason/closeReasonNote/actualCloseDate）、V18 migration + 回填、商機 API（owner 預設客戶 owner、probability 依階段預設、結案分流、無效 ownerId 回 404、重開清除結案欄位）、Forecast 加權（ForecastPoint：總額 + 排除失單×機率）、漏斗依 leadSource 切片、ManagerAnalytics 混合口徑（商機指標按商機 owner、客戶指標按客戶 owner；回填使切換等價）、DemoDataService 帶新欄位。前端：型別/標籤、Add/Edit Modal 來源+機率、結案原因 Modal、漏斗來源切換、Forecast 雙線。**後端 96 測試全綠（Testcontainers 真 PG）、前端 tsc+build 綠。** 順帶修 `.gitignore` 的 `com/`→`/com/`（原誤傷 src/**/com/ 來源檔）。煙霧 E2E 待 merge 後於 dev 驗證（避免測試時將 V18 套上 dev DB）。
 
 - 2026-06-26：建立 SP8 spec（商機資料模型強化）。緣起為使用者檢視銷售漏斗發現形狀不合理，追查確認根因（快照計數 / CLOSED_WON 吸收態 / 缺來源維度），並盤點出「AI 層豐富、銷售資料層單薄」。SP8 補 `Opportunity` 四欄：owner（FK+去正規化快取，績效口徑改商機 owner，回填保證等價零差異）、leadSource（INBOUND/OUTBOUND/REFERRAL，回填 OUTBOUND）、probability（依階段預設，修月營收 Forecast 未加權失真，保留總額+新增加權線）、closeReason+actualCloseDate（結案必填，歷史留 NULL 不假造）。單一 V18 migration 含加欄位+回填（子查詢版相容 H2/PG，生產與示範環境部署時自動套用），DemoDataService 同步補新欄位。spec：`docs/superpowers/specs/2026-06-26-sp8-opportunity-sales-model-design.md`。狀態：設計中 🟡，待展開 plan 與實作。
