@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { formatMoney } from "../../lib/format";
 import { CustomerList } from "../customers/components/CustomerList";
 import { Pagination } from "../customers/components/Pagination";
+import { WorkspaceAiPanel } from "./WorkspaceAiPanel";
 
 /** 每頁筆數。 */
 const PAGE_SIZE = 20;
@@ -107,6 +108,9 @@ export function MyWorkspacePage() {
             <div className="kpi-card"><span className="kpi-label">高風險客戶</span><span className="kpi-value">{kpis.highRisk}</span></div>
             <div className="kpi-card"><span className="kpi-label">本週續約到期</span><span className="kpi-value">{kpis.weekRenewals}</span></div>
           </div>
+
+          {/* 個人 AI 助理：待辦 + 工作建議 + 商機草稿 + 問答 */}
+          <WorkspaceAiPanel />
 
           {/* 我的客戶列表(點選沿用既有詳情頁) */}
           <div className="mywork-list">
