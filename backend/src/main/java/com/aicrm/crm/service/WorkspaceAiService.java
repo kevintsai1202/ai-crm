@@ -55,6 +55,9 @@ public class WorkspaceAiService {
     /** 系統設定：解析 chat options（max_completion_tokens 等）。 */
     private final SystemSettingService systemSettings;
 
+    /** 單客戶問答委派：深入單客戶時複用既有客戶對話（grounding/PII/治理皆沿用）。 */
+    private final InsightService insightService;
+
     /** 是否啟用真實 LLM（金鑰非空）。 */
     private final boolean aiEnabled;
 
@@ -62,11 +65,13 @@ public class WorkspaceAiService {
                               ObjectProvider<ChatModel> chatModelProvider,
                               AiGovernanceService aiGovernance,
                               SystemSettingService systemSettings,
+                              InsightService insightService,
                               @Value("${spring.ai.openai.api-key:}") String openAiApiKey) {
         this.customerRepository = customerRepository;
         this.chatModelProvider = chatModelProvider;
         this.aiGovernance = aiGovernance;
         this.systemSettings = systemSettings;
+        this.insightService = insightService;
         this.aiEnabled = openAiApiKey != null && !openAiApiKey.isBlank();
     }
 
@@ -223,16 +228,29 @@ public class WorkspaceAiService {
             return emitter;
         }
 
-        // 無金鑰：直接送 deterministic fallback 後收尾
+        streamLlmText(emitter, AiCallType.WORKSPACE_RECOMMENDATION, subject, userPrompt, fallback, chatModel);
+        return emitter;
+    }
+
+    /**
+     * 共用串流核心：訂閱 {@code ChatClient.stream()} 逐塊送 SSE，完成/失敗/空白皆有 deterministic fallback，
+     * 並以 {@code subject} 寫 ai_call_log（customerId 為 null）。回呼於另一執行緒執行，僅使用傳入純值。
+     *
+     * @param emitter SSE 發送器
+     * @param type 呼叫類型（WORKSPACE_RECOMMENDATION / WORKSPACE_CHAT）
+     * @param subject 分群鍵（username）
+     * @param userPrompt 完整提示詞（已含 grounding）
+     * @param fallback 預先算好的 deterministic 保底答案
+     * @param chatModel ChatModel（null 表無金鑰，直接 fallback）
+     */
+    private void streamLlmText(SseEmitter emitter, AiCallType type, String subject,
+                               String userPrompt, String fallback, ChatModel chatModel) {
         if (chatModel == null) {
-            var saved = aiGovernance.record(AiCallType.WORKSPACE_RECOMMENDATION, null, subject, null,
-                    0, 0, 0, false, false, fallback);
+            var saved = aiGovernance.record(type, null, subject, null, 0, 0, 0, false, false, fallback);
             SseHelper.sendContent(emitter, fallback);
             SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
-            return emitter;
+            return;
         }
-
-        // 真串流
         var fullAnswer = new StringBuilder();
         var lastResponse = new AtomicReference<ChatResponse>();
         var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
@@ -251,24 +269,21 @@ public class WorkspaceAiService {
                     }
                 },
                 error -> {
-                    log.warn("工作檯推薦串流失敗，subject={}，改用 fallback：{}", subject, error.getMessage());
+                    log.warn("工作檯串流失敗，type={}，subject={}，改用 fallback：{}", type, subject, error.getMessage());
                     var partial = fullAnswer.toString().strip();
                     if (partial.isBlank()) {
-                        var saved = aiGovernance.record(AiCallType.WORKSPACE_RECOMMENDATION, null, subject, null,
-                                0, 0, 0, false, false, fallback);
+                        var saved = aiGovernance.record(type, null, subject, null, 0, 0, 0, false, false, fallback);
                         SseHelper.sendContent(emitter, fallback);
                         SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
                     } else {
-                        var saved = aiGovernance.record(AiCallType.WORKSPACE_RECOMMENDATION, null, subject, null,
-                                0, 0, 0, true, false, partial);
+                        var saved = aiGovernance.record(type, null, subject, null, 0, 0, 0, true, false, partial);
                         SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
                     }
                 },
                 () -> {
                     var answer = fullAnswer.toString().strip();
                     if (answer.isBlank()) {
-                        var saved = aiGovernance.record(AiCallType.WORKSPACE_RECOMMENDATION, null, subject, null,
-                                0, 0, 0, false, false, fallback);
+                        var saved = aiGovernance.record(type, null, subject, null, 0, 0, 0, false, false, fallback);
                         SseHelper.sendContent(emitter, fallback);
                         SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
                         return;
@@ -279,11 +294,75 @@ public class WorkspaceAiService {
                     Integer pt = usage == null ? null : usage.getPromptTokens();
                     Integer ct = usage == null ? null : usage.getCompletionTokens();
                     Integer tt = usage == null ? null : usage.getTotalTokens();
-                    var saved = aiGovernance.record(AiCallType.WORKSPACE_RECOMMENDATION, null, subject, model,
-                            pt, ct, tt, true, false, answer);
+                    var saved = aiGovernance.record(type, null, subject, model, pt, ct, tt, true, false, answer);
                     SseHelper.sendSimpleTailAndComplete(emitter, saved.getId());
                 }
         );
+    }
+
+    /**
+     * 驗證 customerId 在呼叫者 scope 內，否則拋 EntityNotFoundException（不洩漏存在性）。
+     *
+     * @param principal 認證主體
+     * @param scope 範圍
+     * @param customerId 欲存取的客戶
+     */
+    public void assertCustomerVisible(AuthPrincipal principal, String scope, Long customerId) {
+        boolean visible = loadScopedCustomers(principal, scope).stream()
+                .anyMatch(c -> c.getId().equals(customerId));
+        if (!visible) {
+            throw new jakarta.persistence.EntityNotFoundException("查無此客戶資料：" + customerId);
+        }
+    }
+
+    /**
+     * 個人問答串流。有 customerId：驗證可見性後委派既有單客戶對話；無 customerId：對個人客戶組合做總覽問答。
+     *
+     * @param principal 認證主體
+     * @param req 問答請求（scope / customerId / message）
+     * @return SseEmitter
+     */
+    public SseEmitter streamChat(AuthPrincipal principal, Dtos.WorkspaceChatRequest req) {
+        if (req.customerId() != null) {
+            // 深入單客戶：先驗證可見性，再複用既有客戶對話（含 RAG/PII/治理）
+            assertCustomerVisible(principal, req.scope(), req.customerId());
+            return insightService.streamChat(new Dtos.ChatRequest(req.customerId(), req.message()));
+        }
+        // 總覽問答：以個人客戶組合摘要當 grounding
+        SseEmitter emitter = new SseEmitter(300_000L);
+        var customers = loadScopedCustomers(principal, req.scope());
+        final String subject = principal.username();
+        final String userPrompt = buildPortfolioPrompt(principal, customers, req.message());
+        final String fallback = deterministicPortfolioAnswer(customers);
+        var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
+        streamLlmText(emitter, AiCallType.WORKSPACE_CHAT, subject, userPrompt, fallback, chatModel);
         return emitter;
+    }
+
+    /**
+     * 組個人客戶組合的 grounding 提示詞（名稱 / 風險 / 續約 / 開放商機數），明示不可竄改。
+     */
+    String buildPortfolioPrompt(AuthPrincipal principal, List<Customer> customers, String question) {
+        var today = LocalDate.now();
+        var sb = new StringBuilder();
+        sb.append("以下為業務「").append(principal.displayName()).append("」負責的客戶組合摘要（資料庫事實，請勿更改）：\n");
+        for (var c : customers) {
+            long openOpps = c.getOpportunities().stream().filter(o ->
+                    o.getStage() != OpportunityStage.CLOSED_WON && o.getStage() != OpportunityStage.CLOSED_LOST).count();
+            sb.append("- ").append(c.getName())
+              .append("｜風險:").append(c.getRiskLevel() == null ? "未評" : c.getRiskLevel())
+              .append("｜續約日:").append(c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate())
+              .append("｜進行中商機:").append(openOpps).append("\n");
+        }
+        sb.append("\n（今日為 ").append(today).append("）\n# 業務提問\n").append(question)
+          .append("\n請用繁體中文，只根據上述客戶資料回答，不要編造未列出的客戶或數字。");
+        return sb.toString();
+    }
+
+    /** 總覽問答的 deterministic fallback。 */
+    String deterministicPortfolioAnswer(List<Customer> customers) {
+        long high = customers.stream().filter(c -> "HIGH".equalsIgnoreCase(c.getRiskLevel())).count();
+        return "根據 CRM 資料庫，您目前負責 " + customers.size() + " 位客戶，其中高風險 " + high
+                + " 位。建議優先關注高風險與近期續約客戶。（AI 服務暫不可用，以上為系統統計）";
     }
 }

@@ -73,4 +73,20 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
         assertThat(fallback).contains("艾美高風險客");
         assertThat(fallback).contains("待辦");
     }
+
+    @Test
+    void chatDrilldown_foreignCustomer_isRejected() {
+        var foreign = customerRepository.findByOwnerName("別的業務").get(0);
+        // 艾美不可深入問「別的業務」的客戶
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                () -> workspaceAiService.assertCustomerVisible(sales, "self", foreign.getId()));
+    }
+
+    @Test
+    void chatDrilldown_ownCustomer_isAllowed() {
+        var own = customerRepository.findByOwnerName("艾美").get(0);
+        // 自己的客戶不應拋例外
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                () -> workspaceAiService.assertCustomerVisible(sales, "self", own.getId()));
+    }
 }
