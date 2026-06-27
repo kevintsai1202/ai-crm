@@ -36,12 +36,17 @@ public class InteractionController {
     /** 情緒意圖分類服務：編輯互動後重新分析落庫。 */
     private final SentimentIntentService sentimentIntentService;
 
+    /** 擁有權守衛：強制 SALES 僅能編輯 / 刪除自己負責客戶的互動紀錄。 */
+    private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
+
     public InteractionController(InteractionRepository interactionRepository,
                                  InteractionInsightRepository interactionInsightRepository,
-                                 SentimentIntentService sentimentIntentService) {
+                                 SentimentIntentService sentimentIntentService,
+                                 com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
         this.interactionRepository = interactionRepository;
         this.interactionInsightRepository = interactionInsightRepository;
         this.sentimentIntentService = sentimentIntentService;
+        this.ownershipGuard = ownershipGuard;
     }
 
     /**
@@ -56,6 +61,7 @@ public class InteractionController {
     public Dtos.InteractionResponse update(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateInteractionRequest request) {
         var interaction = interactionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("查無此互動：" + id));
+        ownershipGuard.assertCanAccessOwner(interaction.getCustomer().getOwnerName());
         interaction.updateInfo(request.type(), request.occurredAt(), request.content());
         interactionRepository.saveAndFlush(interaction);
         // 內容已變更，重新分析情緒意圖（deterministic，與編輯流程一致）。
@@ -83,7 +89,11 @@ public class InteractionController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void delete(@PathVariable Long id) {
+        // 先載入並驗證擁有權，避免 SALES 刪除他人客戶的互動紀錄
+        var interaction = interactionRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("查無此互動：" + id));
+        ownershipGuard.assertCanAccessOwner(interaction.getCustomer().getOwnerName());
         interactionInsightRepository.deleteByInteractionId(id);
-        interactionRepository.deleteById(id);
+        interactionRepository.delete(interaction);
     }
 }

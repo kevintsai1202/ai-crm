@@ -74,5 +74,6 @@ public class Contact extends AuditableEntity {
     public String getName() { return name; }
     public String getTitle() { return title; }
     public String getEmail() { return email; }
+    public Customer getCustomer() { return customer; }
 }
 

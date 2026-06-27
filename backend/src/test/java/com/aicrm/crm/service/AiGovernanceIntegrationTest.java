@@ -47,11 +47,14 @@ class AiGovernanceIntegrationTest extends PostgresTestBase {
     @Test
     void chatLogsCall_feedbackPersists_usageRbacEnforced() throws Exception {
         var salesToken = login("sales@aurora.local");
+        // 客戶存取已加擁有權守衛（SALES 僅能存取自己負責客戶）；本測試聚焦治理記錄與用量 RBAC，
+        // 與業務歸屬無關，故 chat 以 ADMIN 登入（可存取既有客戶，繞過歸屬限制）。
+        var adminToken = login("admin@aurora.local");
 
-        // 1. SALES 呼叫 /api/ai/chat → 200 且回應含 callId（非 null）
+        // 1. 呼叫 /api/ai/chat → 200 且回應含 callId（非 null）
         var chatBody = "{\"customerId\":1,\"message\":\"請評估\"}";
         var chatJson = mockMvc().perform(post("/api/ai/chat")
-                        .header("Authorization", "Bearer " + salesToken)
+                        .header("Authorization", "Bearer " + adminToken)
                         .accept(MediaType.APPLICATION_JSON)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(chatBody))

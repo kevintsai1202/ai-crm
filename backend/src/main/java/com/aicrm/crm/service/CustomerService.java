@@ -55,6 +55,9 @@ public class CustomerService {
     /** 聯絡人存取：新增客戶聯絡人時持久化。 */
     private final ContactRepository contacts;
 
+    /** 擁有權守衛：單一客戶存取時強制 SALES 僅能操作自己負責的客戶。 */
+    private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
+
     /** Entity/DTO 轉換工具。 */
     private final CustomerMapper mapper = new CustomerMapper();
 
@@ -63,13 +66,15 @@ public class CustomerService {
                            InteractionInsightRepository interactionInsights,
                            InteractionRepository interactionRepository,
                            AppUserRepository users,
-                           ContactRepository contacts) {
+                           ContactRepository contacts,
+                           com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
         this.customers = customers;
         this.sentimentIntentService = sentimentIntentService;
         this.interactionInsights = interactionInsights;
         this.interactionRepository = interactionRepository;
         this.users = users;
         this.contacts = contacts;
+        this.ownershipGuard = ownershipGuard;
     }
 
     /**
@@ -245,8 +250,12 @@ public class CustomerService {
      */
     @Transactional(readOnly = true)
     public Customer findDetail(Long id) {
-        return customers.findDetailById(id)
+        var customer = customers.findDetailById(id)
                 .orElseThrow(() -> new EntityNotFoundException("查無此客戶資料：" + id));
+        // 單一客戶存取的集中鎖點：客戶 CRUD（getDetail/update/updateStatus/addContact/addInteraction）
+        // 與 AI chat/assessment 皆經此載入，於此強制 SALES 僅能存取自己負責的客戶（防 IDOR 水平越權）。
+        ownershipGuard.assertCanAccessOwner(customer.getOwnerName());
+        return customer;
     }
 
     /**

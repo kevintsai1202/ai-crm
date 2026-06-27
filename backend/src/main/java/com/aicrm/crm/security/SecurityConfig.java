@@ -62,8 +62,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/manager/**").hasAnyRole("MANAGER", "ADMIN")
                         .requestMatchers("/api/dev/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/customers/**", "/api/opportunities/**", "/api/dashboard/**", "/api/ai/**", "/api/agent/**", "/api/me/**", "/api/workspace/**").authenticated()
-                        .anyRequest().permitAll()
+                        .requestMatchers("/api/customers/**", "/api/opportunities/**", "/api/contacts/**", "/api/interactions/**", "/api/dashboard/**", "/api/ai/**", "/api/agent/**", "/api/me/**", "/api/workspace/**").authenticated()
+                        // 預設拒絕：未明確列為公開（line 58）的端點一律需認證，避免日後新增 Controller 因漏列白名單而裸露。
+                        .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {

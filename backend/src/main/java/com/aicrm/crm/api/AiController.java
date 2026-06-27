@@ -33,11 +33,16 @@ public class AiController {
     /** AI 治理服務：採納/拒絕回饋與用量彙總。 */
     private final AiGovernanceService aiGovernanceService;
 
+    /** 擁有權守衛：客戶 AI 歷程查詢時強制 SALES 僅能讀自己負責客戶。 */
+    private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
+
     public AiController(InsightService insightService, KnowledgeIndexer knowledgeIndexer,
-                        AiGovernanceService aiGovernanceService) {
+                        AiGovernanceService aiGovernanceService,
+                        com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
         this.insightService = insightService;
         this.knowledgeIndexer = knowledgeIndexer;
         this.aiGovernanceService = aiGovernanceService;
+        this.ownershipGuard = ownershipGuard;
     }
 
     /**
@@ -158,6 +163,8 @@ public class AiController {
      */
     @GetMapping("/customers/{id}/calls")
     public java.util.List<Dtos.AiCallHistoryItem> customerCalls(@PathVariable Long id) {
+        // 此端點不經 CustomerService.findDetail，需自行擋下 SALES 跨客戶讀取 AI 歷程
+        ownershipGuard.assertCanAccessCustomer(id);
         return aiGovernanceService.customerCallHistory(id);
     }
 

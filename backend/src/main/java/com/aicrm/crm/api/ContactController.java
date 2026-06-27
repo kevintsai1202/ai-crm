@@ -23,8 +23,13 @@ public class ContactController {
     /** 聯絡人資料存取介面。 */
     private final ContactRepository contactRepository;
 
-    public ContactController(ContactRepository contactRepository) {
+    /** 擁有權守衛：強制 SALES 僅能編輯 / 刪除自己負責客戶的聯絡人。 */
+    private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
+
+    public ContactController(ContactRepository contactRepository,
+                             com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
         this.contactRepository = contactRepository;
+        this.ownershipGuard = ownershipGuard;
     }
 
     /**
@@ -39,6 +44,7 @@ public class ContactController {
     public Dtos.ContactResponse update(@PathVariable Long id, @Valid @RequestBody Dtos.UpdateContactRequest request) {
         var contact = contactRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("查無此聯絡人：" + id));
+        ownershipGuard.assertCanAccessOwner(contact.getCustomer().getOwnerName());
         contact.updateInfo(request.name(), request.title(), request.email());
         contactRepository.save(contact);
         return new Dtos.ContactResponse(contact.getId(), contact.getName(), contact.getTitle(), contact.getEmail());
@@ -53,6 +59,10 @@ public class ContactController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void delete(@PathVariable Long id) {
-        contactRepository.deleteById(id);
+        // 先載入並驗證擁有權，避免 SALES 刪除他人客戶的聯絡人
+        var contact = contactRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("查無此聯絡人：" + id));
+        ownershipGuard.assertCanAccessOwner(contact.getCustomer().getOwnerName());
+        contactRepository.delete(contact);
     }
 }
