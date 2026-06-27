@@ -1,6 +1,12 @@
 server:
   port: 18080
 
+logging:
+  level:
+    org.springframework.web.client.RestClient: DEBUG
+    org.springframework.web.reactive.function.client.WebClient: DEBUG
+    org.springframework.ai: DEBUG
+    com.aicrm.crm.service.embedding.VoyageEmbeddingClient: DEBUG
 
 spring:
   application:
@@ -71,6 +77,11 @@ app:
   risk:
     daily-recompute:
       enabled: ${APP_RISK_DAILY_RECOMPUTE_ENABLED:true}
+  # 示範資料「清除重建」開關：預設 false（安全側）。
+  # 正式環境務必維持 false，避免 /api/dev/generate-demo-data?reset=true 誤刪真實業務資料；
+  # 開發 / 示範環境以 DEMO_RESET_ENABLED=true 啟用。
+  demo:
+    reset-enabled: ${DEMO_RESET_ENABLED:false}
 
 ---
 spring:

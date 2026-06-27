@@ -24,13 +24,19 @@ public class DevController {
     }
 
     /**
-     * 生成示範資料（附加，不清既有資料）。
+     * 生成示範資料。預設清除重建（reset=true），先清掉既有業務資料再重建，
+     * 使漏斗等報表呈現乾淨的示範分布；reset=false 則沿用附加模式。
+     *
+     * <p>清除重建需後端啟用 {@code app.demo.reset-enabled=true}（正式環境應維持關閉）。</p>
      *
      * @param customers 欲生成的客戶數（預設 200）
+     * @param reset 是否先清除既有業務資料再重建（預設 true）
      * @return 生成統計（客戶數 / 互動數 / 分析筆數）
      */
     @PostMapping("/generate-demo-data")
-    public DemoDataService.DemoStats generateDemoData(@RequestParam(defaultValue = "200") int customers) {
-        return demoDataService.generate(customers);
+    public DemoDataService.DemoStats generateDemoData(
+            @RequestParam(defaultValue = "200") int customers,
+            @RequestParam(defaultValue = "true") boolean reset) {
+        return demoDataService.generate(customers, reset);
     }
 }

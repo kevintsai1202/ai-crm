@@ -1,6 +1,7 @@
 package com.aicrm.crm.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.aicrm.crm.domain.Intent;
 import com.aicrm.crm.repository.InteractionInsightRepository;
@@ -10,6 +11,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * 示範資料生成器整合測試（Testcontainers pgvector + V8 套用）。
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * <p>驗證 {@code DemoDataService.generate} 後：互動與 interaction_insights 筆數成長、
  * 每筆互動都有對應 insight（待分析互動數歸零）、且意圖分布含多類（≥3 種 intent 出現）。</p>
  */
+@TestPropertySource(properties = "app.demo.reset-enabled=false") // 明確釘關閉，不受本機 .env 的 DEMO_RESET_ENABLED 影響
 class DemoDataIntegrationTest extends PostgresTestBase {
 
     @Autowired DemoDataService demoDataService;
@@ -55,5 +58,16 @@ class DemoDataIntegrationTest extends PostgresTestBase {
             distinctIntents.add(((Intent) row[0]).name());
         }
         assertThat(distinctIntents).hasSizeGreaterThanOrEqualTo(3);
+    }
+
+    /**
+     * 安全防護：預設未啟用 reset-enabled 時，要求清除重建（reset=true）必須拋例外，
+     * 避免正式環境誤刪真實業務資料。
+     */
+    @Test
+    void generateWithReset_whenDisabled_shouldThrow() {
+        assertThatThrownBy(() -> demoDataService.generate(3, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEMO_RESET_ENABLED");
     }
 }

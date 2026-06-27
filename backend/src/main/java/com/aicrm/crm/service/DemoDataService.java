@@ -12,7 +12,11 @@ import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.OpportunityType;
 import com.aicrm.crm.domain.Role;
 import com.aicrm.crm.repository.AppUserRepository;
+import com.aicrm.crm.repository.ChatMessageRepository;
+import com.aicrm.crm.repository.ContactRepository;
 import com.aicrm.crm.repository.CustomerRepository;
+import com.aicrm.crm.repository.InteractionInsightRepository;
+import com.aicrm.crm.repository.InteractionRepository;
 import com.aicrm.crm.repository.OpportunityRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -71,10 +75,17 @@ public class DemoDataService {
             "半導體", "金融", "醫療", "零售", "製造", "電信", "教育", "物流", "餐飲", "電商"
     };
 
-    /** 負責業務常數池。 */
+    /** 負責業務常數池（12 位，讓「業務績效」分布更分散、示範更真實）。 */
     private static final String[] OWNERS = {
-            "王小明", "李美華", "張志豪", "陳怡君", "林家豪", "黃淑芬", "吳俊賢", "劉雅婷"
+            "王小明", "李美華", "張志豪", "陳怡君", "林家豪", "黃淑芬",
+            "吳俊賢", "劉雅婷", "蔡承翰", "鄭雅文", "許志明", "周庭瑋"
     };
+
+    /**
+     * 商機階段的「漏斗權重」：越前段越多，使快照計數天然呈現上寬下窄的漏斗。
+     * 順序對應 {@link OpportunityStage}：資格評估 / 提案 / 議價 / 已成交 / 已流失。
+     */
+    private static final int[] STAGE_WEIGHTS = {35, 27, 18, 13, 7};
 
     /**
      * 每個 Intent 一組中文互動範本。
@@ -143,6 +154,18 @@ public class DemoDataService {
     /** 商機資料存取。 */
     private final OpportunityRepository opportunityRepository;
 
+    /** 互動資料存取：清除重建時刪除既有互動。 */
+    private final InteractionRepository interactionRepository;
+
+    /** 互動分析（衍生資料）存取：清除重建時先刪除，避免 FK 殘留。 */
+    private final InteractionInsightRepository interactionInsightRepository;
+
+    /** 聯絡人資料存取：清除重建時刪除既有客戶聯絡人（FK 參照 customers）。 */
+    private final ContactRepository contactRepository;
+
+    /** 對話記憶存取：清除重建時刪除綁定既有客戶的對話（FK 參照 customers，not null）。 */
+    private final ChatMessageRepository chatMessageRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -152,16 +175,32 @@ public class DemoDataService {
     /** 密碼雜湊：自動建立業務帳號的預設密碼。 */
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * 清除重建開關：預設 false（安全側）。正式環境保持 false 以防誤刪真實業務資料；
+     * 開發 / 示範環境以 {@code DEMO_RESET_ENABLED=true} 啟用。
+     */
+    private final boolean resetEnabled;
+
     public DemoDataService(CustomerRepository customerRepository,
                            OpportunityRepository opportunityRepository,
+                           InteractionRepository interactionRepository,
+                           InteractionInsightRepository interactionInsightRepository,
+                           ContactRepository contactRepository,
+                           ChatMessageRepository chatMessageRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           @org.springframework.beans.factory.annotation.Value("${app.demo.reset-enabled:false}") boolean resetEnabled) {
         this.customerRepository = customerRepository;
         this.opportunityRepository = opportunityRepository;
+        this.interactionRepository = interactionRepository;
+        this.interactionInsightRepository = interactionInsightRepository;
+        this.contactRepository = contactRepository;
+        this.chatMessageRepository = chatMessageRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.resetEnabled = resetEnabled;
     }
 
     /**
@@ -218,6 +257,60 @@ public class DemoDataService {
         @CacheEvict(CacheConfig.CACHE_DASHBOARD_SENTIMENT)
     })
     public DemoStats generate(int customers) {
+        return generate(customers, false);
+    }
+
+    /**
+     * 生成示範資料，可選擇先清除既有業務資料再重建。
+     *
+     * <p>{@code reset=true}（清除重建）僅在 {@code app.demo.reset-enabled=true} 時允許；
+     * 清除範圍限「業務資料」：互動分析 → 互動 → 商機 → 客戶（依 FK 順序），
+     * 不動帳號（app_users）、系統設定、AI 呼叫歷程與對話記憶。</p>
+     *
+     * @param customers 欲生成的客戶數
+     * @param reset 是否先清除既有業務資料再重建
+     * @return 生成統計（客戶數 / 互動數 / 分析筆數）
+     * @throws IllegalStateException reset=true 但未啟用 {@code app.demo.reset-enabled}
+     */
+    @Caching(evict = {
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_SUMMARY),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_REPORTS),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_RFM),
+        @CacheEvict(CacheConfig.CACHE_DASHBOARD_SENTIMENT)
+    })
+    public DemoStats generate(int customers, boolean reset) {
+        if (reset) {
+            if (!resetEnabled) {
+                throw new IllegalStateException(
+                        "示範資料清除重建未啟用：請於開發 / 示範環境設定 DEMO_RESET_ENABLED=true，"
+                        + "正式環境請維持關閉以保護真實業務資料。");
+            }
+            clearBusinessData();
+        }
+        return doGenerate(customers);
+    }
+
+    /**
+     * 依 FK 順序清除「業務資料」：互動分析 → 互動 → 商機 → 客戶。
+     * 帳號、系統設定、AI 歷程、對話記憶不在清除範圍。
+     */
+    private void clearBusinessData() {
+        interactionInsightRepository.deleteAllInBatch();
+        interactionRepository.deleteAllInBatch();
+        contactRepository.deleteAllInBatch();
+        opportunityRepository.deleteAllInBatch();
+        chatMessageRepository.deleteAllInBatch();
+        customerRepository.deleteAllInBatch();
+        log.info("示範資料清除完成（互動分析 / 互動 / 聯絡人 / 商機 / 對話記憶 / 客戶）；帳號、設定與 AI 稽核歷程保留。");
+    }
+
+    /**
+     * 實際生成邏輯（不含清除）。
+     *
+     * @param customers 欲生成的客戶數
+     * @return 生成統計
+     */
+    private DemoStats doGenerate(int customers) {
         var random = new Random(SEED);
         // 確保示範業務皆有對應 SALES 帳號，客戶以正規關聯指派給帳號
         var owners = ensureOwnerAccounts();
@@ -306,7 +399,7 @@ public class DemoDataService {
      * @return 商機實體
      */
     private Opportunity buildOpportunity(Random random, Customer customer) {
-        var stage = pick(random, OPPORTUNITY_STAGES);
+        var stage = pickStage(random);
         var type = pick(random, OPPORTUNITY_TYPES);
         // 金額 10 萬 – 510 萬，整數萬元
         var amount = BigDecimal.valueOf((10 + random.nextInt(500)) * 10_000L);
@@ -342,5 +435,29 @@ public class DemoDataService {
      */
     private <T> T pick(Random random, T[] pool) {
         return pool[random.nextInt(pool.length)];
+    }
+
+    /**
+     * 依 {@link #STAGE_WEIGHTS} 加權挑選商機階段：越前段權重越高，
+     * 使大量生成後的階段快照天然呈現上寬下窄的漏斗。
+     *
+     * @param random 固定種子亂數源
+     * @return 加權後的商機階段
+     */
+    private OpportunityStage pickStage(Random random) {
+        int totalWeight = 0;
+        for (int w : STAGE_WEIGHTS) {
+            totalWeight += w;
+        }
+        int roll = random.nextInt(totalWeight);
+        int cumulative = 0;
+        for (int i = 0; i < OPPORTUNITY_STAGES.length; i++) {
+            cumulative += STAGE_WEIGHTS[i];
+            if (roll < cumulative) {
+                return OPPORTUNITY_STAGES[i];
+            }
+        }
+        // 理論上不會到這（roll < totalWeight），保險回最後一個階段
+        return OPPORTUNITY_STAGES[OPPORTUNITY_STAGES.length - 1];
     }
 }
