@@ -12,11 +12,14 @@ import { FormEvent } from "react";
 export function AddOpportunityModal({
   customerName,
   onSubmit,
-  onClose
+  onClose,
+  initialValues
 }: {
   customerName: string;
   onSubmit: (data: { name: string; stage: string; amount: number; expectedCloseDate: string | null; type: string; leadSource: string; probability: number | null }) => void;
   onClose: () => void;
+  /** 選填預填值（供 AI 建議商機草稿帶入名稱/階段；其餘維持原預設）。 */
+  initialValues?: { name?: string; stage?: string };
 }) {
   /** 解析表單並回傳資料;金額轉數字,預計成交日空字串轉 null。 */
   function handle(e: FormEvent<HTMLFormElement>) {
@@ -40,9 +43,9 @@ export function AddOpportunityModal({
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
         <h3>新增商機 — {customerName}</h3>
-        <label>商機名稱 <input name="name" type="text" required placeholder="例:智慧工廠擴充授權" /></label>
+        <label>商機名稱 <input name="name" type="text" required placeholder="例:智慧工廠擴充授權" defaultValue={initialValues?.name ?? ""} /></label>
         <label>階段
-          <select name="stage" required defaultValue="QUALIFICATION">
+          <select name="stage" required defaultValue={initialValues?.stage ?? "QUALIFICATION"}>
             <option value="QUALIFICATION">資格評估</option>
             <option value="PROPOSAL">提案</option>
             <option value="NEGOTIATION">議價</option>

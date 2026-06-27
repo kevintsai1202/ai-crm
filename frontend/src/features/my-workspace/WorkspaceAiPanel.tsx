@@ -5,12 +5,14 @@ import remarkGfm from "remark-gfm";
 import {
   fetchWorkspaceRecommendation,
   streamWorkspaceRecommendation,
+  createOpportunity,
   type SseChunk
 } from "../../api";
 import type { WorkspaceTodoItem, SuggestedOpportunityDraft } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { AiBadge } from "../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
+import { AddOpportunityModal } from "../customers/components/AddOpportunityModal";
 
 /** 待辦類型對應的中文標籤與色票。 */
 const TODO_META: Record<string, { label: string; cls: string }> = {
@@ -36,6 +38,8 @@ export function WorkspaceAiPanel() {
   const [summary, setSummary] = useState("");
   const [generating, setGenerating] = useState(false);
   const [model, setModel] = useState<string | null>(null);
+  // 正在以哪一筆草稿開啟新增商機 Modal（null 為未開）
+  const [draftFor, setDraftFor] = useState<SuggestedOpportunityDraft | null>(null);
 
   // 進區塊 / 切換範圍：讀上次總結 + 即時待辦
   useEffect(() => {
@@ -131,10 +135,30 @@ export function WorkspaceAiPanel() {
               <li key={i} className="draft-card">
                 <div><strong>{d.customerName}</strong>｜{d.name}</div>
                 <div className="draft-rationale">{d.rationale}</div>
+                <button type="button" className="btn-secondary" onClick={() => setDraftFor(d)}>建立</button>
               </li>
             ))}
           </ul>
         </div>
+      ) : null}
+
+      {/* AI 草稿 → 預填新增商機 Modal；確認後走既有建立流程 */}
+      {draftFor ? (
+        <AddOpportunityModal
+          customerName={draftFor.customerName}
+          initialValues={{ name: draftFor.name, stage: draftFor.suggestedStage }}
+          onClose={() => setDraftFor(null)}
+          onSubmit={async (data) => {
+            try {
+              await createOpportunity({ customerId: draftFor.customerId, ...data });
+              // 建立成功後關閉並移除該草稿
+              setDrafts((prev) => prev.filter((x) => x !== draftFor));
+              setDraftFor(null);
+            } catch (e) {
+              console.error("建立商機失敗:", e);
+            }
+          }}
+        />
       ) : null}
     </section>
   );
