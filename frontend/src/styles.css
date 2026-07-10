@@ -1,3 +1,5 @@
+@import "./styles/skeleton.css";
+
 :root {
   color-scheme: light;
   font-family: "Microsoft JhengHei UI", "Segoe UI", sans-serif;
@@ -873,31 +875,6 @@ button {
 .loading-line,
 .empty-state {
   color: #506371;
-}
-
-/* 客戶詳情等區塊 skeleton */
-.skeleton-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  min-height: 4rem;
-}
-.skeleton-line {
-  height: 0.75rem;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #e8ecf2 25%, #f4f6f9 50%, #e8ecf2 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.2s ease-in-out infinite;
-}
-.skeleton-line.w-30 { width: 30%; }
-.skeleton-line.w-40 { width: 40%; }
-.skeleton-line.w-50 { width: 50%; }
-.skeleton-line.w-60 { width: 60%; }
-.skeleton-line.w-70 { width: 70%; }
-.skeleton-line.h-lg { height: 1.4rem; }
-@keyframes skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
 }
 
 .skeleton-list {

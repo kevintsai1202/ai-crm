@@ -12,6 +12,17 @@
 > 不要急著蓋 PRD 的 6 大旗艦模組（二樓），先用兩週把 **pgvector、測試、PII** 三件地基補好，
 > 接著做 **RFM 分群 + 情緒雷達**，就能從「教學專案」變成「可賣的 AI CRM MVP」。
 
+## 2026-07 現況附錄（SP1–SP15）
+
+原報告中「零測試／假 RAG／無 PII／App.tsx 巨石」**已過時**。至 2026-07：
+
+- 後端大量單元＋整合測試（Testcontainers pgvector）、PII 遮罩、AI 治理與用量
+- 真 pgvector RAG + **chunk 級** embedding（V19）、對話記憶與前端歷史 hydrate
+- 前端 Router + features 拆分、儀表板可編排、工作檯個人 AI
+- 商機 StageHistory + 漏斗停留／超時（V20）
+- 生產防呆（BASE_URL 正規化、prod 關 demo reset、限流）
+- Agent Trace 仍為**教學用決策流程模擬**，勿對外宣稱 multi-agent
+
 ---
 
 ## 1. 定位判斷

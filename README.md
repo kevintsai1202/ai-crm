@@ -63,7 +63,7 @@ pnpm run dev -- --port 5175 --host 127.0.0.1
 - `GET /api/dashboard/summary`
 - `GET /api/dashboard/reports`
 - `POST /api/ai/chat`
-- `GET /api/agent/customers/{id}/trace`
+- `GET /api/agent/customers/{id}/trace`（**教學用決策流程 Trace 模擬**，非多步 tool-calling Agent）
 
 ## 圖表與宣傳截圖
 

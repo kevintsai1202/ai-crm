@@ -16,5 +16,7 @@ app:
     # 測試用 JWT 密鑰（≥32 字元）：避免 JwtService fail-fast 導致整合測試 context 載入失敗。
     # 正式環境一律由環境變數 APP_SECURITY_JWT_SECRET 提供，切勿沿用此測試值。
     jwt-secret: "test-only-jwt-secret-please-change-1234567890abcd"
+  rate-limit:
+    enabled: false
   voyage:
     api-key: ""

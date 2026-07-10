@@ -7,6 +7,7 @@ import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.domain.OpportunityStage;
+import com.aicrm.crm.service.ai.AiGroundingService;
 import com.aicrm.crm.service.ai.RagCitationService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -71,6 +72,9 @@ public class InsightService {
     /** RAG 引用（chunk → 文件 → similarityHint）。 */
     private final RagCitationService ragCitations;
 
+    /** Grounding 組裝（客戶資料 + 風險 + 引用 + 記憶）。 */
+    private final AiGroundingService grounding;
+
     /**
      * OpenAI ChatModel 提供者。
      * 注意：Spring AI 2.0 即使 api-key 為空仍會建立此 bean，故不可僅以 bean 是否存在判斷是否啟用。
@@ -113,6 +117,7 @@ public class InsightService {
 
     public InsightService(CustomerService customers,
                           RagCitationService ragCitations,
+                          AiGroundingService grounding,
                           ObjectProvider<ChatModel> chatModelProvider,
                           AiGovernanceService aiGovernance,
                           ChatMemoryService chatMemory,
@@ -123,6 +128,7 @@ public class InsightService {
                           @Value("${app.ai.model-test.reasoning-effort:low}") String modelTestReasoningEffort) {
         this.customers = customers;
         this.ragCitations = ragCitations;
+        this.grounding = grounding;
         this.chatModelProvider = chatModelProvider;
         this.aiGovernance = aiGovernance;
         this.chatMemory = chatMemory;
@@ -190,7 +196,7 @@ public class InsightService {
         // 在交易內先把 deterministic fallback 文字算好（會讀 customer LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        var prompt = buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
 
         // 對話：最終答案出爐後才存「本輪 user + assistant」對話記憶（延後到串流完成，保持首字延遲低）
         streamAnswer(emitter, AiCallType.CHAT, customerId, chatModel, prompt, citations, risk, fallbackAnswer,
@@ -220,7 +226,7 @@ public class InsightService {
         // 在交易內先算好 fallback 文字（讀 LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        var prompt = buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION;
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION;
 
         // 評估非對話，不寫對話記憶 → onFinalAnswer 傳 null
         streamAnswer(emitter, AiCallType.ASSESSMENT, customerId, chatModel, prompt, citations, risk, fallbackAnswer, null);
@@ -376,7 +382,7 @@ public class InsightService {
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
         var citations = ragCitations.loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
-        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION);
+        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION);
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
     }
 
@@ -477,93 +483,8 @@ public class InsightService {
      * @return 回答文字
      */
     private LlmResult buildAnswer(AiCallType type, Customer customer, Dtos.RiskResponse risk, List<Dtos.CitationResponse> citations, String memory, String userMessage) {
-        var prompt = buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
         return callLlm(type, customer, risk, prompt);
-    }
-
-    /**
-     * 組裝餵給 LLM 的 grounding context：客戶完整資料、風險與知識庫引用。
-     * 函式級註解：擴充為完整互動歷史（近 20 筆）、所有商機與聯絡人，讓 LLM 能做整體評估而非僅看單筆互動。
-     *
-     * @param customer 客戶實體
-     * @param risk 風險評分
-     * @param citations RAG 引用
-     * @param memory 對話記憶區塊（可為空字串；本方法會過 PII 遮罩後併入）
-     * @return grounding context 文字
-     */
-    private String buildGroundingContext(Customer customer, Dtos.RiskResponse risk, List<Dtos.CitationResponse> citations, String memory) {
-        var knowledge = citations.stream()
-                .map(c -> "- [" + c.docType() + "] " + c.title() + "：" + c.content())
-                .collect(Collectors.joining("\n"));
-        // 對話記憶送 LLM 前過 PII 遮罩；無記憶時不額外輸出區塊
-        var maskedMemory = (memory == null || memory.isBlank()) ? "" : PiiMasker.mask(memory) + "\n\n";
-        return """
-                %s%s
-
-                # 風險評分（系統計算，請勿更改數字）
-                流失風險：%d 分
-                續約延遲風險：%d 分
-                風險原因：%s
-
-                # 知識庫引用
-                %s
-                """.formatted(
-                maskedMemory,
-                // PII 遮罩只作用在「送 LLM 的 grounding context」：遮蔽客戶資料中的 email/電話/統編
-                PiiMasker.mask(customerContext(customer)),
-                risk.churnRisk(),
-                risk.renewalDelayRisk(),
-                risk.reasons().isEmpty() ? "無顯著風險訊號" : String.join("、", risk.reasons()),
-                knowledge.isBlank() ? "（無可用引用）" : knowledge);
-    }
-
-    /**
-     * 組裝單一客戶的完整資料區塊：基本資料、合約、聯絡人、商機、互動歷史。
-     *
-     * @param customer 客戶實體
-     * @return 客戶資料 Markdown 區塊
-     */
-    private String customerContext(Customer customer) {
-        var contacts = customer.getContacts().stream()
-                .map(c -> "- " + c.getName() + "（" + c.getTitle() + " / " + c.getEmail() + "）")
-                .collect(Collectors.joining("\n"));
-        var opportunities = customer.getOpportunities().stream()
-                .map(o -> "- " + o.getName() + "｜階段 " + o.getStage() + "｜金額 " + o.getAmount()
-                        + "｜預計成交 " + (o.getExpectedCloseDate() == null ? "未定" : o.getExpectedCloseDate())
-                        + "｜類型 " + o.getType())
-                .collect(Collectors.joining("\n"));
-        var interactions = customer.getInteractions().stream()
-                .sorted(Comparator.comparing(Interaction::getOccurredAt).reversed())
-                .limit(20)
-                .map(i -> "- [" + i.getOccurredAt().toLocalDate() + "][" + i.getType() + "] " + i.getContent())
-                .collect(Collectors.joining("\n"));
-        return """
-                # 客戶資料
-                名稱：%s
-                產業：%s
-                負責業務：%s
-                狀態：%s
-                合約起訖：%s ~ %s
-                預計續約日：%s
-
-                ## 聯絡人
-                %s
-
-                ## 商機（Pipeline）
-                %s
-
-                ## 互動歷史（近 20 筆，新到舊）
-                %s""".formatted(
-                customer.getName(),
-                customer.getIndustry(),
-                customer.getOwnerName(),
-                customer.getStatus(),
-                customer.getContractStartDate() == null ? "未定" : customer.getContractStartDate(),
-                customer.getContractEndDate() == null ? "未定" : customer.getContractEndDate(),
-                customer.getRenewalDueDate() == null ? "未設定" : customer.getRenewalDueDate(),
-                contacts.isBlank() ? "（無聯絡人資料）" : contacts,
-                opportunities.isBlank() ? "（無商機）" : opportunities,
-                interactions.isBlank() ? "（無互動紀錄）" : interactions);
     }
 
     /**

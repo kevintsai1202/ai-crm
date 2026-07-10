@@ -1,0 +1,11 @@
+from pathlib import Path
+p = Path(r"d:/GitHub/ai-crm/frontend/src/api/rest.ts")
+t = p.read_text(encoding="utf-8")
+t = t.replace("from './types'", "from '../types'")
+t = t.replace('from "./types"', 'from "../types"')
+t = t.replace("from './types'", "from '../types'")
+# also import type paths like import("./types")
+t = t.replace('import("./types")', 'import("../types")')
+t = t.replace("import('./types')", "import('../types')")
+p.write_text(t, encoding="utf-8")
+print("fixed")

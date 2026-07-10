@@ -64,6 +64,11 @@ app:
     # 預設留空，啟動時由 JwtService 做 fail-fast 檢查，杜絕使用公開預設值（避免認證繞過）。
     jwt-secret: ${APP_SECURITY_JWT_SECRET:}
     token-ttl-seconds: 28800
+  # 簡易限流（SP15）：登入與 AI 高成本端點；測試 profile 可關。
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    login-per-minute: ${APP_RATE_LIMIT_LOGIN_PER_MINUTE:30}
+    ai-per-minute: ${APP_RATE_LIMIT_AI_PER_MINUTE:60}
   # Voyage 向量嵌入設定：api-key 取自 .env / 環境變數 VOYAGE_API_KEY，未設定時為空字串，
   # 此時 VoyageEmbeddingClient 走 deterministic fallback。model/url/dimension 對應 Voyage embeddings API。
   voyage:
