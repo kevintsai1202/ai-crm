@@ -24,7 +24,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * 頁面重整後可還原顯示名稱 / 角色，401 事件自動清除。
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserResponse | null>(null);
+  // 初始化時同步還原 session（避免登入後 navigate 時 setState 尚未 flush 被 ProtectedRoute 踢回 /login）
+  const [user, setUser] = useState<UserResponse | null>(() => {
+    try {
+      const stored = sessionStorage.getItem(USER_KEY);
+      return stored ? (JSON.parse(stored) as UserResponse) : null;
+    } catch {
+      return null;
+    }
+  });
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState(false);
 
@@ -47,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem(TOKEN_KEY, result.token);
     }
     sessionStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    // 先寫 session 再 setState：ProtectedRoute 可同步以 token/user 判定已登入
     setUser(result.user);
   }
 
@@ -83,11 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("auth:logout", onLogout);
   }, []);
 
+  // isAuthed 同時看 React state 與 sessionStorage token，
+  // 避免 await login() 後立即 navigate 時 setUser 尚未 commit 被誤判未登入。
+  const hasSessionToken =
+    typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(TOKEN_KEY);
   const value: AuthContextValue = {
     user,
     health,
     healthError,
-    isAuthed: !!user,
+    isAuthed: !!user || hasSessionToken,
     login,
     logout,
     refreshHealth

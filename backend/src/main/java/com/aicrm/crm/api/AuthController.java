@@ -46,9 +46,9 @@ public class AuthController {
         // token 改由 response body 回傳，由前端存入 sessionStorage 後以 Bearer header 傳送，
         // 解決 iOS Safari ITP 封鎖跨域 httpOnly cookie 的問題。
         // 同時保留 cookie 以相容既有桌面瀏覽器 session（cookie 優先於 Bearer header）。
-        response.addHeader("Set-Cookie",
-                COOKIE_NAME + "=" + result.token()
-                + "; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=" + tokenTtlSeconds);
+        // 本機 HTTP 開發勿用 Secure（瀏覽器會丟棄 cookie）；正式 HTTPS 再加 Secure。
+        // 前端主要靠 response body token + sessionStorage Bearer；cookie 為相容路徑。
+        response.addHeader("Set-Cookie", buildSessionCookie(result.token(), tokenTtlSeconds));
         return new Dtos.LoginResponse(result.token(), result.user());
     }
 
@@ -59,7 +59,26 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public void logout(HttpServletResponse response) {
-        response.addHeader("Set-Cookie",
-                COOKIE_NAME + "=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0");
+        response.addHeader("Set-Cookie", buildSessionCookie("", 0));
+    }
+
+    /**
+     * 組裝 session cookie：本機 HTTP 用 SameSite=Lax；可用 APP_COOKIE_SECURE=true 強制 Secure+None（跨站 HTTPS）。
+     *
+     * @param token JWT 或空字串（清除）
+     * @param maxAge 秒數
+     * @return Set-Cookie 值
+     */
+    private String buildSessionCookie(String token, long maxAge) {
+        boolean secure = Boolean.parseBoolean(System.getenv().getOrDefault("APP_COOKIE_SECURE", "false"));
+        StringBuilder sb = new StringBuilder();
+        sb.append(COOKIE_NAME).append("=").append(token == null ? "" : token);
+        sb.append("; Path=/; HttpOnly; Max-Age=").append(maxAge);
+        if (secure) {
+            sb.append("; Secure; SameSite=None");
+        } else {
+            sb.append("; SameSite=Lax");
+        }
+        return sb.toString();
     }
 }

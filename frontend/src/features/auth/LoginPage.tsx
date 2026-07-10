@@ -20,9 +20,23 @@ export function LoginPage() {
     const form = new FormData(event.currentTarget);
     try {
       await login(String(form.get("username")), String(form.get("password")));
-      navigate("/dashboard");
-    } catch {
-      setError("登入失敗，請確認帳號與密碼。");
+      navigate("/dashboard", { replace: true });
+    } catch (e: unknown) {
+      // 顯示較具體錯誤（網路／HTTP），方便本機除錯
+      const ax = e as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      const detail = ax?.response?.data?.detail;
+      const status = ax?.response?.status;
+      if (status === 401) {
+        setError("帳號或密碼錯誤。");
+      } else if (status === 429) {
+        setError("請求過於頻繁，請稍後再試。");
+      } else if (detail) {
+        setError(`登入失敗：${detail}`);
+      } else if (!ax?.response) {
+        setError("無法連線後端，請確認服務已啟動（18080）且前端代理正常。");
+      } else {
+        setError("登入失敗，請確認帳號與密碼。");
+      }
     }
   }
 
