@@ -59,6 +59,15 @@ export function LoginPage() {
         {error ? <div className="error-box">{error}</div> : null}
         <button type="submit">登入</button>
         <small>可用帳號：sales@aurora.local / manager@aurora.local / admin@aurora.local，密碼皆為 password123。</small>
+        {/* 募資課程問卷：新分頁開啟，避免離開登入流程時遺失表單狀態 */}
+        <a
+          className="survey-link"
+          href="https://survey.springai.world/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          📋 填寫募資課程問卷
+        </a>
       </form>
     </section>
   );

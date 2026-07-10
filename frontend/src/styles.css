@@ -872,6 +872,36 @@ button {
   background: #fff1f1;
 }
 
+/* 募資課程問卷外部連結（登入頁、儀表板共用） */
+.survey-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid #b7d4c8;
+  border-radius: 6px;
+  background: #f0faf6;
+  color: #0f3d32;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.survey-link:hover {
+  background: #e2f5ec;
+  border-color: #7fb89f;
+}
+
+.survey-link--topbar {
+  margin-top: 0;
+  padding: 9px 14px;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+
 .loading-line,
 .empty-state {
   color: #506371;

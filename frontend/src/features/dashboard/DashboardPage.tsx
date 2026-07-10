@@ -301,6 +301,15 @@ export function DashboardPage() {
           <h2>儀表板</h2>
         </div>
         <div className="topbar-actions">
+          {/* 募資課程問卷：儀表板首頁快捷入口，新分頁開啟 */}
+          <a
+            className="survey-link survey-link--topbar"
+            href="https://survey.springai.world/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            📋 募資課程問卷
+          </a>
           <button type="button" className="layout-btn" onClick={() => setDrawerOpen(true)}>⊞ 版面（隱藏 {hiddenBlocks.length}）</button>
           {isAdmin ? (
             <button type="button" className="btn-assess" onClick={handleGenerateDemo} disabled={generatingDemo}>

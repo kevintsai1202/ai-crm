@@ -20,20 +20,41 @@
 
 ## 關鍵環境變數
 
-### backend
-- `SERVER_PORT=${PORT}`（讓 Spring 監聽 Zeabur 指派的埠）
-- `SPRING_DATASOURCE_URL=jdbc:postgresql://postgresql.zeabur.internal:5432/zeabur`
-- `SPRING_DATASOURCE_USERNAME=root` / `SPRING_DATASOURCE_PASSWORD=<DB 密碼>`
-- `ZBPACK_JDK_VERSION=21`（zbpack 預設 JDK 太舊，須指定 21）
-- `APP_CORS_ALLOWED_ORIGINS=https://aicrm-frontend-kt2026.zeabur.app`
-- `APP_SECURITY_JWT_SECRET=<高強度隨機值，≥32 bytes>`（**必填**；未設或為舊公開預設值時應用會 fail-fast 拒絕啟動。修補 commit 8e2da11）
-- AI 金鑰：`OPENAI_API_KEY` / `OPENAI_CHAT_MODEL` / `BASE_URL` / `VOYAGE_API_KEY` / `VOYAGE_MODEL` / `VOYAGE_URL`
-- **`BASE_URL` 必須含 `/v1`**（Spring AI 2.0 不自動補）；勿設成空字串（應用會正規化為 OpenAI 預設，但閘道情境應明確設值）
-- 展示站可 `DEMO_RESET_ENABLED=true`；若使用 `SPRING_PROFILES_ACTIVE=prod` 則強制關閉清除重建且不註冊 `/api/dev/**`
-- 建議正式：`SPRING_PROFILES_ACTIVE=prod`
+### backend（既有，redeploy 後仍必填／建議維持）
+
+| 變數 | 必要性 | 說明 |
+|------|--------|------|
+| `SERVER_PORT=${PORT}` | 必填 | 對齊 Zeabur 指派埠 |
+| `SPRING_DATASOURCE_URL` | 必填 | `jdbc:postgresql://postgresql.zeabur.internal:5432/zeabur` |
+| `SPRING_DATASOURCE_USERNAME` / `PASSWORD` | 必填 | 例：`root` / DB 密碼 |
+| `ZBPACK_JDK_VERSION=21` | 必填 | zbpack 預設 JDK 太舊 |
+| `APP_SECURITY_JWT_SECRET` | 必填 | ≥32 bytes 隨機值；fail-fast |
+| `APP_CORS_ALLOWED_ORIGINS` | 必填 | `https://aicrm-frontend-kt2026.zeabur.app`（對應 `app.cors.allowed-origins`） |
+| `OPENAI_API_KEY` / `OPENAI_CHAT_MODEL` / `BASE_URL` | 建議 | AI；**`BASE_URL` 必須含 `/v1`**，勿留空字串 |
+| `VOYAGE_API_KEY` / `VOYAGE_MODEL` / `VOYAGE_URL` | 建議 | 真向量 RAG；無則 deterministic embedding |
+
+### backend（SP10–SP15 新增／建議，**非強制改才會動**）
+
+| 變數 | 必要性 | 建議（展示站） | 說明 |
+|------|--------|----------------|------|
+| `APP_COOKIE_SECURE` | **建議改 true** | `true` | 後端為 HTTPS 時 cookie 應用 `Secure; SameSite=None`。未設預設 `false`（本機 HTTP）；**不改也能用**，因前端主路徑是 Bearer token |
+| `DEMO_RESET_ENABLED` | 依定位 | 展示站 `true`；真正式 `false` | 預設 true；僅影響 ADMIN 清除重建 |
+| `SPRING_PROFILES_ACTIVE` | 選用 | 展示站**不要**設 `prod` | `prod` 會關 demo reset 且不註冊 `/api/dev/**` |
+| `APP_RATE_LIMIT_ENABLED` | 選用 | 可不設（預設 true） | 登入 30/分、AI 60/分／IP |
+| `APP_RATE_LIMIT_LOGIN_PER_MINUTE` | 選用 | 課室可調高如 `60` | 預設 30 |
+| `APP_RATE_LIMIT_AI_PER_MINUTE` | 選用 | 課室可調高如 `120` | 預設 60 |
+| Flyway V19/V20 | **自動** | 無需參數 | redeploy 後自動套 knowledge_chunks、stage_history |
 
 ### frontend
 - `VITE_API_BASE_URL=https://aicrm-backend-kt2026.zeabur.app/api`（建置期烘入 bundle）
+- **本次無需改**（除非後端網域變了）
+
+### 結論（2026-07 SP 後）
+
+- **不必為了新功能大改一堆變數**；push 後 redeploy backend（+ 若前端有 bundle 變更也 redeploy frontend）即可。
+- **唯一建議立刻加／改：** 後端 `APP_COOKIE_SECURE=true`（HTTPS 部署較正確）。
+- **請確認既有未壞：** `BASE_URL` 含 `/v1`、JWT、CORS、DB、JDK 21。
+- **展示站不要** 誤設 `SPRING_PROFILES_ACTIVE=prod`，否則 demo 生成 API 會消失。
 
 ## 重要踩雷紀錄
 
