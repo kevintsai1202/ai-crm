@@ -2,6 +2,7 @@ package com.aicrm.crm.repository;
 
 import com.aicrm.crm.domain.ChatMessage;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
@@ -17,4 +18,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
      * @return 最近 6 則訊息（新到舊）
      */
     List<ChatMessage> findTop6ByCustomerIdOrderByCreatedAtDesc(Long customerId);
+
+    /**
+     * 取指定客戶訊息（新到舊），搭配 {@link Pageable} 限制筆數，供前端歷史 UI 使用。
+     *
+     * @param customerId 客戶 id
+     * @param pageable 分頁（通常 page=0、size=limit）
+     * @return 訊息列表（新到舊）
+     */
+    List<ChatMessage> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
 }

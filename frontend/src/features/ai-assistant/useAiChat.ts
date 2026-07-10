@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { askAssistantStream } from "../../api";
+import { askAssistantStream, fetchCustomerChatMessages } from "../../api";
 import type { CitationResponse, RiskResponse } from "../../types";
 
 /**
@@ -23,15 +23,42 @@ export interface ChatMessage {
 /**
  * AI 助理對話 hook：管理對話歷史、開關、送出與 SSE 串流。
  * 函式級註解：把原 App.tsx 的 messages/chatSending/chatOpen 狀態與 handleAiChat 邏輯集中於此。
+ * SP11：切換客戶時可從伺服器 hydrate 歷史（loadHistory）。
  */
 export function useAiChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatSending, setChatSending] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  /** 歷史載入中（避免空窗閃爍）。 */
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   /** 清空對話（切換客戶時呼叫）。 */
   function resetChat() {
     setMessages([]);
+  }
+
+  /**
+   * 從後端載入指定客戶的對話歷史並填入 messages。
+   * @param customerId 目標客戶 ID
+   */
+  async function loadHistory(customerId: number) {
+    setHistoryLoading(true);
+    try {
+      const items = await fetchCustomerChatMessages(customerId, 50);
+      setMessages(
+        items.map((m) => ({
+          role: m.role === "ASSISTANT" || m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+          pending: false
+        }))
+      );
+    } catch (e) {
+      console.error("載入對話歷史失敗:", e);
+      // 失敗不擋新對話，維持空列表
+      setMessages([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   /**
@@ -85,5 +112,14 @@ export function useAiChat() {
     );
   }
 
-  return { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat };
+  return {
+    messages,
+    chatSending,
+    chatOpen,
+    setChatOpen,
+    sendChat,
+    resetChat,
+    loadHistory,
+    historyLoading
+  };
 }

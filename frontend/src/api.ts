@@ -3,6 +3,7 @@ import type {
   AdminUser,
   AgentTraceResponse,
   AiCallHistoryItem,
+  ChatMessageHistoryItem,
   ChatResponse,
   ContactResponse,
   CustomerDetail,
@@ -538,6 +539,17 @@ export async function fetchAgentTrace(customerId: number) {
  */
 export async function fetchCustomerAiCalls(customerId: number) {
   const { data } = await apiClient.get<AiCallHistoryItem[]>(`/ai/customers/${customerId}/calls`);
+  return data;
+}
+
+/**
+ * 查詢某客戶的對話室歷史（舊→新），供 AI 助理聊天窗 hydrate。
+ */
+export async function fetchCustomerChatMessages(customerId: number, limit = 50) {
+  const { data } = await apiClient.get<ChatMessageHistoryItem[]>(
+    `/ai/customers/${customerId}/messages`,
+    { params: { limit } }
+  );
   return data;
 }
 

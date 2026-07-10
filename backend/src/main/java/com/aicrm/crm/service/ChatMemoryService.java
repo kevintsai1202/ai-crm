@@ -1,5 +1,6 @@
 package com.aicrm.crm.service;
 
+import com.aicrm.crm.api.Dtos;
 import com.aicrm.crm.domain.ChatMessage;
 import com.aicrm.crm.domain.ChatRole;
 import com.aicrm.crm.repository.ChatMessageRepository;
@@ -7,11 +8,13 @@ import com.aicrm.crm.repository.ChatMessageVectorRepository;
 import com.aicrm.crm.service.embedding.EmbeddingClient;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,12 @@ public class ChatMemoryService {
 
     /** 每則記憶截斷上限（字元），避免 prompt 膨脹。 */
     private static final int MAX_CONTENT_LEN = 200;
+
+    /** 前端歷史預設則數。 */
+    private static final int UI_HISTORY_DEFAULT_LIMIT = 50;
+
+    /** 前端歷史上限則數。 */
+    private static final int UI_HISTORY_MAX_LIMIT = 100;
 
     /** 向量嵌入用戶端。 */
     private final EmbeddingClient embeddingClient;
@@ -68,6 +77,29 @@ public class ChatMemoryService {
         }
         var vec = embeddingClient.embed(List.of(content), EmbeddingClient.InputType.DOCUMENT).get(0);
         vectorRepo.save(customerId, role.name(), content, vec, OffsetDateTime.now());
+    }
+
+    /**
+     * 列出給前端顯示的對話歷史：取最近 {@code limit} 則，回傳舊→新（不含 embedding）。
+     *
+     * @param customerId 客戶 id
+     * @param limit 則數（null 或 ≤0 用預設 50；超過 100 截為 100）
+     * @return 訊息 DTO 清單（舊→新）
+     */
+    @Transactional(readOnly = true)
+    public List<Dtos.ChatMessageResponse> listRecentForUi(Long customerId, Integer limit) {
+        int n = (limit == null || limit <= 0) ? UI_HISTORY_DEFAULT_LIMIT : Math.min(limit, UI_HISTORY_MAX_LIMIT);
+        var newestFirst = messageRepo.findByCustomerIdOrderByCreatedAtDesc(
+                customerId, PageRequest.of(0, n));
+        var oldestFirst = new ArrayList<>(newestFirst);
+        Collections.reverse(oldestFirst);
+        return oldestFirst.stream()
+                .map(m -> new Dtos.ChatMessageResponse(
+                        m.getId(),
+                        m.getRole().name(),
+                        m.getContent(),
+                        m.getCreatedAt()))
+                .toList();
     }
 
     /**

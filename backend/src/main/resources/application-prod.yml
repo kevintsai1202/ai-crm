@@ -1,0 +1,14 @@
+# 正式環境 profile：安全預設與安靜日誌。
+# 啟動：--spring.profiles.active=prod 或 SPRING_PROFILES_ACTIVE=prod
+app:
+  demo:
+    # 正式環境強制關閉清除重建（即使 DEMO_RESET_ENABLED=true 也應在服務層再擋一層）
+    reset-enabled: false
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web.client.RestClient: INFO
+    org.springframework.web.reactive.function.client.WebClient: INFO
+    org.springframework.ai: INFO
+    com.aicrm.crm.service.embedding.VoyageEmbeddingClient: INFO

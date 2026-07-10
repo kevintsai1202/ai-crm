@@ -9,10 +9,17 @@
 
 ## 目前進度
 
-> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅、SP8 ✅、SP9-A 示範資料/漏斗 ✅、SP9-B 工作檯個人 AI ✅**　｜　最後完成：SP9-B（工作檯待辦+AI工作建議+建商機草稿+個人問答+AI歷程+SALES隔離；後端 105 測試綠、前端 tsc 綠、Playwright e2e 通過）
+> **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅、SP8 ✅、SP9-A 示範資料/漏斗 ✅、SP9-B 工作檯個人 AI ✅**　｜　最後完成：SP9-B  
+> **下一階段程式：** SP10–SP15 優化修正（見 `docs/superpowers/plans/2026-07-10-post-sp9-optimization-program.md`）；**不含**金鑰輪替。建議序：SP10 → SP11 →（SP12 ∥ SP13）→ SP14 → SP15。
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|
+| **SP10** | 生產防呆（BASE_URL 空白正規化、demo reset／Dev 端點 prod 硬化、log profile、文件最小對齊） | ✅ 完成 | （主計畫內嵌） | `docs/superpowers/plans/2026-07-10-post-sp9-optimization-program.md` | 2026-07-10 實作 |
+| **SP11** | 客戶對話歷史 API + AI thinking 一致 + 詳情 skeleton | ✅ 完成 | （主計畫內嵌） | 同上 | `GET /api/ai/customers/{id}/messages`；前端 hydrate + skeleton |
+| **SP12** | InsightService 拆分 + 知識庫 chunk 級 RAG | ⬜ 未開始 | 開工前可補短 spec | 同上 | P1；1–2 週 |
+| **SP13** | 商機 StageHistory + 漏斗停留天數／超時示警 | ⬜ 未開始 | 開工第一天寫 spec | 同上 | P1；可與 SP12 並行 |
+| **SP14** | 前端 api.ts／styles 拆分 + vitest | ⬜ 未開始 | （主計畫內嵌） | 同上 | P2；建議 SP11 後 |
+| **SP15** | AI／登入限流 + metrics + 文件大掃除 | ⬜ 未開始 | （主計畫內嵌） | 同上 | P2；收斂用 |
 | **SP1** | 前端架構重構（側邊欄 + React Router、儀表板↔操作分頁、拆 App.tsx 成 features/） | ✅ 完成 | `docs/superpowers/specs/2026-06-19-sp1-frontend-architecture-refactor-design.md` | `docs/superpowers/plans/2026-06-19-sp1-frontend-architecture-refactor.md` | App.tsx 1337→27 行；tsc+build 綠燈；Playwright 煙霧測試通過 |
 | SP2 | 後端測試網（InsightService 風險計算 / Security・JWT / Controller 權限） | ✅ 完成 | `docs/superpowers/specs/2026-06-19-sp2-backend-test-net-design.md` | `docs/superpowers/plans/2026-06-19-sp2-backend-test-net.md` | 22 測試全綠（單元12+整合9+冒煙1）+ JaCoCo；**修復 Flyway autoconfig 遺漏 production bug** |
 | SP3 | 真 pgvector RAG（Voyage embedding、knowledge_documents.embedding vector(1024)、向量檢索取代 similarityHint） | ✅ 完成 | `docs/superpowers/specs/2026-06-19-sp3-pgvector-rag-design.md` | `docs/superpowers/plans/2026-06-19-sp3-pgvector-rag.md` | 31 測試全綠；EmbeddingClient(Voyage+deterministic fallback)、V5+hnsw、整合測試遷 Testcontainers；文件級 embedding（chunking 未做） |

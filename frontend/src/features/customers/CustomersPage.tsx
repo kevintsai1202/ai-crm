@@ -75,7 +75,7 @@ export function CustomersPage() {
   // AI 歷程 Modal：open 控制開關、loading 載入中、calls 為該客戶歷次 AI 呼叫
   const [aiHistory, setAiHistory] = useState<{ open: boolean; loading: boolean; calls: AiCallHistoryItem[] } | null>(null);
 
-  const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat } = useAiChat();
+  const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat, loadHistory, historyLoading } = useAiChat();
 
   /** 載入客戶列表（支援多條件篩選與分頁）。 */
   async function loadCustomers(overrides?: { keyword?: string; industry?: string; owner?: string; page?: number; status?: string; riskLevel?: string; renewalFrom?: string; renewalTo?: string }) {
@@ -122,7 +122,7 @@ export function CustomersPage() {
     })();
   }, []);
 
-  // :id 變動 → 載入詳情與 Trace、重置對話
+  // :id 變動 → 載入詳情與 Trace、hydrate 對話歷史
   useEffect(() => {
     if (!selectedId) {
       setSelected(null);
@@ -132,10 +132,15 @@ export function CustomersPage() {
     // 競態防護：快速切換客戶時，cleanup 設旗標忽略過期回應，避免舊請求覆蓋新客戶資料
     let cancelled = false;
     setLoading(true);
+    setSelected(null); // 先清空以顯示 skeleton，避免殘留上一客戶
     resetChat();
     void (async () => {
       try {
-        const [detail, traceResult] = await Promise.all([fetchCustomerDetail(selectedId), fetchAgentTrace(selectedId)]);
+        const [detail, traceResult] = await Promise.all([
+          fetchCustomerDetail(selectedId),
+          fetchAgentTrace(selectedId),
+          loadHistory(selectedId)
+        ]);
         if (cancelled) return;
         setSelected(detail);
         setTrace(traceResult);
@@ -422,6 +427,7 @@ export function CustomersPage() {
           customer={selected?.customer ?? null}
           messages={messages}
           sending={chatSending}
+          historyLoading={historyLoading}
           onSend={(msg) => { if (selected) sendChat(selected.customer.id, msg); }}
           onClose={() => setChatOpen(false)}
         />

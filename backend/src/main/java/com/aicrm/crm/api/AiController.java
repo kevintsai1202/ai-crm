@@ -2,10 +2,12 @@ package com.aicrm.crm.api;
 
 import com.aicrm.crm.domain.FeedbackDecision;
 import com.aicrm.crm.service.AiGovernanceService;
+import com.aicrm.crm.service.ChatMemoryService;
 import com.aicrm.crm.service.InsightService;
 import com.aicrm.crm.service.JwtService;
 import com.aicrm.crm.service.KnowledgeIndexer;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -36,13 +39,18 @@ public class AiController {
     /** 擁有權守衛：客戶 AI 歷程查詢時強制 SALES 僅能讀自己負責客戶。 */
     private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
 
+    /** 對話記憶：前端歷史列表。 */
+    private final ChatMemoryService chatMemoryService;
+
     public AiController(InsightService insightService, KnowledgeIndexer knowledgeIndexer,
                         AiGovernanceService aiGovernanceService,
-                        com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
+                        com.aicrm.crm.security.OwnershipGuard ownershipGuard,
+                        ChatMemoryService chatMemoryService) {
         this.insightService = insightService;
         this.knowledgeIndexer = knowledgeIndexer;
         this.aiGovernanceService = aiGovernanceService;
         this.ownershipGuard = ownershipGuard;
+        this.chatMemoryService = chatMemoryService;
     }
 
     /**
@@ -166,6 +174,21 @@ public class AiController {
         // 此端點不經 CustomerService.findDetail，需自行擋下 SALES 跨客戶讀取 AI 歷程
         ownershipGuard.assertCanAccessCustomer(id);
         return aiGovernanceService.customerCallHistory(id);
+    }
+
+    /**
+     * 列出指定客戶的對話歷史（舊→新），供前端聊天室 hydrate。
+     *
+     * @param id 客戶 ID
+     * @param limit 則數（預設 50、上限 100）
+     * @return 對話訊息列表
+     */
+    @GetMapping("/customers/{id}/messages")
+    public List<Dtos.ChatMessageResponse> customerMessages(
+            @PathVariable Long id,
+            @RequestParam(required = false) Integer limit) {
+        ownershipGuard.assertCanAccessCustomer(id);
+        return chatMemoryService.listRecentForUi(id, limit);
     }
 
     /**

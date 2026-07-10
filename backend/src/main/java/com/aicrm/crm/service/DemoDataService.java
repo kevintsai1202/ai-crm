@@ -185,6 +185,9 @@ public class DemoDataService {
      */
     private final boolean resetEnabled;
 
+    /** 啟用中的 Spring profiles；含 prod 時一律拒絕清除重建。 */
+    private final org.springframework.core.env.Environment environment;
+
     public DemoDataService(CustomerRepository customerRepository,
                            OpportunityRepository opportunityRepository,
                            InteractionRepository interactionRepository,
@@ -194,9 +197,11 @@ public class DemoDataService {
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
-                           @org.springframework.beans.factory.annotation.Value("${app.demo.reset-enabled:false}") boolean resetEnabled) {
+                           @org.springframework.beans.factory.annotation.Value("${app.demo.reset-enabled:false}") boolean resetEnabled,
+                           org.springframework.core.env.Environment environment) {
         this.customerRepository = customerRepository;
         this.opportunityRepository = opportunityRepository;
+        this.environment = environment;
         this.interactionRepository = interactionRepository;
         this.interactionInsightRepository = interactionInsightRepository;
         this.contactRepository = contactRepository;
@@ -284,6 +289,11 @@ public class DemoDataService {
     })
     public DemoStats generate(int customers, boolean reset) {
         if (reset) {
+            // prod profile 雙重保險：即使誤開 DEMO_RESET_ENABLED 也不允許清庫
+            if (environment.matchesProfiles("prod")) {
+                throw new IllegalStateException(
+                        "正式環境（profile=prod）禁止示範資料清除重建，以保護真實業務資料。");
+            }
             if (!resetEnabled) {
                 throw new IllegalStateException(
                         "示範資料清除重建未啟用：請於開發 / 示範環境設定 DEMO_RESET_ENABLED=true，"

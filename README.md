@@ -1,13 +1,13 @@
 # AI CRM 智慧業務助理
 
-本專案依據 `D:\GitHub\hahow-ai-full-stack\teaching-site` 的 8 個教學單元與 AI 協作提示詞建立，是一套教學版全端 CRM 應用。專案採用 monorepo：
+本專案依據 Hahow 教學站的單元與 AI 協作提示詞建立，是一套教學／示範用全端 AI CRM。專案採用 monorepo：
 
-- `backend/`：Spring Boot 3.5、Java 21、JPA、Flyway、Spring Security。
-- `frontend/`：Vite、React、TypeScript。
-- `docs/`：從教學站整理出的規格、API 與任務狀態。
+- `backend/`：Spring Boot **4.1**、Java 21、JPA、Flyway、Spring Security、Spring AI **2.0**、pgvector。
+- `frontend/`：Vite、React 19、TypeScript。
+- `docs/`：規格、API、路線圖（`docs/roadmap-progress.md`）與 SP 計畫。
 - `scripts/`：Windows PowerShell 7+ 驗證腳本。
 
-為了讓本機不需要外部 AI API key 也能完整驗收，Unit 6 到 Unit 8 的 AI / RAG / Agent Flow 先以 deterministic backend service 實作，保留清楚的 Spring AI、pgvector 與 Embabel 擴充邊界。
+AI 行為：有 `OPENAI_API_KEY`（可走 OpenAI 相容閘道 `BASE_URL`，須含 `/v1`）時呼叫真實 LLM；無金鑰或失敗時 fallback 至 deterministic 流程。RAG 使用 Voyage embedding + pgvector；無 `VOYAGE_API_KEY` 時用 deterministic embedding。
 
 ## 快速啟動
 
@@ -18,8 +18,12 @@ docker compose up -d postgres
 $env:JAVA_HOME = "D:\java\jdk-21"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 
+# 本機除錯日誌可加 local profile；正式部署用 prod（關閉 demo 清除與 /api/dev）
 mvn -pl backend spring-boot:run
+# 或：mvn -pl backend spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=local"
 ```
+
+必要環境變數（專案根目錄 `.env`，勿提交）：`APP_SECURITY_JWT_SECRET`（≥32 字元）、可選 `OPENAI_API_KEY` / `BASE_URL` / `VOYAGE_API_KEY`。`BASE_URL` 若留空字串會被正規化為 OpenAI 預設。
 
 PostgreSQL 由 Docker 提供，host 端口固定使用 `15432`，避免和其他本機專案的 PostgreSQL `5432` 衝突。
 後端預設使用 `http://127.0.0.1:18080/api`，避免和其他本機 Spring Boot 專案的 `8080` 衝突。

@@ -1,12 +1,10 @@
 server:
   port: 18080
 
+# 預設日誌等級 INFO；本機除錯請加 --spring.profiles.active=local（見 application-local.yml）。
 logging:
   level:
-    org.springframework.web.client.RestClient: DEBUG
-    org.springframework.web.reactive.function.client.WebClient: DEBUG
-    org.springframework.ai: DEBUG
-    com.aicrm.crm.service.embedding.VoyageEmbeddingClient: DEBUG
+    root: INFO
 
 spring:
   application:
@@ -49,6 +47,7 @@ spring:
       # 若為空才 fallback 至預設 "https://api.openai.com/v1"。
       # 因此必須明確帶 /v1，否則 SDK 會打 https://api.openai.com/chat/completions → 404。
       # BASE_URL 環境變數（如 Zeabur AI Hub）應已含 /v1（如 https://hnd1.aihub.zeabur.ai/v1）。
+      # 若平台設了 BASE_URL= 空字串，BaseUrlEnvironmentPostProcessor 會正規化為下方預設，避免蓋掉預設。
       base-url: ${BASE_URL:https://api.openai.com/v1}
       chat:
         model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}

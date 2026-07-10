@@ -1,0 +1,8 @@
+# 本機開發 profile：開啟 AI / HTTP 用戶端除錯日誌。
+# 啟動範例：--spring.profiles.active=local
+logging:
+  level:
+    org.springframework.web.client.RestClient: DEBUG
+    org.springframework.web.reactive.function.client.WebClient: DEBUG
+    org.springframework.ai: DEBUG
+    com.aicrm.crm.service.embedding.VoyageEmbeddingClient: DEBUG

@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 class ChatMemoryIntegrationTest extends PostgresTestBase {
 
     @Autowired InsightService insightService;
+    @Autowired ChatMemoryService chatMemoryService;
     @Autowired ChatMessageRepository chatMessageRepository;
     @Autowired ChatMessageVectorRepository chatMessageVectorRepository;
 
@@ -34,5 +35,21 @@ class ChatMemoryIntegrationTest extends PostgresTestBase {
         assertThat(hits).isNotEmpty();
         // 命中項保留角色資訊（USER / ASSISTANT）
         assertThat(hits.get(0).role()).isIn("USER", "ASSISTANT");
+    }
+
+    @Test
+    void listRecentForUiReturnsOldestFirst() {
+        insightService.chat(new Dtos.ChatRequest(1L, "歷史 UI 問題 A"));
+        insightService.chat(new Dtos.ChatRequest(1L, "歷史 UI 問題 B"));
+
+        var list = chatMemoryService.listRecentForUi(1L, 50);
+        assertThat(list).isNotEmpty();
+        // 舊→新：建立時間非遞減
+        for (int i = 1; i < list.size(); i++) {
+            assertThat(list.get(i).createdAt()).isAfterOrEqualTo(list.get(i - 1).createdAt());
+        }
+        // 角色為 USER / ASSISTANT
+        assertThat(list.get(0).role()).isIn("USER", "ASSISTANT");
+        assertThat(list.get(0).content()).isNotBlank();
     }
 }

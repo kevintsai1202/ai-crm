@@ -28,6 +28,9 @@
 - `APP_CORS_ALLOWED_ORIGINS=https://aicrm-frontend-kt2026.zeabur.app`
 - `APP_SECURITY_JWT_SECRET=<高強度隨機值，≥32 bytes>`（**必填**；未設或為舊公開預設值時應用會 fail-fast 拒絕啟動。修補 commit 8e2da11）
 - AI 金鑰：`OPENAI_API_KEY` / `OPENAI_CHAT_MODEL` / `BASE_URL` / `VOYAGE_API_KEY` / `VOYAGE_MODEL` / `VOYAGE_URL`
+- **`BASE_URL` 必須含 `/v1`**（Spring AI 2.0 不自動補）；勿設成空字串（應用會正規化為 OpenAI 預設，但閘道情境應明確設值）
+- 展示站可 `DEMO_RESET_ENABLED=true`；若使用 `SPRING_PROFILES_ACTIVE=prod` 則強制關閉清除重建且不註冊 `/api/dev/**`
+- 建議正式：`SPRING_PROFILES_ACTIVE=prod`
 
 ### frontend
 - `VITE_API_BASE_URL=https://aicrm-backend-kt2026.zeabur.app/api`（建置期烘入 bundle）

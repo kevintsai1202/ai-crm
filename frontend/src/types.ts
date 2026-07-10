@@ -327,6 +327,15 @@ export interface AiCallHistoryItem {
   createdAt: string;
 }
 
+/** 客戶對話室歷史單則（chat_messages，舊→新）。 */
+export interface ChatMessageHistoryItem {
+  id: number;
+  /** USER 或 ASSISTANT */
+  role: string;
+  content: string;
+  createdAt: string;
+}
+
 // ===== 我的工作檯個人 AI (SP9-B) =====
 
 /** 工作檯待辦項目（純 DB 規則計算）。type: HIGH_RISK / RENEWAL_DUE / STALE_OPPORTUNITY。 */

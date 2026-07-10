@@ -46,6 +46,32 @@ export function CustomerDetailPanel({
   onDeleteInteraction: (interaction: CustomerDetail["interactions"][number]) => void;
   userRole?: string;
 }) {
+  // 載入中且尚無詳情：顯示 skeleton，避免空白久候
+  if (!detail && loading) {
+    return (
+      <section className="detail-stack" aria-busy="true" aria-label="載入客戶詳情中">
+        <div className="panel customer-hero skeleton-block">
+          <div className="skeleton-line w-30" />
+          <div className="skeleton-line w-50 h-lg" />
+          <div className="skeleton-line w-40" />
+        </div>
+        <div className="kpi-row">
+          {[0, 1, 2, 3].map((i) => (
+            <div className="kpi-card skeleton-block" key={i}>
+              <div className="skeleton-line w-40" />
+              <div className="skeleton-line w-60 h-lg" />
+            </div>
+          ))}
+        </div>
+        <div className="panel skeleton-block">
+          <div className="skeleton-line w-30" />
+          <div className="skeleton-line" />
+          <div className="skeleton-line" />
+          <div className="skeleton-line w-70" />
+        </div>
+      </section>
+    );
+  }
   if (!detail) {
     return <section className="panel empty-state">尚未選取客戶</section>;
   }

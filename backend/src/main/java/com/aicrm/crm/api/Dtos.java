@@ -329,6 +329,16 @@ public final class Dtos {
 
     public record ChatResponse(String answer, List<CitationResponse> citations, RiskResponse risk, Long callId) {}
 
+    /**
+     * 前端對話歷史單則（不含 embedding）。
+     *
+     * @param id 訊息 id
+     * @param role USER 或 ASSISTANT
+     * @param content 訊息內容
+     * @param createdAt 建立時間
+     */
+    public record ChatMessageResponse(Long id, String role, String content, Instant createdAt) {}
+
     public record AiFeedbackRequest(@NotBlank String decision, String note) {}
 
     public record UsageSummaryResponse(long totalCalls, long totalTokens, long realCalls, long fallbackCalls, long adopted, long rejected) {}

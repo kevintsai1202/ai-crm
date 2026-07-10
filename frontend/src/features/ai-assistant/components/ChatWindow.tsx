@@ -17,7 +17,22 @@ const CHAT_SUGGESTIONS = [
  * 浮動 AI 聊天視窗：多輪對話歷史、Markdown 渲染、串流打字機。
  * 函式級註解：右下角獨立彈出視窗，輸入框支援 Enter 送出 / Shift+Enter 換行，新訊息自動捲動到底。
  */
-export function ChatWindow({ customer, messages, sending, onSend, onClose }: { customer: CustomerSummary | null; messages: ChatMessage[]; sending: boolean; onSend: (message: string) => void; onClose: () => void }) {
+export function ChatWindow({
+  customer,
+  messages,
+  sending,
+  historyLoading = false,
+  onSend,
+  onClose
+}: {
+  customer: CustomerSummary | null;
+  messages: ChatMessage[];
+  sending: boolean;
+  /** 伺服器歷史載入中 */
+  historyLoading?: boolean;
+  onSend: (message: string) => void;
+  onClose: () => void;
+}) {
   const [input, setInput] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -53,13 +68,17 @@ export function ChatWindow({ customer, messages, sending, onSend, onClose }: { c
       <header className="chat-header">
         <div>
           <strong>AI 助理 <AiBadge onDark /></strong>
-          <small>{customer ? customer.name : "尚未選取客戶"} · Tool Calling + RAG</small>
+          <small>{customer ? customer.name : "尚未選取客戶"} · RAG + 對話記憶</small>
         </div>
         <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
       </header>
 
       <div className="chat-body" ref={bodyRef}>
-        {messages.length === 0 ? (
+        {historyLoading ? (
+          <div className="chat-empty">
+            <p>載入對話紀錄中…</p>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="chat-empty">
             <p>{customer ? `向 AI 助理詢問關於「${customer.name}」的問題` : "請先在左側選取客戶"}</p>
             {customer ? (
