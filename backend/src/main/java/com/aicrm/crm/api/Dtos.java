@@ -225,7 +225,17 @@ public final class Dtos {
             List<ActivityReport> recentActivities
     ) {}
 
-    public record StageReport(String stage, long count, BigDecimal amount) {}
+    /**
+     * 漏斗階段報表。
+     *
+     * @param stage 階段代碼
+     * @param count 筆數
+     * @param amount 金額合計
+     * @param avgDaysInStage 平均停留天數（無歷史時為 0）
+     * @param overdueCount 超過 SLA 門檻的筆數
+     */
+    public record StageReport(String stage, long count, BigDecimal amount,
+                              Double avgDaysInStage, long overdueCount) {}
 
     public record MoneyChartPoint(String label, BigDecimal amount, long count) {}
 

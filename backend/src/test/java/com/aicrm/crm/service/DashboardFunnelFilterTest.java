@@ -29,7 +29,10 @@ class DashboardFunnelFilterTest {
 
         var repo = Mockito.mock(CustomerRepository.class);
         Mockito.when(repo.findAll()).thenReturn(List.of(customer));
-        var service = new DashboardService(repo);
+        var stageHistory = org.mockito.Mockito.mock(OpportunityStageHistoryService.class);
+        org.mockito.Mockito.when(stageHistory.computeDwellStats(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(java.util.Map.of());
+        var service = new DashboardService(repo, stageHistory);
 
         // 只取 INBOUND：PROPOSAL 階段應僅有 1 筆、金額 100
         var proposal = service.dashboardReports("INBOUND").pipelineByStage().stream()

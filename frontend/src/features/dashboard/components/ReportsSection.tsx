@@ -106,7 +106,9 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
               className={`funnel-stage-wrapper funnel-layer-${index} clickable`}
               key={item.stage}
               style={{ background: backgroundGradient }}
-              title={`點擊查看 ${stageLabel(item.stage)} 的 ${item.count} 筆商機`}
+              title={`點擊查看 ${stageLabel(item.stage)} 的 ${item.count} 筆商機` +
+                (item.avgDaysInStage != null ? ` · 平均停留 ${item.avgDaysInStage} 天` : "") +
+                (item.overdueCount ? ` · ${item.overdueCount} 筆超時` : "")}
               role="button"
               tabIndex={0}
               onClick={() => onDrill("stage", item.stage, `銷售漏斗 · ${stageLabel(item.stage)}`)}
@@ -114,7 +116,11 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
             >
               <div className="funnel-content">
                 <strong>{stageLabel(item.stage)}</strong>
-                <span>{item.count} 筆</span>
+                <span>
+                  {item.count} 筆
+                  {item.avgDaysInStage != null && item.count > 0 ? ` · 均 ${item.avgDaysInStage} 天` : ""}
+                  {item.overdueCount ? ` · ⚠${item.overdueCount}` : ""}
+                </span>
                 <b>{formatCompactMoney(item.amount)}</b>
               </div>
             </div>

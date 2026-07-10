@@ -30,7 +30,10 @@ class DashboardForecastTest {
 
         var repo = Mockito.mock(CustomerRepository.class);
         Mockito.when(repo.findAll()).thenReturn(List.of(customer));
-        var service = new DashboardService(repo);
+        var stageHistory = org.mockito.Mockito.mock(OpportunityStageHistoryService.class);
+        org.mockito.Mockito.when(stageHistory.computeDwellStats(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(java.util.Map.of());
+        var service = new DashboardService(repo, stageHistory);
 
         var point = service.dashboardReports().monthlyForecast().stream()
                 .filter(p -> p.label().equals("2026-05")).findFirst().orElseThrow();

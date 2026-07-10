@@ -6,9 +6,7 @@ import static org.mockito.Mockito.mock;
 import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.InteractionType;
-import com.aicrm.crm.repository.KnowledgeDocumentRepository;
-import com.aicrm.crm.repository.KnowledgeVectorRepository;
-import com.aicrm.crm.service.embedding.EmbeddingClient;
+import com.aicrm.crm.service.ai.RagCitationService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
@@ -24,14 +22,12 @@ class InsightServiceRiskTest {
     @SuppressWarnings("unchecked")
     private InsightService newService() {
         var customerService = mock(CustomerService.class);
-        var knowledge = mock(KnowledgeDocumentRepository.class);
-        var embeddingClient = mock(EmbeddingClient.class);
-        var vectorRepo = mock(KnowledgeVectorRepository.class);
+        var rag = mock(RagCitationService.class);
         var provider = (ObjectProvider<ChatModel>) mock(ObjectProvider.class);
         var governance = mock(AiGovernanceService.class);
         var chatMemory = mock(ChatMemoryService.class);
         var systemSettings = mock(SystemSettingService.class);
-        return new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, "", "https://api.openai.com", 8000, "low");
+        return new InsightService(customerService, rag, provider, governance, chatMemory, systemSettings, "", "https://api.openai.com", 8000, "low");
     }
 
     /** 建立指定產業/業務的空客戶。 */

@@ -7,9 +7,7 @@ import com.aicrm.crm.domain.Customer;
 import com.aicrm.crm.domain.Interaction;
 import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.domain.OpportunityStage;
-import com.aicrm.crm.repository.KnowledgeDocumentRepository;
-import com.aicrm.crm.repository.KnowledgeVectorRepository;
-import com.aicrm.crm.service.embedding.EmbeddingClient;
+import com.aicrm.crm.service.ai.RagCitationService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -70,14 +68,8 @@ public class InsightService {
     /** 客戶查詢服務。 */
     private final CustomerService customers;
 
-    /** 知識文件資料來源（fallback 用，依 similarityHint 排序）。 */
-    private final KnowledgeDocumentRepository knowledgeDocuments;
-
-    /** 向量嵌入用戶端：將查詢文字嵌入為向量供檢索。 */
-    private final EmbeddingClient embeddingClient;
-
-    /** 知識文件向量存取：pgvector cosine 近鄰檢索。 */
-    private final KnowledgeVectorRepository vectorRepo;
+    /** RAG 引用（chunk → 文件 → similarityHint）。 */
+    private final RagCitationService ragCitations;
 
     /**
      * OpenAI ChatModel 提供者。
@@ -120,9 +112,7 @@ public class InsightService {
     private final String modelTestReasoningEffort;
 
     public InsightService(CustomerService customers,
-                          KnowledgeDocumentRepository knowledgeDocuments,
-                          EmbeddingClient embeddingClient,
-                          KnowledgeVectorRepository vectorRepo,
+                          RagCitationService ragCitations,
                           ObjectProvider<ChatModel> chatModelProvider,
                           AiGovernanceService aiGovernance,
                           ChatMemoryService chatMemory,
@@ -132,9 +122,7 @@ public class InsightService {
                           @Value("${app.ai.model-test.max-completion-tokens:8000}") int modelTestMaxCompletionTokens,
                           @Value("${app.ai.model-test.reasoning-effort:low}") String modelTestReasoningEffort) {
         this.customers = customers;
-        this.knowledgeDocuments = knowledgeDocuments;
-        this.embeddingClient = embeddingClient;
-        this.vectorRepo = vectorRepo;
+        this.ragCitations = ragCitations;
         this.chatModelProvider = chatModelProvider;
         this.aiGovernance = aiGovernance;
         this.chatMemory = chatMemory;
@@ -163,7 +151,7 @@ public class InsightService {
     public Dtos.ChatResponse chat(Dtos.ChatRequest request) {
         var customer = customers.findDetail(request.customerId());
         var risk = calculateOpportunityRisk(customer);
-        var citations = loadCitations(request.message());
+        var citations = ragCitations.loadCitations(request.message());
         // 順序：先 recall（不含本則）→ 產生 answer → 再 save 本輪 user+assistant，避免把本則當記憶
         var memory = chatMemory.recall(request.customerId(), request.message());
         var result = buildAnswer(AiCallType.CHAT, customer, risk, citations, memory, request.message());
@@ -196,7 +184,7 @@ public class InsightService {
         final String userMessage = request.message();
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
-        var citations = loadCitations(userMessage);
+        var citations = ragCitations.loadCitations(userMessage);
         // 順序：先 recall（不含本則）→ 產生 answer → 再 save 本輪，避免把本則當記憶
         var memory = chatMemory.recall(customerId, userMessage);
         // 在交易內先把 deterministic fallback 文字算好（會讀 customer LAZY 關聯），供 callback 執行緒安全使用
@@ -228,7 +216,7 @@ public class InsightService {
 
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
-        var citations = loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
+        var citations = ragCitations.loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
         // 在交易內先算好 fallback 文字（讀 LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
@@ -379,27 +367,6 @@ public class InsightService {
     }
 
     /**
-     * 依查詢語意做向量檢索取回 top-3 引用；無任何向量時 graceful fallback 回相似度提示排序。
-     *
-     * @param query 查詢文字（使用者提問或評估指令）
-     * @return 引用清單
-     */
-    private List<Dtos.CitationResponse> loadCitations(String query) {
-        try {
-            var vec = embeddingClient.embed(List.of(query), EmbeddingClient.InputType.QUERY).get(0);
-            var hits = vectorRepo.searchTopK(vec, 3);
-            if (!hits.isEmpty()) {
-                return hits;
-            }
-        } catch (Exception e) {
-            log.warn("向量檢索失敗，改用 similarityHint fallback：{}", e.getMessage());
-        }
-        return knowledgeDocuments.findTop3ByOrderBySimilarityHintDesc().stream()
-                .map(doc -> new Dtos.CitationResponse(doc.getTitle(), doc.getDocType(), doc.getContent(), doc.getSimilarityHint()))
-                .toList();
-    }
-
-    /**
      * 產生客戶 360 度整體評估報告（Markdown）。複用對話的完整 grounding context。
      *
      * @param customerId 客戶 ID
@@ -408,7 +375,7 @@ public class InsightService {
     public Dtos.ChatResponse customerAssessment(Long customerId) {
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
-        var citations = loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
+        var citations = ragCitations.loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
         var result = callLlm(AiCallType.ASSESSMENT, customer, risk, buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION);
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
     }

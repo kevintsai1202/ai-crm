@@ -5,6 +5,7 @@ import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.repository.AppUserRepository;
 import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.repository.OpportunityRepository;
+import com.aicrm.crm.service.OpportunityStageHistoryService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -37,14 +38,19 @@ public class OpportunityController {
     /** 擁有權守衛：強制 SALES 僅能操作自己負責客戶的商機。 */
     private final com.aicrm.crm.security.OwnershipGuard ownershipGuard;
 
+    /** 階段歷史：漏斗停留／超時。 */
+    private final OpportunityStageHistoryService stageHistory;
+
     public OpportunityController(OpportunityRepository opportunityRepository,
                                  CustomerRepository customerRepository,
                                  AppUserRepository users,
-                                 com.aicrm.crm.security.OwnershipGuard ownershipGuard) {
+                                 com.aicrm.crm.security.OwnershipGuard ownershipGuard,
+                                 OpportunityStageHistoryService stageHistory) {
         this.opportunityRepository = opportunityRepository;
         this.customerRepository = customerRepository;
         this.users = users;
         this.ownershipGuard = ownershipGuard;
+        this.stageHistory = stageHistory;
     }
 
     /**
@@ -103,6 +109,8 @@ public class OpportunityController {
                 : customer.getOwner();
         opportunity.assignOwner(owner);
         opportunityRepository.save(opportunity);
+        // 建立時寫入初始階段歷史（from=null）
+        stageHistory.record(opportunity, null, opportunity.getStage());
         return toResponse(opportunity);
     }
 
@@ -163,6 +171,7 @@ public class OpportunityController {
                 .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + id));
         // SALES 僅能變更自己負責客戶的商機階段
         ownershipGuard.assertCanAccessOwner(opportunity.getCustomer().getOwnerName());
+        var fromStage = opportunity.getStage();
         // 結案階段走 closeWith，一般階段走 updateStage
         if (request.stage() == OpportunityStage.CLOSED_WON || request.stage() == OpportunityStage.CLOSED_LOST) {
             var closeDate = request.actualCloseDate() == null ? java.time.LocalDate.now() : request.actualCloseDate();
@@ -171,6 +180,7 @@ public class OpportunityController {
             opportunity.updateStage(request.stage());
         }
         opportunityRepository.save(opportunity);
+        stageHistory.record(opportunity, fromStage, opportunity.getStage());
         return toResponse(opportunity);
     }
 }

@@ -127,6 +127,10 @@ export interface StageReport {
   stage: OpportunityStage;
   count: number;
   amount: number;
+  /** 平均停留天數（SP13；舊後端可能缺省） */
+  avgDaysInStage?: number;
+  /** 超時筆數（SP13） */
+  overdueCount?: number;
 }
 
 export interface MoneyChartPoint {

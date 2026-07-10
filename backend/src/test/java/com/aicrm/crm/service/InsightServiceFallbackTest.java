@@ -12,9 +12,7 @@ import com.aicrm.crm.api.Dtos;
 import com.aicrm.crm.domain.AiCallLog;
 import com.aicrm.crm.domain.AiCallType;
 import com.aicrm.crm.domain.Customer;
-import com.aicrm.crm.repository.KnowledgeDocumentRepository;
-import com.aicrm.crm.repository.KnowledgeVectorRepository;
-import com.aicrm.crm.service.embedding.EmbeddingClient;
+import com.aicrm.crm.service.ai.RagCitationService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
@@ -29,9 +27,7 @@ class InsightServiceFallbackTest {
     @Test
     void chat_withoutApiKey_usesDeterministicFallback() {
         var customerService = mock(CustomerService.class);
-        var knowledge = mock(KnowledgeDocumentRepository.class);
-        var embeddingClient = mock(EmbeddingClient.class);
-        var vectorRepo = mock(KnowledgeVectorRepository.class);
+        var rag = mock(RagCitationService.class);
         var provider = (ObjectProvider<ChatModel>) mock(ObjectProvider.class);
         var governance = mock(AiGovernanceService.class);
         // fallback 路徑會寫 ai_call_log，回傳含 id 的紀錄供 callId 使用
@@ -40,16 +36,11 @@ class InsightServiceFallbackTest {
 
         var customer = new Customer("艾克玫", "a@b.c", "0912345678", "12345678", "雲端服務", "業務A");
         when(customerService.findDetail(1L)).thenReturn(customer);
-        when(knowledge.findTop3ByOrderBySimilarityHintDesc()).thenReturn(List.of());
-        // 向量檢索回空，使 loadCitations graceful fallback 至 similarityHint（此處亦為空）
-        when(embeddingClient.embed(List.of("請評估這位客戶"), EmbeddingClient.InputType.QUERY))
-                .thenReturn(List.of(new float[1024]));
-        when(vectorRepo.searchTopK(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(3)))
-                .thenReturn(List.of());
+        when(rag.loadCitations(any())).thenReturn(List.of());
 
         var chatMemory = mock(ChatMemoryService.class); // recall 預設回 null/空、save 不動作，不影響 fallback 行為
         var systemSettings = mock(SystemSettingService.class);
-        var service = new InsightService(customerService, knowledge, embeddingClient, vectorRepo, provider, governance, chatMemory, systemSettings, "", "https://api.openai.com", 8000, "low"); // 空金鑰 → aiEnabled=false
+        var service = new InsightService(customerService, rag, provider, governance, chatMemory, systemSettings, "", "https://api.openai.com", 8000, "low"); // 空金鑰 → aiEnabled=false
         var response = service.chat(new Dtos.ChatRequest(1L, "請評估這位客戶"));
 
         assertThat(response.answer()).contains("艾克玫");          // deterministic 內容含客戶名

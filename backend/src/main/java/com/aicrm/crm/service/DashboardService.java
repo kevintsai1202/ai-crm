@@ -25,8 +25,12 @@ public class DashboardService {
     /** Entity/DTO 轉換工具。 */
     private final CustomerMapper mapper = new CustomerMapper();
 
-    public DashboardService(CustomerRepository customers) {
+    /** 階段停留／超時（SP13）。 */
+    private final OpportunityStageHistoryService stageHistory;
+
+    public DashboardService(CustomerRepository customers, OpportunityStageHistoryService stageHistory) {
         this.customers = customers;
+        this.stageHistory = stageHistory;
     }
 
     /**
@@ -86,11 +90,19 @@ public class DashboardService {
                 .filter(opp -> leadSource == null || opp.getLeadSource().name().equals(leadSource))
                 .toList();
 
+        var dwell = stageHistory.computeDwellStats(opportunities);
         var pipelineByStage = java.util.Arrays.stream(OpportunityStage.values())
                 .map(stage -> {
                     var stageOpps = opportunities.stream().filter(opp -> opp.getStage() == stage).toList();
                     var amount = stageOpps.stream().map(opp -> opp.getAmount()).reduce(BigDecimal.ZERO, BigDecimal::add);
-                    return new Dtos.StageReport(stage.name(), stageOpps.size(), amount);
+                    var stats = dwell.getOrDefault(stage,
+                            new OpportunityStageHistoryService.StageDwellStats(0.0, 0));
+                    return new Dtos.StageReport(
+                            stage.name(),
+                            stageOpps.size(),
+                            amount,
+                            Math.round(stats.avgDaysInStage() * 10) / 10.0,
+                            stats.overdueCount());
                 })
                 .toList();
 
