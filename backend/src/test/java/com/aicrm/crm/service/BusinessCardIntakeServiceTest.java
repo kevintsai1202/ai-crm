@@ -18,6 +18,8 @@ import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 
 /** 名片辨識重複比對、原子確認與冪等規則測試。 */
 class BusinessCardIntakeServiceTest {
@@ -31,11 +33,13 @@ class BusinessCardIntakeServiceTest {
     private final CrmTaskRepository tasks=mock(CrmTaskRepository.class);
     private final AppUserRepository users=mock(AppUserRepository.class);
     private final ObjectMapper mapper=new ObjectMapper();
+    private final EntityManager entityManager=mock(EntityManager.class);
+    private final Query advisoryQuery=mock(Query.class);
     private final JwtService.AuthPrincipal principal=new JwtService.AuthPrincipal("sales@example.com","業務",Role.SALES);
     private BusinessCardIntakeService service;
 
     /** 每案建立乾淨 service。 */
-    @BeforeEach void setUp(){service=new BusinessCardIntakeService(intakes,media,vision,settings,customers,contacts,opportunities,tasks,users,mapper);}
+    @BeforeEach void setUp(){when(entityManager.createNativeQuery(anyString())).thenReturn(advisoryQuery);when(advisoryQuery.setParameter(anyInt(),any())).thenReturn(advisoryQuery);when(advisoryQuery.getSingleResult()).thenReturn(1L);service=new BusinessCardIntakeService(intakes,media,vision,settings,customers,contacts,opportunities,tasks,users,mapper,entityManager);}
 
     /** Email exact、正規化電話與公司模糊名稱均只產生候選，不自動合併。 */
     @Test void create_reportsAllDuplicateReasonsWithoutWritingCrm(){

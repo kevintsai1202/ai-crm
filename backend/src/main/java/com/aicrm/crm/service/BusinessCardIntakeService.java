@@ -7,6 +7,7 @@ import com.aicrm.crm.service.businesscard.*;
 import com.aicrm.crm.service.media.TemporaryMediaService;
 import com.aicrm.crm.service.vision.*;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -31,15 +32,16 @@ public class BusinessCardIntakeService {
     private final CustomerRepository customers; private final ContactRepository contacts;
     private final OpportunityRepository opportunities; private final CrmTaskRepository tasks;
     private final AppUserRepository users; private final ObjectMapper mapper;
+    private final EntityManager entityManager;
 
     /** 注入所有持久化與外部服務邊界。 */
     public BusinessCardIntakeService(BusinessCardIntakeRepository intakes, TemporaryMediaService mediaService,
             BusinessCardRecognitionClient recognition, SystemSettingService settings, CustomerRepository customers,
             ContactRepository contacts, OpportunityRepository opportunities, CrmTaskRepository tasks,
-            AppUserRepository users, ObjectMapper mapper) {
+            AppUserRepository users, ObjectMapper mapper, EntityManager entityManager) {
         this.intakes=intakes; this.mediaService=mediaService; this.recognition=recognition; this.settings=settings;
         this.customers=customers; this.contacts=contacts; this.opportunities=opportunities; this.tasks=tasks;
-        this.users=users; this.mapper=mapper;
+        this.users=users; this.mapper=mapper; this.entityManager=entityManager;
     }
 
     /** 驗證 OCR assignment 後暫存圖片並執行 deterministic/production Vision client。 */
@@ -72,11 +74,18 @@ public class BusinessCardIntakeService {
     public Dtos.BusinessCardConfirmResponse confirm(Long id, Dtos.ConfirmBusinessCardRequest request,
             JwtService.AuthPrincipal principal, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) throw new IllegalArgumentException("Idempotency-Key 為必填");
+        String key=idempotencyKey.trim(); String hash = sha256(write(request));
+        entityManager.createNativeQuery("select pg_advisory_xact_lock(hashtextextended(?1, 0))")
+                .setParameter(1, principal.username()+":"+key).getSingleResult();
+        Optional<BusinessCardIntake> prior=intakes.findByCreatorUsernameAndIdempotencyKey(principal.username(),key);
+        if(prior.isPresent()) {
+            if(hash.equals(prior.get().getIdempotencyPayloadHash())) return confirmedResponse(prior.get());
+            throw new BusinessCardConflictException("Idempotency-Key 已由不同請求使用");
+        }
         BusinessCardIntake intake = visible(intakes.findByIdForUpdate(id)
                 .orElseThrow(() -> new EntityNotFoundException("名片辨識工作不存在")), principal);
-        String hash = sha256(write(request));
         if (intake.getStatus() == BusinessCardStatus.CONFIRMED) {
-            if (idempotencyKey.equals(intake.getIdempotencyKey()) && hash.equals(intake.getIdempotencyPayloadHash())) return confirmedResponse(intake);
+            if (key.equals(intake.getIdempotencyKey()) && hash.equals(intake.getIdempotencyPayloadHash())) return confirmedResponse(intake);
             throw new BusinessCardConflictException("名片已由不同請求確認");
         }
         if (intake.getStatus() != BusinessCardStatus.REVIEW_PENDING) throw new BusinessCardConflictException("名片目前不可確認");
@@ -91,7 +100,7 @@ public class BusinessCardIntakeService {
         CrmTask task = tasks.save(new CrmTask(customer, opportunity, contact, CrmTaskType.PHONE_CALL,
                 CrmTaskPriority.NORMAL, "名片聯絡：" + contact.getName(), "安排電話訪問", owner,
                 callAt, callAt.plusMinutes(30), CrmTaskSource.BUSINESS_CARD));
-        intake.confirm(principal.username(), idempotencyKey.trim(), hash, customer.getId(), contact.getId(), opportunity.getId(), task.getId());
+        intake.confirm(principal.username(), key, hash, customer.getId(), contact.getId(), opportunity.getId(), task.getId());
         intakes.save(intake); intake.getMedia().transition(MediaStatus.CONFIRMED);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             /** 僅在資料庫 commit 成功後刪除名片原圖。 */

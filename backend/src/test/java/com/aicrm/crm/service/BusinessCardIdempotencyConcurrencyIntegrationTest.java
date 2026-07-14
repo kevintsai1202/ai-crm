@@ -22,6 +22,9 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
+import jakarta.persistence.*;
 
 /** 真實 PostgreSQL 鎖與唯一約束下的名片確認併發冪等測試。 */
 @org.springframework.boot.test.context.SpringBootTest(properties={"app.media.enabled=true","app.media.s3.endpoint=http://unused","app.media.s3.access-key=x","app.media.s3.secret-key=x"})
@@ -29,6 +32,7 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
     @Autowired BusinessCardIntakeService service; @Autowired SystemSettingService settings;
     @Autowired AiProviderRepository providers; @Autowired AppUserRepository users; @Autowired CustomerRepository customers;
     @Autowired ContactRepository contacts; @Autowired OpportunityRepository opportunities; @Autowired CrmTaskRepository tasks;
+    @Autowired JdbcTemplate jdbc; @Autowired EntityManagerFactory entityManagerFactory;
     @MockitoBean TemporaryMediaStore store; @MockitoBean BusinessCardRecognitionClient vision;
     private byte[] png; private JwtService.AuthPrincipal principal; private Customer mergeCustomer;
 
@@ -50,25 +54,43 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
 
     /** 同 key 同 payload 雙執行緒只建立一組 CRM，兩者回相同結果。 */
     @Test void sameKeySamePayload_replaysSingleCommittedResult() throws Exception {
-        long intake=createIntake(), c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
-        var results=runPair(intake,request("併發同內容"),request("併發同內容"));
+        long first=createIntake(), second=createIntake(), c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
+        var results=runPair(first,second,request("併發同內容"),request("併發同內容"));
         assertThat(results).allMatch(Result::success); assertThat(results.get(0).response()).isEqualTo(results.get(1).response());
         assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
     }
 
     /** 同 key 不同 payload 只能一筆成功，另一筆衝突且仍只建立一組 CRM。 */
     @Test void sameKeyDifferentPayload_oneWinsOneConflictsWithoutPartialDuplicate() throws Exception {
-        long intake=createIntake(),c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
-        var results=runPair(intake,request("版本A"),request("版本B"));
+        long first=createIntake(),second=createIntake(),c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
+        var results=runPair(first,second,request("版本A"),request("版本B"));
         assertThat(results.stream().filter(Result::success)).hasSize(1);assertThat(results.stream().filter(r->r.error() instanceof BusinessCardConflictException)).hasSize(1);
         assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
     }
 
+    /** V23.2 CHECK 在資料庫層拒絕缺少結果欄位的假 CONFIRMED。 */
+    @Test void confirmationConstraintRejectsIncompleteResult(){
+        long intake=createIntake();
+        assertThatThrownBy(()->jdbc.update("update business_card_intakes set status='CONFIRMED' where id=?",intake))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /** @Version 使兩個 persistence context 的第二次提交發生 optimistic conflict。 */
+    @Test void versionRejectsLostUpdate(){
+        long id=createIntake(); EntityManager first=entityManagerFactory.createEntityManager(),second=entityManagerFactory.createEntityManager();
+        try {
+            first.getTransaction().begin();second.getTransaction().begin();
+            first.find(BusinessCardIntake.class,id).fail("first");second.find(BusinessCardIntake.class,id).fail("second");
+            first.getTransaction().commit();
+            assertThatThrownBy(()->second.getTransaction().commit()).isInstanceOf(RollbackException.class);
+        } finally {if(first.getTransaction().isActive())first.getTransaction().rollback();if(second.getTransaction().isActive())second.getTransaction().rollback();first.close();second.close();}
+    }
+
     /** 以 barrier 同時送出兩筆確認。 */
-    private List<Result> runPair(long intake,Dtos.ConfirmBusinessCardRequest a,Dtos.ConfirmBusinessCardRequest b) throws Exception {
+    private List<Result> runPair(long first,long second,Dtos.ConfirmBusinessCardRequest a,Dtos.ConfirmBusinessCardRequest b) throws Exception {
         CyclicBarrier barrier=new CyclicBarrier(2);ExecutorService executor=Executors.newFixedThreadPool(2);
-        String key="same-key-"+intake;
-        try {var f1=executor.submit(()->invoke(barrier,intake,a,key));var f2=executor.submit(()->invoke(barrier,intake,b,key));return List.of(f1.get(30,TimeUnit.SECONDS),f2.get(30,TimeUnit.SECONDS));}
+        String key="same-key-"+first;
+        try {var f1=executor.submit(()->invoke(barrier,first,a,key));var f2=executor.submit(()->invoke(barrier,second,b,key));return List.of(f1.get(30,TimeUnit.SECONDS),f2.get(30,TimeUnit.SECONDS));}
         finally {executor.shutdownNow();}
     }
     /** 單一併發呼叫轉成可斷言結果。 */

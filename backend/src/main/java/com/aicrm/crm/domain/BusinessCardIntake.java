@@ -6,6 +6,8 @@ import java.time.Instant;
 /** 保存名片辨識草稿、重複候選與人工確認結果。 */
 @Entity @Table(name = "business_card_intakes")
 public class BusinessCardIntake extends AuditableEntity {
+    /** 樂觀鎖版本，避免非確認路徑遺失更新。 */
+    @Version @Column(nullable=false) private long version;
     /** 名片 intake 主鍵。 */
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     /** 暫存原圖 metadata。 */

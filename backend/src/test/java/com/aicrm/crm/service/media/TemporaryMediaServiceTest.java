@@ -3,12 +3,14 @@ package com.aicrm.crm.service.media;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 
 import com.aicrm.crm.domain.MediaPurpose;
 import com.aicrm.crm.domain.MediaStatus;
@@ -23,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.zip.CRC32;
 import java.time.Duration;
 import java.time.Instant;
@@ -201,7 +204,7 @@ class TemporaryMediaServiceTest {
         Instant now = Instant.parse("2026-07-15T00:00:00Z");
         TemporaryMedia success = TemporaryMedia.restoreForCleanup(1L, "media/one", MediaStatus.UPLOADED, now.minusSeconds(1));
         TemporaryMedia failedObject = TemporaryMedia.restoreForCleanup(2L, "media/two", MediaStatus.FAILED, now.minusSeconds(1));
-        when(repository.findCleanupCandidates(now, List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED)))
+        when(repository.findCleanupCandidates(now, List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED, MediaStatus.DELETE_PENDING)))
                 .thenReturn(List.of(success, failedObject));
         doThrow(new IllegalStateException("s3 down")).when(store).delete("media/two");
 
@@ -215,7 +218,7 @@ class TemporaryMediaServiceTest {
         Instant now = Instant.parse("2026-07-15T00:00:00Z");
         TemporaryMedia retry = TemporaryMedia.restoreForCleanup(1L, "media/retry", MediaStatus.REVIEW_PENDING, now);
         TemporaryMedia later = TemporaryMedia.restoreForCleanup(2L, "media/later", MediaStatus.FAILED, now.minusSeconds(1));
-        List<MediaStatus> eligible = List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED);
+        List<MediaStatus> eligible = List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED, MediaStatus.DELETE_PENDING);
         when(repository.findCleanupCandidates(now, eligible)).thenReturn(List.of(retry, later), List.of(retry));
         doThrow(new IllegalStateException("db down")).doNothing().when(repository).delete(retry);
 
@@ -224,6 +227,23 @@ class TemporaryMediaServiceTest {
         assertThat(service.deleteExpired(now)).isEqualTo(1);
         verify(store, org.mockito.Mockito.times(2)).delete("media/retry");
         verify(repository, org.mockito.Mockito.times(2)).delete(retry);
+    }
+
+    /** object 已刪但最終 DB save 失敗時，先前 DELETE_PENDING 可由下一輪冪等重試完成。 */
+    @Test
+    void deleteConfirmed_finalSaveFailureRemainsRetryableThenBecomesDeleted() {
+        TemporaryMedia media=TemporaryMedia.restoreForCleanup(9L,"media/pending",MediaStatus.CONFIRMED,Instant.EPOCH);
+        List<MediaStatus> saved=new ArrayList<>();
+        when(repository.save(any())).thenAnswer(inv->{TemporaryMedia value=inv.getArgument(0);saved.add(value.getStatus());if(saved.size()==2)throw new IllegalStateException("db down");return value;});
+        service.deleteConfirmed(media);
+        assertThat(saved).containsExactly(MediaStatus.DELETE_PENDING,MediaStatus.DELETED);
+
+        TemporaryMedia pending=TemporaryMedia.restoreForCleanup(9L,"media/pending",MediaStatus.DELETE_PENDING,Instant.EPOCH);
+        Instant now=Instant.now();
+        when(repository.findCleanupCandidates(eq(now),any())).thenReturn(List.of(pending));
+        assertThat(service.deleteExpired(now)).isEqualTo(1);
+        assertThat(pending.getStatus()).isEqualTo(MediaStatus.DELETED);
+        verify(store,times(2)).delete("media/pending");
     }
 
     private void assertAccepted(MediaPurpose purpose, String mime, byte[] bytes) {

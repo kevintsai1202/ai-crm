@@ -83,6 +83,9 @@ public class TemporaryMedia extends AuditableEntity {
     /** 記錄物件已刪除；metadata 保留供 audit。 */
     public void markDeleted() { this.status = MediaStatus.DELETED; this.deletedAt = Instant.now(); this.errorSummary = null; }
 
+    /** 在刪除 object 前持久化可重試狀態。 */
+    public void markDeletePending() { this.status = MediaStatus.DELETE_PENDING; this.errorSummary = null; }
+
     /** 記錄刪除失敗的安全摘要供 cleanup retry。 */
     public void deletionFailed(String summary) { this.status = MediaStatus.FAILED; this.errorSummary = summary; }
 

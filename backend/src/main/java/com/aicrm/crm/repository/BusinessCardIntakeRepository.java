@@ -12,4 +12,7 @@ public interface BusinessCardIntakeRepository extends JpaRepository<BusinessCard
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from BusinessCardIntake b where b.id=:id")
     Optional<BusinessCardIntake> findByIdForUpdate(@Param("id") Long id);
+
+    /** 查詢此使用者首次使用冪等鍵產生的確認結果。 */
+    Optional<BusinessCardIntake> findByCreatorUsernameAndIdempotencyKey(String creatorUsername, String idempotencyKey);
 }

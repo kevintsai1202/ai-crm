@@ -89,9 +89,9 @@ public class TemporaryMediaService {
     public int deleteExpired(Instant now) {
         int deleted = 0;
         List<TemporaryMedia> candidates = repository.findCleanupCandidates(
-                now, List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED));
+                now, List.of(MediaStatus.UPLOADED, MediaStatus.REVIEW_PENDING, MediaStatus.FAILED, MediaStatus.DELETE_PENDING));
         for (TemporaryMedia media : candidates) {
-            try { store.delete(media.getObjectKey()); repository.delete(media); deleted++; }
+            try { store.delete(media.getObjectKey()); if(media.getStatus()==MediaStatus.DELETE_PENDING){media.markDeleted();repository.save(media);}else repository.delete(media); deleted++; }
             catch (RuntimeException exception) { log.warn("暫存媒體清理失敗，保留 metadata 供下次重試：mediaId={}", media.getId(), exception); }
         }
         return deleted;
@@ -106,12 +106,12 @@ public class TemporaryMediaService {
         catch (IOException exception) { throw new IllegalStateException("無法讀取暫存媒體", exception); }
     }
 
-    /** commit 後刪除 object；失敗保留 CONFIRMED metadata 供 cleanup 重試。 */
+    /** commit 後先持久化 DELETE_PENDING，再刪 object 並標記 DELETED。 */
     public void deleteConfirmed(TemporaryMedia media) {
+        media.markDeletePending(); repository.save(media);
         try { store.delete(media.getObjectKey()); media.markDeleted(); repository.save(media); }
         catch (RuntimeException exception) {
-            media.deletionFailed("暫存物件刪除失敗"); repository.save(media);
-            log.warn("確認後暫存媒體刪除失敗，保留 metadata：mediaId={}", media.getId());
+            log.warn("確認後暫存媒體刪除或完成標記失敗，DELETE_PENDING 可供重試：mediaId={}", media.getId(), exception);
         }
     }
 

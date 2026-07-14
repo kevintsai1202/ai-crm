@@ -6,6 +6,7 @@ public enum MediaStatus {
     PROCESSING,
     REVIEW_PENDING,
     CONFIRMED,
+    DELETE_PENDING,
     FAILED,
     DELETED
 }

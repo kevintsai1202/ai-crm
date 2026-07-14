@@ -20,16 +20,16 @@ class OpenAiBusinessCardRecognitionClientTest {
     /** 使用 provider baseURL/key/model 並以 data URL 傳圖，可解析嚴格 JSON。 */
     @Test void recognize_sendsProviderPayloadAndParsesStructuredJson(){
         server.createContext("/v1/chat/completions",exchange->{body.set(new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8));
-            String response="{\"choices\":[{\"message\":{\"content\":\"{\\\"personName\\\":\\\"王小明\\\",\\\"title\\\":\\\"採購\\\",\\\"email\\\":\\\"a@example.com\\\",\\\"phone\\\":\\\"0912\\\",\\\"companyName\\\":\\\"未來科技\\\",\\\"website\\\":null,\\\"confidence\\\":{},\\\"warnings\\\":[]}\"}}]}";
+            String response="{\"choices\":[{\"message\":{\"content\":\"{\\\"personName\\\":\\\"王小明\\\",\\\"title\\\":\\\"採購\\\",\\\"email\\\":\\\"a@example.com\\\",\\\"phone\\\":\\\"0912345678\\\",\\\"companyName\\\":\\\"未來科技\\\",\\\"website\\\":null,\\\"confidence\\\":{},\\\"warnings\\\":[]}\"}}]}";
             byte[] bytes=response.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();});
-        var result=new OpenAiBusinessCardRecognitionClient(new ObjectMapper()).recognize(new byte[]{1,2},"image/png",assignment());
-        assertThat(result.companyName()).isEqualTo("未來科技"); assertThat(body.get()).contains("vision-test","data:image/png;base64,AQI=","json_object");
+        var result=new OpenAiBusinessCardRecognitionClient(new ObjectMapper(),new ProviderEndpointPolicy("localhost")).recognize(new byte[]{1,2},"image/png",assignment());
+        assertThat(result.companyName()).isEqualTo("未來科技"); assertThat(body.get()).contains("vision-test","data:image/png;base64,AQI=","json_schema","untrusted data");
     }
 
     /** 非 JSON 或缺少 choices 內容必須 fail closed。 */
     @Test void recognize_invalidResponse_throwsSanitizedServiceException(){
         server.createContext("/v1/chat/completions",exchange->{byte[] bytes="{}".getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();});
-        assertThatThrownBy(()->new OpenAiBusinessCardRecognitionClient(new ObjectMapper()).recognize(new byte[]{1},"image/png",assignment()))
+        assertThatThrownBy(()->new OpenAiBusinessCardRecognitionClient(new ObjectMapper(),new ProviderEndpointPolicy("localhost")).recognize(new byte[]{1},"image/png",assignment()))
                 .isInstanceOf(VisionServiceException.class).hasMessage("Vision provider 回應缺少內容");
     }
 
