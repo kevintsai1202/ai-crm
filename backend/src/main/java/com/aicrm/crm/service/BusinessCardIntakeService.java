@@ -74,7 +74,8 @@ public class BusinessCardIntakeService {
     public Dtos.BusinessCardConfirmResponse confirm(Long id, Dtos.ConfirmBusinessCardRequest request,
             JwtService.AuthPrincipal principal, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) throw new IllegalArgumentException("Idempotency-Key 為必填");
-        String key=idempotencyKey.trim(); String hash = sha256(write(request));
+        CanonicalConfirmCommand command=CanonicalConfirmCommand.from(request);
+        String key=idempotencyKey.trim(); String hash = sha256(write(command));
         entityManager.createNativeQuery("select pg_advisory_xact_lock(hashtextextended(?1, 0))")
                 .setParameter(1, principal.username()+":"+key).getSingleResult();
         Optional<BusinessCardIntake> prior=intakes.findByCreatorUsernameAndIdempotencyKey(principal.username(),key);
@@ -90,13 +91,13 @@ public class BusinessCardIntakeService {
         }
         if (intake.getStatus() != BusinessCardStatus.REVIEW_PENDING) throw new BusinessCardConflictException("名片目前不可確認");
         AppUser owner = users.findByUsername(principal.username()).orElseThrow(() -> new AccessDeniedException("找不到登入帳號"));
-        Customer customer = resolveCustomer(request, principal, owner);
-        Contact contact = contacts.save(new Contact(customer, request.contactName().trim(), request.contactTitle().trim(), request.contactEmail().trim()));
-        Opportunity opportunity = new Opportunity(customer, request.opportunityName().trim(), OpportunityStage.QUALIFICATION,
-                Optional.ofNullable(request.opportunityAmount()).orElse(BigDecimal.ZERO), request.expectedCloseDate(), OpportunityType.NEW_BUSINESS,
+        Customer customer = resolveCustomer(command, principal, owner);
+        Contact contact = contacts.save(new Contact(customer, command.contactName(), command.contactTitle(), command.contactEmail()));
+        Opportunity opportunity = new Opportunity(customer, command.opportunityName(), OpportunityStage.QUALIFICATION,
+                command.opportunityAmount(), command.expectedCloseDate(), OpportunityType.NEW_BUSINESS,
                 LeadSource.REFERRAL, 10);
         opportunity.assignOwner(owner); opportunity = opportunities.save(opportunity);
-        LocalDateTime callAt = request.callAt();
+        LocalDateTime callAt = command.callAt();
         CrmTask task = tasks.save(new CrmTask(customer, opportunity, contact, CrmTaskType.PHONE_CALL,
                 CrmTaskPriority.NORMAL, "名片聯絡：" + contact.getName(), "安排電話訪問", owner,
                 callAt, callAt.plusMinutes(30), CrmTaskSource.BUSINESS_CARD));
@@ -110,11 +111,11 @@ public class BusinessCardIntakeService {
     }
 
     /** 依人工選擇建立新客戶或合併既有客戶；候選永不自動合併。 */
-    private Customer resolveCustomer(Dtos.ConfirmBusinessCardRequest request, JwtService.AuthPrincipal principal, AppUser owner) {
-        String action = request.customerAction().trim().toUpperCase(Locale.ROOT);
+    private Customer resolveCustomer(CanonicalConfirmCommand request, JwtService.AuthPrincipal principal, AppUser owner) {
+        String action = request.customerAction();
         if ("CREATE".equals(action)) {
-            Customer customer = new Customer(request.customerName().trim(), request.customerEmail().trim(), request.customerPhone().trim(),
-                    request.taxId().trim(), request.industry().trim(), owner.getDisplayName());
+            Customer customer = new Customer(request.customerName(), request.customerEmail(), request.customerPhone(),
+                    request.taxId(), request.industry(), owner.getDisplayName());
             customer.assignOwner(owner); return customers.save(customer);
         }
         if (!"MERGE".equals(action) || request.customerId() == null) throw new IllegalArgumentException("必須明確選擇 CREATE 或 MERGE 與 customerId");

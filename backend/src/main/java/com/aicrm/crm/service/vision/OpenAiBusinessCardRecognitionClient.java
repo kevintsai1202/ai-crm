@@ -1,9 +1,6 @@
 package com.aicrm.crm.service.vision;
 
 import com.aicrm.crm.api.Dtos.RecognizedBusinessCard;
-import java.net.URI;
-import java.net.http.*;
-import java.time.Duration;
 import java.util.*;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -12,20 +9,19 @@ import tools.jackson.databind.JsonNode;
 /** OpenAI-compatible Vision adapter，使用 Provider base URL 與憑證。 */
 @Component
 public class OpenAiBusinessCardRecognitionClient implements BusinessCardRecognitionClient {
-    /** 有界 timeout 的 HTTP client。 */
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     /** Jackson 3 parser。 */
     private final ObjectMapper mapper;
     private final ProviderEndpointPolicy endpointPolicy;
-    private static final int MAX_RESPONSE_BODY=1_000_000, MAX_CONTENT=32_000;
+    private final VisionHttpTransport transport;
+    private static final int MAX_CONTENT=32_000;
 
     /** 建立 Vision adapter。 */
-    public OpenAiBusinessCardRecognitionClient(ObjectMapper mapper, ProviderEndpointPolicy endpointPolicy) { this.mapper = mapper; this.endpointPolicy=endpointPolicy; }
+    public OpenAiBusinessCardRecognitionClient(ObjectMapper mapper, ProviderEndpointPolicy endpointPolicy, VisionHttpTransport transport) { this.mapper = mapper; this.endpointPolicy=endpointPolicy; this.transport=transport; }
 
     /** 以 data URL 傳送圖片並要求模型只輸出 JSON。 */
     @Override public RecognizedBusinessCard recognize(byte[] image, String mimeType, AiModelAssignment assignment) {
         try {
-            URI endpoint = endpointPolicy.chatCompletions(assignment.baseUrl());
+            var endpoint = endpointPolicy.resolveAndValidate(assignment.baseUrl());
             String dataUrl = "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(image);
             var payload = mapper.createObjectNode(); payload.put("model", assignment.model()); payload.put("temperature", 0);
             var messages = payload.putArray("messages");
@@ -37,13 +33,8 @@ public class OpenAiBusinessCardRecognitionClient implements BusinessCardRecognit
             var format=payload.putObject("response_format"); format.put("type","json_schema");
             var definition=format.putObject("json_schema"); definition.put("name","business_card"); definition.put("strict",true);
             definition.set("schema", mapper.readTree(schema()));
-            endpointPolicy.revalidate(endpoint);
-            var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(30))
-                    .header("Content-Type", "application/json").header("Authorization", "Bearer " + assignment.apiKey())
-                    .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(payload))).build();
-            var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new VisionServiceException("Vision provider HTTP 錯誤");
-            if(response.body().length()>MAX_RESPONSE_BODY) throw new VisionServiceException("Vision provider 回應過大");
+            var response=transport.post(endpoint,assignment.apiKey(),mapper.writeValueAsString(payload));
+            if (response.status() < 200 || response.status() >= 300) throw new VisionServiceException("Vision provider HTTP 錯誤");
             var root = mapper.readTree(response.body());
             String json = root.path("choices").path(0).path("message").path("content").asText();
             if (json == null || json.isBlank()) throw new VisionServiceException("Vision provider 回應缺少內容");

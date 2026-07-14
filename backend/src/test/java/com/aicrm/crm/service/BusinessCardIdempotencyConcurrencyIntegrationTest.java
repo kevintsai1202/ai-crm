@@ -55,7 +55,7 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
     /** 同 key 同 payload 雙執行緒只建立一組 CRM，兩者回相同結果。 */
     @Test void sameKeySamePayload_replaysSingleCommittedResult() throws Exception {
         long first=createIntake(), second=createIntake(), c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
-        var results=runPair(first,second,request("併發同內容"),request("併發同內容"));
+        var results=runPair(first,second,request("併發同內容"),semanticEquivalent("併發同內容"));
         assertThat(results).allMatch(Result::success); assertThat(results.get(0).response()).isEqualTo(results.get(1).response());
         assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
     }
@@ -99,5 +99,7 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
     private long createIntake(){return service.create(new MockMultipartFile("file","card.png","image/png",png),principal).id();}
     /** 建立固定 hash 輸入，僅商機名可變。 */
     private Dtos.ConfirmBusinessCardRequest request(String name){return new Dtos.ConfirmBusinessCardRequest("MERGE",mergeCustomer.getId(),mergeCustomer.getName(),mergeCustomer.getEmail(),mergeCustomer.getPhone(),mergeCustomer.getTaxId(),mergeCustomer.getIndustry(),"王小明","採購","buyer@example.com",name,new BigDecimal("1000"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
+    /** 空白、action case、email case、電話格式及金額 scale 不影響 canonical payload。 */
+    private Dtos.ConfirmBusinessCardRequest semanticEquivalent(String name){return new Dtos.ConfirmBusinessCardRequest(" merge ",mergeCustomer.getId()," "+mergeCustomer.getName()+" ",mergeCustomer.getEmail().toUpperCase(Locale.ROOT),"+886 "+mergeCustomer.getPhone().substring(1)," "+mergeCustomer.getTaxId()+" "," "+mergeCustomer.getIndustry()+" "," 王小明 "," 採購 "," BUYER@EXAMPLE.COM "," "+name+" ",new BigDecimal("1000.00"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
     /** 併發呼叫結果。 */ private record Result(Dtos.BusinessCardConfirmResponse response,Throwable error){boolean success(){return response!=null;}}
 }

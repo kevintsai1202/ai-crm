@@ -8,6 +8,7 @@ import com.aicrm.crm.api.Dtos;
 import com.aicrm.crm.domain.*;
 import com.aicrm.crm.repository.*;
 import com.aicrm.crm.service.businesscard.BusinessCardConflictException;
+import com.aicrm.crm.service.businesscard.CanonicalConfirmCommand;
 import com.aicrm.crm.service.media.TemporaryMediaService;
 import com.aicrm.crm.service.vision.*;
 import java.math.BigDecimal;
@@ -90,7 +91,7 @@ class BusinessCardIntakeServiceTest {
     /** 同 key 同 payload replay 原結果；同 key 不同 payload 必須 409 且零寫入。 */
     @Test void confirm_idempotencyReplayAndConflict(){
         BusinessCardIntake intake=mock(BusinessCardIntake.class); when(intake.getId()).thenReturn(7L); when(intake.getCreatorUsername()).thenReturn(principal.username()); when(intake.getStatus()).thenReturn(BusinessCardStatus.CONFIRMED);
-        var request=request("CREATE",null); when(intake.getIdempotencyKey()).thenReturn("key-1"); when(intake.getIdempotencyPayloadHash()).thenReturn(hash(write(request)));
+        var request=request("CREATE",null); when(intake.getIdempotencyKey()).thenReturn("key-1"); when(intake.getIdempotencyPayloadHash()).thenReturn(hash(write(CanonicalConfirmCommand.from(request))));
         when(intake.getCustomerId()).thenReturn(1L); when(intake.getContactId()).thenReturn(2L); when(intake.getOpportunityId()).thenReturn(3L); when(intake.getTaskId()).thenReturn(4L); when(intakes.findByIdForUpdate(7L)).thenReturn(Optional.of(intake));
         assertThat(service.confirm(7L,request,principal,"key-1").taskId()).isEqualTo(4L);
         assertThatThrownBy(()->service.confirm(7L,request("CREATE",null,"另一商機"),principal,"key-1")).isInstanceOf(BusinessCardConflictException.class);
