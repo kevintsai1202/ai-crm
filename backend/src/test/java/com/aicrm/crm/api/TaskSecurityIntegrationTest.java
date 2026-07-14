@@ -3,6 +3,7 @@ package com.aicrm.crm.api;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.aicrm.crm.domain.*;
 import com.aicrm.crm.repository.AppUserRepository;
@@ -162,6 +163,29 @@ class TaskSecurityIntegrationTest extends PostgresTestBase {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.detail").value("CRM 任務資料不符合規則"));
     }
 
+    /** SALES owner 可依正確版本完成 update 與 complete，且 ownership 不變。 */
+    @Test
+    void mutations_salesOwner_updateAndCompleteSucceed() throws Exception {
+        var owner = users.findByUsername("sales@aurora.local").orElseThrow();
+        var task = service.create(new JwtService.AuthPrincipal(owner.getUsername(), owner.getDisplayName(), Role.SALES),
+                request(customers.findAll().getFirst().getId(), owner.getId(), "SALES 正向矩陣"));
+        assertMutationMatrix(salesToken, task, owner.getId());
+    }
+
+    /** MANAGER 可依正確版本 update/postpone/complete 其他 assignee 任務。 */
+    @Test
+    void mutations_manager_otherAssigneeAllSucceed() throws Exception {
+        var task = createOtherAssigneeTask("MANAGER 正向矩陣");
+        assertMutationMatrix(managerToken, task, task.assigneeId());
+    }
+
+    /** ADMIN 可依正確版本 update/postpone/complete 其他 assignee 任務。 */
+    @Test
+    void mutations_admin_otherAssigneeAllSucceed() throws Exception {
+        var task = createOtherAssigneeTask("ADMIN 正向矩陣");
+        assertMutationMatrix(adminToken, task, task.assigneeId());
+    }
+
     /** 以固定排程建立測試任務請求。 */
     private Dtos.CreateTaskRequest request(Long customerId, Long assigneeId, String title) {
         return new Dtos.CreateTaskRequest(customerId, null, null, CrmTaskType.GENERAL, CrmTaskPriority.NORMAL,
@@ -182,6 +206,33 @@ class TaskSecurityIntegrationTest extends PostgresTestBase {
                 + (contactId == null ? "" : ",\"contactId\":" + contactId)
                 + ",\"type\":\"GENERAL\",\"priority\":\"NORMAL\",\"title\":\"" + title + "\",\"assigneeId\":" + assigneeId
                 + ",\"scheduledStart\":\"2026-09-02T09:00:00\",\"scheduledEnd\":\"2026-09-02T10:00:00\",\"source\":\"MANUAL\"}";
+    }
+
+    /** 驗證指定角色可依序 update、postpone、complete，且 version、延期次數與 ownership 正確。 */
+    private void assertMutationMatrix(String token, Dtos.TaskResponse task, Long expectedAssigneeId) throws Exception {
+        var updatePayload = "{\"type\":\"MEETING\",\"priority\":\"HIGH\",\"title\":\"已更新任務\",\"assigneeId\":"
+                + expectedAssigneeId + ",\"scheduledStart\":\"2026-09-10T09:00:00\",\"scheduledEnd\":\"2026-09-10T10:00:00\",\"version\":" + task.version() + "}";
+        var updatedBody = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/tasks/{id}", task.id())
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON).content(updatePayload))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.assigneeId").value(expectedAssigneeId))
+                .andExpect(jsonPath("$.status").value("OPEN")).andReturn().getResponse().getContentAsString();
+        var updated = om.readTree(updatedBody);
+        assertThat(updated.get("version").asLong()).isGreaterThan(task.version());
+
+        var postponePayload = "{\"scheduledStart\":\"2026-09-11T09:00:00\",\"scheduledEnd\":\"2026-09-11T10:00:00\",\"version\":" + updated.get("version").asLong() + "}";
+        var postponedBody = mvc.perform(post("/api/tasks/{id}/postpone", task.id()).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content(postponePayload))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.assigneeId").value(expectedAssigneeId))
+                .andExpect(jsonPath("$.postponeCount").value(task.postponeCount() + 1)).andReturn().getResponse().getContentAsString();
+        var postponed = om.readTree(postponedBody);
+        assertThat(postponed.get("version").asLong()).isGreaterThan(updated.get("version").asLong());
+
+        mvc.perform(post("/api/tasks/{id}/complete", task.id()).header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"version\":" + postponed.get("version").asLong() + "}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.assigneeId").value(expectedAssigneeId))
+                .andExpect(jsonPath("$.postponeCount").value(task.postponeCount() + 1))
+                .andExpect(jsonPath("$.version").value(org.hamcrest.Matchers.greaterThan(postponed.get("version").asInt())));
     }
 
     /** 登入 seed 帳號並回傳 JWT。 */
