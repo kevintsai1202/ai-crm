@@ -15,7 +15,14 @@ import com.aicrm.crm.domain.TemporaryMedia;
 import com.aicrm.crm.repository.TemporaryMediaRepository;
 import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.zip.CRC32;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +33,14 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 
 class TemporaryMediaServiceTest {
     private final TemporaryMediaStore store = mock(TemporaryMediaStore.class);
@@ -51,6 +66,21 @@ class TemporaryMediaServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void stage_rejectsLongHeaderSpoofsAndImageDimensionBomb() {
+        byte[] fakeMp3 = new byte[16_000];
+        fakeMp3[0] = (byte) 0xff; fakeMp3[1] = (byte) 0xfb; fakeMp3[2] = (byte) 0x90;
+        byte[] fakeM4a = new byte[16_000];
+        System.arraycopy(new byte[] {0,0,0,16,'f','t','y','p','M','4','A',' ',0,0,0,0}, 0, fakeM4a, 0, 16);
+
+        assertThatThrownBy(() -> service.stage(file("long-spoof.mp3", "audio/mpeg", fakeMp3), MediaPurpose.MEETING_AUDIO, principal))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.stage(file("long-spoof.m4a", "audio/mp4", fakeM4a), MediaPurpose.MEETING_AUDIO, principal))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.stage(file("bomb.png", "image/png", dimensionBombPng()), MediaPurpose.BUSINESS_CARD, principal))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @ParameterizedTest
     @MethodSource("validFormats")
     void stage_acceptsStructurallyValidFormats(MediaPurpose purpose, String mime, byte[] bytes) {
@@ -66,7 +96,7 @@ class TemporaryMediaServiceTest {
 
     @Test
     void stage_enforcesPurposeLimitsUsingDeclaredAndActualSize() throws IOException {
-        byte[] imageAtLimit = png(10 * 1024 * 1024);
+        byte[] imageAtLimit = png();
         assertAccepted(MediaPurpose.BUSINESS_CARD, "image/png", imageAtLimit);
         MultipartFile declaredTooLarge = mock(MultipartFile.class);
         when(declaredTooLarge.getSize()).thenReturn(10L * 1024 * 1024 + 1);
@@ -74,9 +104,9 @@ class TemporaryMediaServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         verify(declaredTooLarge, never()).getBytes();
 
-        byte[] audioAtLimit = wav(100 * 1024 * 1024);
+        byte[] audioAtLimit = wav();
         assertAccepted(MediaPurpose.MEETING_AUDIO, "audio/wav", audioAtLimit);
-        byte[] audioOverLimit = wav(100 * 1024 * 1024 + 1);
+        byte[] audioOverLimit = new byte[100 * 1024 * 1024 + 1];
         MultipartFile understated = mock(MultipartFile.class);
         when(understated.getSize()).thenReturn(1L);
         when(understated.getContentType()).thenReturn("audio/wav");
@@ -140,11 +170,11 @@ class TemporaryMediaServiceTest {
     static Stream<Arguments> validFormats() {
         TemporaryMediaServiceTest fixture = new TemporaryMediaServiceTest();
         return Stream.of(
-                Arguments.of(MediaPurpose.BUSINESS_CARD, "image/jpeg", fixture.jpeg()),
+                Arguments.of(MediaPurpose.BUSINESS_CARD, "image/jpeg", fixture.progressiveJpeg()),
                 Arguments.of(MediaPurpose.BUSINESS_CARD, "image/png", fixture.png()),
-                Arguments.of(MediaPurpose.BUSINESS_CARD, "image/webp", fixture.webp()),
-                Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/mpeg", fixture.mp3()),
-                Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/mp4", fixture.m4a()),
+                Arguments.of(MediaPurpose.BUSINESS_CARD, "image/webp", fixture.resource("synthetic-extended.webp")),
+                Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/mpeg", fixture.resource("synthetic-tone.mp3")),
+                Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/mp4", fixture.resource("synthetic-tone.m4a")),
                 Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/wav", fixture.wav()));
     }
 
@@ -158,60 +188,53 @@ class TemporaryMediaServiceTest {
                 Arguments.of(MediaPurpose.MEETING_AUDIO, "audio/wav", new byte[] {'R','I','F','F',4,0,0,0,'W','A','V','E'}));
     }
 
-    private byte[] webp() {
-        return new byte[] {'R','I','F','F',18,0,0,0,'W','E','B','P','V','P','8','L',5,0,0,0,1,2,3,4,5,0};
-    }
-
-    private byte[] m4a() {
-        return new byte[] {0,0,0,16,'f','t','y','p','M','4','A',' ',0,0,0,0,
-                0,0,0,9,'m','o','o','v',1, 0,0,0,9,'m','d','a','t',1};
-    }
-
+    /** 以 AudioSystem 產生一秒 PCM WAV，確保 fixture 可被真實音訊 parser 讀取。 */
     private byte[] wav() {
-        return wav(46);
+        try {
+            AudioFormat format = new AudioFormat(8000, 16, 1, true, false);
+            byte[] pcm = new byte[16000];
+            try (AudioInputStream input = new AudioInputStream(new ByteArrayInputStream(pcm), format, 8000);
+                    ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                AudioSystem.write(input, AudioFileFormat.Type.WAVE, output);
+                return output.toByteArray();
+            }
+        } catch (IOException exception) { throw new IllegalStateException(exception); }
     }
 
-    private byte[] wav(int size) {
-        byte[] bytes = new byte[size];
-        byte[] header = new byte[] {'R','I','F','F',36,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0,1,0,1,0};
-        System.arraycopy(header, 0, bytes, 0, header.length);
-        putLeInt(bytes, 4, size - 8);
-        bytes[36]='d'; bytes[37]='a'; bytes[38]='t'; bytes[39]='a';
-        putLeInt(bytes, 40, size - 44);
-        bytes[44]=1;
-        return bytes;
-    }
-
+    /** 以 ImageIO 產生具有正確 CRC/zlib 資料的 PNG。 */
     private byte[] png() {
-        return png(58);
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", output);
+            return output.toByteArray();
+        } catch (IOException exception) { throw new IllegalStateException(exception); }
     }
 
-    private byte[] png(int size) {
-        byte[] bytes = new byte[size];
-        byte[] signature = new byte[] {(byte)0x89,'P','N','G',13,10,26,10,0,0,0,13,'I','H','D','R',0,0,0,1,0,0,0,1,8,2,0,0,0,0,0,0,0};
-        System.arraycopy(signature, 0, bytes, 0, signature.length);
-        int idatLength = size - 57;
-        putBeInt(bytes, 33, idatLength); bytes[37]='I'; bytes[38]='D'; bytes[39]='A'; bytes[40]='T'; bytes[41]=1;
-        int iend = 45 + idatLength;
-        bytes[iend+4]='I'; bytes[iend+5]='E'; bytes[iend+6]='N'; bytes[iend+7]='D';
-        return bytes;
+    /** 以 ImageIO JPEG writer 產生 progressive JPEG。 */
+    private byte[] progressiveJpeg() {
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream(); ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output)) {
+            ImageWriteParam parameters = writer.getDefaultWriteParam();
+            parameters.setProgressiveMode(ImageWriteParam.MODE_DEFAULT);
+            writer.setOutput(imageOutput);
+            writer.write(null, new javax.imageio.IIOImage(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), null, null), parameters);
+            return output.toByteArray();
+        } catch (IOException exception) { throw new IllegalStateException(exception); }
+        finally { writer.dispose(); }
     }
 
-    private byte[] jpeg() {
-        return new byte[] {(byte)0xff,(byte)0xd8,(byte)0xff,(byte)0xda,0,6,1,1,0,0,1,2,3,(byte)0xff,(byte)0xd9};
+    /** 讀取已簽入、來源可重現的合成媒體 fixture。 */
+    private byte[] resource(String name) {
+        try { return Files.readAllBytes(Path.of("src/test/resources/media", name)); }
+        catch (IOException exception) { throw new IllegalStateException(exception); }
     }
 
-    private byte[] mp3() {
-        byte[] bytes = new byte[417];
-        bytes[0]=(byte)0xff; bytes[1]=(byte)0xfb; bytes[2]=(byte)0x90; bytes[3]=0; bytes[4]=1;
-        return bytes;
-    }
-
-    private void putLeInt(byte[] bytes, int offset, int value) {
-        ByteBuffer.wrap(bytes, offset, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(value);
-    }
-
-    private void putBeInt(byte[] bytes, int offset, int value) {
-        ByteBuffer.wrap(bytes, offset, 4).putInt(value);
+    /** 建立超過一億像素且 IHDR CRC 正確的 PNG，驗證解碼前像素防護。 */
+    private byte[] dimensionBombPng() {
+        byte[] bytes = png();
+        ByteBuffer.wrap(bytes, 16, 8).putInt(10_001).putInt(10_000);
+        CRC32 crc = new CRC32();
+        crc.update(bytes, 12, 17);
+        ByteBuffer.wrap(bytes, 29, 4).putInt((int) crc.getValue());
+        return Arrays.copyOf(bytes, bytes.length);
     }
 }
