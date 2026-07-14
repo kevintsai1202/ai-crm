@@ -32,7 +32,7 @@ export function newPhaseDataPrefix(phase: string): string {
 /**
  * 刪除指定前綴建立的客戶資料；客戶的聯絡人、互動與商機由後端既有 cascade 一併清除。
  *
- * @param request 已具備登入狀態的 Playwright API request context
+ * @param request 已以 ADMIN 登入的 Playwright API request context；SALES 無權刪除任意前綴客戶
  * @param prefix 本次測試由 newPhaseDataPrefix 建立的唯一前綴
  */
 export async function cleanupPhaseData(request: APIRequestContext, prefix: string): Promise<void> {
@@ -49,7 +49,8 @@ export async function cleanupPhaseData(request: APIRequestContext, prefix: strin
       params: { keyword: prefix, page, size: 100 },
     });
     if (!response.ok()) {
-      throw new Error(`查詢 E2E 客戶資料失敗：HTTP ${response.status()}`);
+      const adminHint = response.status() === 403 ? "；cleanupPhaseData 必須使用 ADMIN APIRequestContext" : "";
+      throw new Error(`查詢 E2E 客戶資料失敗：HTTP ${response.status()}${adminHint}`);
     }
 
     const customerPage = (await response.json()) as CustomerPage;
@@ -63,7 +64,8 @@ export async function cleanupPhaseData(request: APIRequestContext, prefix: strin
     if (!customer.name.startsWith(prefix)) continue;
     const response = await request.delete(`/api/customers/${customer.id}`);
     if (!response.ok()) {
-      throw new Error(`刪除 E2E 客戶資料失敗：customerId=${customer.id}，HTTP ${response.status()}`);
+      const adminHint = response.status() === 403 ? "；請確認使用 ADMIN APIRequestContext" : "";
+      throw new Error(`刪除 E2E 客戶資料失敗：customerId=${customer.id}，HTTP ${response.status()}${adminHint}`);
     }
   }
 }
