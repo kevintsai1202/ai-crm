@@ -170,6 +170,9 @@ public class DemoDataService {
     /** 對話記憶存取：清除重建時刪除綁定既有客戶的對話（FK 參照 customers，not null）。 */
     private final ChatMessageRepository chatMessageRepository;
 
+    /** CRM 任務存取：示範資料清除重建時須先明確刪除，正式外鍵不做 cascade。 */
+    private final com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -194,6 +197,7 @@ public class DemoDataService {
                            InteractionInsightRepository interactionInsightRepository,
                            ContactRepository contactRepository,
                            ChatMessageRepository chatMessageRepository,
+                           com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -206,6 +210,7 @@ public class DemoDataService {
         this.interactionInsightRepository = interactionInsightRepository;
         this.contactRepository = contactRepository;
         this.chatMessageRepository = chatMessageRepository;
+        this.crmTaskRepository = crmTaskRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -305,17 +310,19 @@ public class DemoDataService {
     }
 
     /**
-     * 依 FK 順序清除「業務資料」：互動分析 → 互動 → 商機 → 客戶。
+     * 依 FK 順序清除「業務資料」：任務 → 互動分析 → 互動 → 商機 → 客戶。
      * 帳號、系統設定、AI 歷程、對話記憶不在清除範圍。
      */
     private void clearBusinessData() {
+        // 正式 FK 刻意禁止 cascade；只有已明確啟用的示範 reset 流程可主動清除歷史任務。
+        crmTaskRepository.deleteAllInBatch();
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();
         contactRepository.deleteAllInBatch();
         opportunityRepository.deleteAllInBatch();
         chatMessageRepository.deleteAllInBatch();
         customerRepository.deleteAllInBatch();
-        log.info("示範資料清除完成（互動分析 / 互動 / 聯絡人 / 商機 / 對話記憶 / 客戶）；帳號、設定與 AI 稽核歷程保留。");
+        log.info("示範資料清除完成（任務 / 互動分析 / 互動 / 聯絡人 / 商機 / 對話記憶 / 客戶）；帳號、設定與 AI 稽核歷程保留。");
     }
 
     /**

@@ -466,6 +466,45 @@ public final class Dtos {
     /** 優先關懷單筆：客戶與中文關懷理由。 */
     public record PriorityCareItem(Long customerId, String name, String reason) {}
 
+    /** 建立 CRM 任務請求。 */
+    public record CreateTaskRequest(
+            @NotNull Long customerId,
+            Long opportunityId,
+            Long contactId,
+            @NotNull com.aicrm.crm.domain.CrmTaskType type,
+            @NotNull com.aicrm.crm.domain.CrmTaskPriority priority,
+            @NotBlank String title,
+            String description,
+            @NotNull Long assigneeId,
+            @NotNull LocalDateTime scheduledStart,
+            @NotNull LocalDateTime scheduledEnd,
+            @NotNull com.aicrm.crm.domain.CrmTaskSource source) {}
+
+    /** 編輯 CRM 任務請求；version 用於拒絕過期畫面送出的更新。 */
+    public record UpdateTaskRequest(
+            @NotNull com.aicrm.crm.domain.CrmTaskType type,
+            @NotNull com.aicrm.crm.domain.CrmTaskPriority priority,
+            @NotBlank String title,
+            String description,
+            @NotNull Long assigneeId,
+            @NotNull LocalDateTime scheduledStart,
+            @NotNull LocalDateTime scheduledEnd,
+            @NotNull Long version) {}
+
+    /** CRM 任務延期請求。 */
+    public record PostponeTaskRequest(@NotNull LocalDateTime scheduledStart,
+                                      @NotNull LocalDateTime scheduledEnd) {}
+
+    /** CRM 任務 API 回應。 */
+    public record TaskResponse(
+            Long id, Long customerId, Long opportunityId, Long contactId,
+            com.aicrm.crm.domain.CrmTaskType type,
+            com.aicrm.crm.domain.CrmTaskStatus status,
+            com.aicrm.crm.domain.CrmTaskPriority priority,
+            String title, String description, Long assigneeId, String assigneeName,
+            LocalDateTime scheduledStart, LocalDateTime scheduledEnd, LocalDateTime completedAt,
+            int postponeCount, com.aicrm.crm.domain.CrmTaskSource source, long version) {}
+
     /** 模型設定項目（含供應商關聯、已確認能力及能力來源）。 */
     public record ModelOptionItem(
             String model,

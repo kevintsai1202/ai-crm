@@ -8,6 +8,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -67,6 +68,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return problem(HttpStatus.FORBIDDEN, "Forbidden", "目前角色沒有執行此操作的權限", request);
+    }
+
+    /** 將任務狀態或排程規則違反轉為 400，而非洩漏成 500。 */
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    ResponseEntity<ProblemDetail> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
+    }
+
+    /** 將過期版本或資料庫樂觀鎖衝突轉為 409。 */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
     }
 
     /**
