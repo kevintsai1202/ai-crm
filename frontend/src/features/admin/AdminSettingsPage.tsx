@@ -16,7 +16,15 @@ import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { downloadMarkdown, downloadZip } from "../../lib/download";
-import { filterModelsForCapability, hasCapability } from "./modelCapabilities";
+import {
+  buildModelAssignments,
+  canEditCapabilities,
+  filterModelsForCapability,
+  hasCapability,
+  isSameModelPair,
+  modelOptionKey,
+  modelPairKey,
+} from "./modelCapabilities";
 
 /** 單一模型的競速測試結果。 */
 interface ModelRaceResult {
@@ -58,8 +66,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [settingError, setSettingError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [ocrModel, setOcrModel] = useState("");
-  const [transcriptionModel, setTranscriptionModel] = useState("");
+  const [ocrModelKey, setOcrModelKey] = useState("");
+  const [transcriptionModelKey, setTranscriptionModelKey] = useState("");
 
   /* ── Provider 管理狀態 ─────────────────────────────── */
   /** 已設定的 AI 供應商清單 */
@@ -124,8 +132,8 @@ export default function AdminSettingsPage() {
       setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setProviders(data.providers);
-      setOcrModel(data.ocrModel ?? "");
-      setTranscriptionModel(data.transcriptionModel ?? "");
+      setOcrModelKey(modelPairKey(data.ocrModel, data.ocrProviderId));
+      setTranscriptionModelKey(modelPairKey(data.transcriptionModel, data.transcriptionProviderId));
       syncParams(data);
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "載入失敗");
@@ -141,8 +149,9 @@ export default function AdminSettingsPage() {
    * 若再次點擊已選模型則取消選取（model 設為空字串）。
    */
   async function selectModel(m: string, pid: number | null) {
-    const newModel = currentModel === m ? "" : m;
-    const newPid = currentModel === m ? null : pid;
+    const isCurrentPair = currentModel === m && currentProviderId === pid;
+    const newModel = isCurrentPair ? "" : m;
+    const newPid = isCurrentPair ? null : pid;
     setCurrentModel(newModel);
     setCurrentProviderId(newPid);
     setActionMsg(null);
@@ -172,7 +181,7 @@ export default function AdminSettingsPage() {
   function addModel() {
     const m = newModel.trim();
     if (!m) return;
-    if (!options.find(o => o.model === m)) {
+    if (!options.find((option) => isSameModelPair(option, m, newModelProviderId))) {
       setOptions(prev => [...prev, {
         model: m,
         providerId: newModelProviderId,
@@ -187,10 +196,11 @@ export default function AdminSettingsPage() {
   }
 
   /** 從候選清單移除指定模型。 */
-  function removeModel(m: string) {
-    setOptions(prev => prev.filter(o => o.model !== m));
+  function removeModel(optionToRemove: ModelOptionItem) {
+    setOptions(prev => prev.filter((option) => modelOptionKey(option) !== modelOptionKey(optionToRemove)));
+    const m = optionToRemove.model;
     setRaceModels(prev => { const s = new Set(prev); s.delete(m); return s; });
-    if (currentModel === m) {
+    if (currentModel === m && currentProviderId === optionToRemove.providerId) {
       setCurrentModel("");
       setCurrentProviderId(null);
     }
@@ -305,23 +315,20 @@ export default function AdminSettingsPage() {
 
   /** 儲存 OCR／Transcription assignment，並以目前 Chat model 一併送出完整契約。 */
   async function saveAssignments() {
-    const selectedOcr = options.find((option) => option.model === ocrModel) ?? null;
-    const selectedTranscription = options.find((option) => option.model === transcriptionModel) ?? null;
     setSaving(true);
     setSettingError(null);
     try {
-      const data = await saveAiModelAssignments({
+      const assignments = buildModelAssignments(options, {
         chatModel: currentModel,
         chatProviderId: currentProviderId,
-        ocrModel: selectedOcr?.model ?? null,
-        ocrProviderId: selectedOcr?.providerId ?? null,
-        transcriptionModel: selectedTranscription?.model ?? null,
-        transcriptionProviderId: selectedTranscription?.providerId ?? null,
+        ocrKey: ocrModelKey,
+        transcriptionKey: transcriptionModelKey,
       });
+      const data = await saveAiModelAssignments(assignments);
       setSettings(data);
       setOptions(data.modelOptions);
-      setOcrModel(data.ocrModel ?? "");
-      setTranscriptionModel(data.transcriptionModel ?? "");
+      setOcrModelKey(modelPairKey(data.ocrModel, data.ocrProviderId));
+      setTranscriptionModelKey(modelPairKey(data.transcriptionModel, data.transcriptionProviderId));
       setActionMsg("OCR 與語音轉錄模型已儲存。");
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "用途模型儲存失敗");
@@ -509,8 +516,8 @@ export default function AdminSettingsPage() {
   const transcriptionOptions = filterModelsForCapability(options, "AUDIO_TRANSCRIPTION");
   /** 能力被移除後保留的舊 assignment 不得再提交，須由 Admin 改選或清除。 */
   const hasInvalidAssignment =
-    (ocrModel !== "" && !visionOptions.some((option) => option.model === ocrModel))
-    || (transcriptionModel !== "" && !transcriptionOptions.some((option) => option.model === transcriptionModel));
+    (ocrModelKey !== "" && !visionOptions.some((option) => modelOptionKey(option) === ocrModelKey))
+    || (transcriptionModelKey !== "" && !transcriptionOptions.some((option) => modelOptionKey(option) === transcriptionModelKey));
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 900 }}>
@@ -659,7 +666,7 @@ export default function AdminSettingsPage() {
                 <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>尚無候選模型，請在下方輸入後新增。</p>
               )}
               {options.map((opt) => {
-                const isSelected = currentModel === opt.model;
+                const isSelected = isSameModelPair(opt, currentModel, currentProviderId);
                 /** 從 providers 清單查找此模型對應的供應商名稱 */
                 const providerName = providers.find(p => p.id === opt.providerId)?.name;
                 return (
@@ -718,7 +725,7 @@ export default function AdminSettingsPage() {
                         padding: "1px 6px", borderRadius: 4,
                       }}>{opt.capabilitySource}</span>
                     </div>
-                    {opt.capabilitySource !== "AUTO" && opt.providerId != null && (
+                    {canEditCapabilities(opt) && (
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", marginRight: 10 }}>
                         <label style={{ fontSize: 11, color: "#475569" }}>
                           <input type="checkbox"
@@ -748,7 +755,7 @@ export default function AdminSettingsPage() {
                       type="button"
                       className="btn-danger"
                       style={{ padding: "3px 10px", fontSize: 12 }}
-                      onClick={(e) => { e.stopPropagation(); removeModel(opt.model); }}
+                      onClick={(e) => { e.stopPropagation(); removeModel(opt); }}
                     >
                       刪除
                     </button>
@@ -787,23 +794,29 @@ export default function AdminSettingsPage() {
               <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
                 <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
                   OCR（僅 👁 Vision）
-                  <select data-testid="ocr-model-select" value={ocrModel} onChange={(event) => setOcrModel(event.target.value)}
+                  <select data-testid="ocr-model-select" value={ocrModelKey} onChange={(event) => setOcrModelKey(event.target.value)}
                     style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
                     <option value="">未設定</option>
-                    {visionOptions.map((option) => (
-                      <option key={`${option.model}-${option.providerId}`} value={option.model}>{option.model}</option>
-                    ))}
+                    {visionOptions.map((option) => {
+                      const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
+                      return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
+                        {option.model}{providerName ? ` — ${providerName}` : ""}
+                      </option>;
+                    })}
                   </select>
                 </label>
                 <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
                   Transcription（僅 👂 Audio）
-                  <select data-testid="transcription-model-select" value={transcriptionModel}
-                    onChange={(event) => setTranscriptionModel(event.target.value)}
+                  <select data-testid="transcription-model-select" value={transcriptionModelKey}
+                    onChange={(event) => setTranscriptionModelKey(event.target.value)}
                     style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
                     <option value="">未設定</option>
-                    {transcriptionOptions.map((option) => (
-                      <option key={`${option.model}-${option.providerId}`} value={option.model}>{option.model}</option>
-                    ))}
+                    {transcriptionOptions.map((option) => {
+                      const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
+                      return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
+                        {option.model}{providerName ? ` — ${providerName}` : ""}
+                      </option>;
+                    })}
                   </select>
                 </label>
                 <button type="button" className="btn-assess" data-testid="save-model-assignments"
