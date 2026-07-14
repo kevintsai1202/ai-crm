@@ -196,7 +196,7 @@ public class AdminSettingController {
      */
     @PutMapping("/ai/models/{model}/capabilities")
     public Dtos.ModelOptionItem updateModelCapabilities(@PathVariable String model,
-                                                        @RequestBody Dtos.ModelCapabilitiesRequest request,
+                                                        @Valid @RequestBody Dtos.ModelCapabilitiesRequest request,
                                                         Authentication authentication) {
         try {
             return systemSettings.updateModelCapabilities(model, request.providerId(), request.capabilities(),
@@ -217,6 +217,9 @@ public class AdminSettingController {
     public Dtos.AiSettingsResponse updateAssignments(@RequestBody Dtos.AiModelAssignments request,
                                                       Authentication authentication) {
         try {
+            if (request == null) {
+                throw new IllegalArgumentException("AI model assignment request 不得為 null");
+            }
             systemSettings.updateAssignments(request, resolveUsername(authentication));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());

@@ -69,9 +69,7 @@ public class OpenAiCompatibleModelCatalogClient implements ModelCatalogClient {
                 continue;
             }
             var capabilities = extractCapabilities(model.get("input_modalities"));
-            var source = model.containsKey("input_modalities")
-                    ? CapabilitySource.AUTO
-                    : CapabilitySource.UNKNOWN;
+            var source = capabilities == null ? CapabilitySource.UNKNOWN : CapabilitySource.AUTO;
             result.add(new Dtos.ModelOptionItem(id, providerId, capabilities, source));
         }
         return List.copyOf(result);
@@ -80,12 +78,12 @@ public class OpenAiCompatibleModelCatalogClient implements ModelCatalogClient {
     /** 將明確 input modalities 映射成受支援能力；不讀取或推測模型名稱。 */
     private Set<ModelCapability> extractCapabilities(Object rawModalities) {
         if (!(rawModalities instanceof List<?> modalities)) {
-            return Set.of();
+            return null;
         }
         var capabilities = new LinkedHashSet<ModelCapability>();
         for (var modality : modalities) {
-            if (!(modality instanceof String value)) {
-                continue;
+            if (!(modality instanceof String value) || !StringUtils.hasText(value)) {
+                return null;
             }
             switch (value.toLowerCase(Locale.ROOT)) {
                 case "image" -> capabilities.add(ModelCapability.VISION);

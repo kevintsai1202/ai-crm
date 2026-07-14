@@ -492,8 +492,8 @@ public final class Dtos {
 
     /** Admin 人工覆寫指定 Provider 模型能力的請求。 */
     public record ModelCapabilitiesRequest(
-            Long providerId,
-            java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities) {}
+            @jakarta.validation.constraints.NotNull Long providerId,
+            @jakarta.validation.constraints.NotNull java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities) {}
 
     /** AI 供應商檢視（apiKey 永不回傳前端，以 apiKeySet 布林代替）。 */
     public record AiProviderItem(Long id, String name, String baseUrl, boolean apiKeySet) {}

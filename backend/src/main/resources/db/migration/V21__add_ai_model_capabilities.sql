@@ -15,8 +15,16 @@ SET setting_value = (
                 WHEN jsonb_typeof(option_value) = 'object' THEN
                     option_value
                     || jsonb_build_object(
-                        'capabilities', COALESCE(option_value->'capabilities', '[]'::jsonb),
-                        'capabilitySource', COALESCE(option_value->'capabilitySource', '"UNKNOWN"'::jsonb)
+                        'capabilities', CASE
+                            WHEN jsonb_typeof(option_value->'capabilities') = 'array'
+                                THEN option_value->'capabilities'
+                            ELSE '[]'::jsonb
+                        END,
+                        'capabilitySource', CASE
+                            WHEN jsonb_typeof(option_value->'capabilitySource') = 'string'
+                                THEN option_value->'capabilitySource'
+                            ELSE '"UNKNOWN"'::jsonb
+                        END
                     )
                 ELSE option_value
             END

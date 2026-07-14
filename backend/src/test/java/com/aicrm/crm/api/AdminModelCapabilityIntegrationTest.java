@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.aicrm.crm.domain.AiProvider;
@@ -48,9 +49,14 @@ class AdminModelCapabilityIntegrationTest extends PostgresTestBase {
 
     /** 取得 seed ADMIN 的 JWT。 */
     private String adminToken() throws Exception {
+        return tokenFor("admin@aurora.local");
+    }
+
+    /** 取得指定 seed 帳號的 JWT。 */
+    private String tokenFor(String username) throws Exception {
         var result = mockMvc().perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"admin@aurora.local\",\"password\":\"password123\"}"))
+                        .content("{\"username\":\"" + username + "\",\"password\":\"password123\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
         return JsonPath.read(result.getResponse().getContentAsString(), "$.token");
@@ -126,6 +132,58 @@ class AdminModelCapabilityIntegrationTest extends PostgresTestBase {
 
         mockMvc().perform(post("/api/admin/settings/ai/providers/{id}/models/refresh", provider.getId())
                         .header("Authorization", "Bearer " + adminToken()))
-                .andExpect(status().isBadGateway());
+                .andExpect(status().isBadGateway())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("provider unavailable"))));
+    }
+
+    /** Null body、null assignment 與無效 enum 必須回 400，不得變成 500。 */
+    @Test
+    void malformedCapabilityRequests_returnBadRequest() throws Exception {
+        var token = adminToken();
+
+        mockMvc().perform(put("/api/admin/settings/ai/models/model/capabilities")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+        mockMvc().perform(put("/api/admin/settings/ai/models/model/capabilities")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"providerId\":1,\"capabilities\":[\"NOT_A_CAPABILITY\"]}"))
+                .andExpect(status().isBadRequest());
+        mockMvc().perform(put("/api/admin/settings/ai/assignments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("null"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /** 三個新 endpoint 均只允許 ADMIN；未登入 401，SALES 403。 */
+    @Test
+    void modelCapabilityEndpoints_requireAdminRole() throws Exception {
+        var salesToken = tokenFor("sales@aurora.local");
+        var assignments = "{\"chatModel\":\"\",\"ocrModel\":\"\",\"transcriptionModel\":\"\"}";
+        var capabilities = "{\"providerId\":1,\"capabilities\":[]}";
+
+        mockMvc().perform(post("/api/admin/settings/ai/providers/1/models/refresh"))
+                .andExpect(status().isUnauthorized());
+        mockMvc().perform(put("/api/admin/settings/ai/models/model/capabilities")
+                        .contentType(MediaType.APPLICATION_JSON).content(capabilities))
+                .andExpect(status().isUnauthorized());
+        mockMvc().perform(put("/api/admin/settings/ai/assignments")
+                        .contentType(MediaType.APPLICATION_JSON).content(assignments))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc().perform(post("/api/admin/settings/ai/providers/1/models/refresh")
+                        .header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isForbidden());
+        mockMvc().perform(put("/api/admin/settings/ai/models/model/capabilities")
+                        .header("Authorization", "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(capabilities))
+                .andExpect(status().isForbidden());
+        mockMvc().perform(put("/api/admin/settings/ai/assignments")
+                        .header("Authorization", "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(assignments))
+                .andExpect(status().isForbidden());
     }
 }

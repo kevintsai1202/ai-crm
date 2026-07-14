@@ -77,4 +77,46 @@ class OpenAiCompatibleModelCatalogClientTest {
         assertThat(result.getFirst().capabilitySource()).isEqualTo(CapabilitySource.AUTO);
         server.verify();
     }
+
+    /** input_modalities 為 null、字串或含非字串元素時不是可靠 metadata。 */
+    @Test
+    void discover_withMalformedInputModalitiesRemainsUnknown() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://models.example/v1/models"))
+                .andRespond(withSuccess("""
+                        {"data":[
+                          {"id":"null-modalities","input_modalities":null},
+                          {"id":"string-modalities","input_modalities":"image"},
+                          {"id":"mixed-modalities","input_modalities":["image",7]},
+                          {"id":"blank-modalities","input_modalities":[""]}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        var provider = new AiProvider("Example", "https://models.example", null, "admin");
+        var result = new OpenAiCompatibleModelCatalogClient(builder).discover(provider);
+
+        assertThat(result).allSatisfy(option -> {
+            assertThat(option.capabilities()).isEmpty();
+            assertThat(option.capabilitySource()).isEqualTo(CapabilitySource.UNKNOWN);
+        });
+        server.verify();
+    }
+
+    /** 有效空陣列明確表示沒有特殊輸入能力，來源仍為 AUTO。 */
+    @Test
+    void discover_withValidEmptyModalitiesIsAutoWithNoCapabilities() {
+        var builder = RestClient.builder();
+        var server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://models.example/v1/models"))
+                .andRespond(withSuccess("{\"data\":[{\"id\":\"text-only\",\"input_modalities\":[]}]}",
+                        MediaType.APPLICATION_JSON));
+
+        var provider = new AiProvider("Example", "https://models.example", null, "admin");
+        var result = new OpenAiCompatibleModelCatalogClient(builder).discover(provider);
+
+        assertThat(result.getFirst().capabilities()).isEmpty();
+        assertThat(result.getFirst().capabilitySource()).isEqualTo(CapabilitySource.AUTO);
+        server.verify();
+    }
 }

@@ -287,7 +287,13 @@ public class SystemSettingService {
      */
     @Transactional
     public void updateAssignments(Dtos.AiModelAssignments assignments, String username) {
+        if (assignments == null) {
+            throw new IllegalArgumentException("AI model assignment request 不得為 null");
+        }
         var options = getModelOptions();
+        validateProvider(assignments.chatProviderId(), "Chat");
+        validateProvider(assignments.ocrProviderId(), "OCR");
+        validateProvider(assignments.transcriptionProviderId(), "Transcription");
         validateCapability(assignments.ocrModel(), assignments.ocrProviderId(),
                 ModelCapability.VISION, "OCR", options);
         validateCapability(assignments.transcriptionModel(), assignments.transcriptionProviderId(),
@@ -318,6 +324,7 @@ public class SystemSettingService {
         if (!StringUtils.hasText(model) || providerId == null) {
             throw new IllegalArgumentException("模型名稱與 providerId 為必填");
         }
+        validateProvider(providerId, "模型能力");
         var safeCapabilities = capabilities == null ? java.util.Set.<ModelCapability>of() : java.util.Set.copyOf(capabilities);
         var updated = new Dtos.ModelOptionItem(model.strip(), providerId, safeCapabilities,
                 com.aicrm.crm.domain.CapabilitySource.MANUAL);
@@ -407,6 +414,13 @@ public class SystemSettingService {
         return providerId == null ? "" : providerId.toString();
     }
 
+    /** 驗證非空 Provider ID 仍存在，避免 stale assignment 或人工能力設定。 */
+    private void validateProvider(Long providerId, String purpose) {
+        if (providerId != null && !providerRepository.existsById(providerId)) {
+            throw new IllegalArgumentException(purpose + " Provider 不存在：" + providerId);
+        }
+    }
+
     /**
      * upsert AI 設定：model 須為空或在 options 內，否則拋例外。
      *
@@ -421,9 +435,12 @@ public class SystemSettingService {
                                  Double temperature, Integer maxCompletionTokens, String reasoningEffort,
                                  String username) {
         var safeModel = model == null ? "" : model.strip();
-        var safeOptions = modelOptions == null ? List.<Dtos.ModelOptionItem>of() : modelOptions;
-        var modelNames = safeOptions.stream().map(Dtos.ModelOptionItem::model).toList();
-        if (!safeModel.isBlank() && !modelNames.contains(safeModel)) {
+        var safeOptions = normalizeExternalModelOptions(modelOptions);
+        validateProvider(providerId, "Chat");
+        var selectedOptionExists = safeOptions.stream()
+                .anyMatch(option -> option.model().equals(safeModel)
+                        && java.util.Objects.equals(option.providerId(), providerId));
+        if (!safeModel.isBlank() && !selectedOptionExists) {
             throw new IllegalArgumentException("選用模型不在候選清單內：" + safeModel);
         }
         // 參數驗證：溫度 0~2、max_completion_tokens > 0、reasoning_effort 限定值
@@ -443,6 +460,27 @@ public class SystemSettingService {
         upsert(KEY_AI_CHAT_TEMPERATURE, temperature != null ? temperature.toString() : "", username);
         upsert(KEY_AI_CHAT_MAX_COMPLETION_TOKENS, maxCompletionTokens != null ? maxCompletionTokens.toString() : "", username);
         upsert(KEY_AI_CHAT_REASONING_EFFORT, safeReasoning, username);
+    }
+
+    /**
+     * 正規化舊設定 API 傳入的模型清單：同 pair 保留伺服器可信能力，新 pair 一律 UNKNOWN。
+     * 此邊界禁止前端藉由一般設定 payload 偽造 AUTO 或 MANUAL 能力。
+     */
+    private List<Dtos.ModelOptionItem> normalizeExternalModelOptions(List<Dtos.ModelOptionItem> requestedOptions) {
+        var existingOptions = getModelOptions();
+        var requested = requestedOptions == null ? List.<Dtos.ModelOptionItem>of() : requestedOptions;
+        return requested.stream().map(option -> {
+            if (option == null || !StringUtils.hasText(option.model())) {
+                throw new IllegalArgumentException("模型候選不得為 null 或空名稱");
+            }
+            validateProvider(option.providerId(), "模型候選");
+            return existingOptions.stream()
+                    .filter(existing -> existing.model().equals(option.model().strip()))
+                    .filter(existing -> java.util.Objects.equals(existing.providerId(), option.providerId()))
+                    .findFirst()
+                    .orElseGet(() -> new Dtos.ModelOptionItem(option.model().strip(), option.providerId(),
+                            java.util.Set.of(), com.aicrm.crm.domain.CapabilitySource.UNKNOWN));
+        }).toList();
     }
 
     /** 解析 ModelOptionItem 清單 JSON；任何錯誤回空清單並記 log。 */
