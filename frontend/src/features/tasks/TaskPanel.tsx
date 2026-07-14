@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { completeTask, downloadTaskIcs, fetchTasks, postponeTask } from "../../api/index";
 import type { CrmTask } from "../../types";
-import { mergePostponedTask, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
+import { mergePostponedTask, parseTaskDateTime, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
 import { executeTaskAction } from "./taskActions";
 
 interface TaskPanelProps {
@@ -12,7 +12,7 @@ interface TaskPanelProps {
 
 /** 格式化工作檯顯示時間。 */
 function formatTaskTime(value: string): string {
-  return new Intl.DateTimeFormat("zh-TW", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("zh-TW", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Taipei" }).format(parseTaskDateTime(value));
 }
 
 /** 顯示正式 CRM 任務；規則式 AI 建議由外層另列，絕不冒充持久狀態。 */

@@ -28,11 +28,13 @@ export async function executeTaskAction(options: TaskActionOptions): Promise<boo
   options.onPendingChange(new Set(options.pending));
   try {
     await options.action();
+    options.onError("");
     return true;
   } catch (error) {
-    options.onError(taskActionErrorMessage(error));
+    const actionError = taskActionErrorMessage(error);
     try {
       await options.recover();
+      options.onError(actionError);
     } catch {
       options.onError("任務動作失敗，且無法重新載入最新資料，請手動按重新整理。");
     }

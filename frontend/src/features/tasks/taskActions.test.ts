@@ -34,4 +34,19 @@ describe("CRM 任務動作協調", () => {
     expect(pending.size).toBe(0);
     expect(pendingChanges).toEqual([true, false]);
   });
+
+  it("409 recovery 成功後仍保留剛設定的動作錯誤", async () => {
+    let visibleError = "";
+
+    await executeTaskAction({
+      key: "3:complete",
+      pending: new Set<string>(),
+      action: async () => { throw { response: { status: 409 } }; },
+      recover: async () => { visibleError = ""; },
+      onError: (message) => { visibleError = message; },
+      onPendingChange: () => undefined,
+    });
+
+    expect(visibleError).toBe("任務已被其他使用者更新，已重新載入最新資料，請再試一次。");
+  });
 });

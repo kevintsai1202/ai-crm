@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CrmTask } from "../../types";
-import { mergePostponedTask, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
+import { mergePostponedTask, parseTaskDateTime, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
 
 /** 建立測試用 CRM 任務，僅覆寫案例關注的欄位。 */
 function task(overrides: Partial<CrmTask>): CrmTask {
@@ -60,5 +60,20 @@ describe("CRM 工作檯任務狀態", () => {
       scheduledStart: "2030-07-16T14:00:00",
       scheduledEnd: "2030-07-16T14:30:00",
     }))).toEqual({ scheduledStart: "2030-07-17T14:00:00", scheduledEnd: "2030-07-17T14:30:00" });
+  });
+
+  it("無 offset 時固定視為 Asia/Taipei 牆鐘時間，且逾期判斷不依瀏覽器時區", () => {
+    const rows = selectActiveTasks([
+      task({ scheduledEnd: "2026-07-15T09:30:00" }),
+    ], new Date("2026-07-15T10:00:00+08:00"));
+
+    expect(parseTaskDateTime("2026-07-15T09:30:00").getTime()).toBe(Date.parse("2026-07-15T09:30:00+08:00"));
+    expect(rows[0].overdue).toBe(true);
+  });
+
+  it("尊重既有 offset 或 Z，無效日期則安全回傳 Invalid Date", () => {
+    expect(parseTaskDateTime("2026-07-15T01:30:00Z").getTime()).toBe(Date.parse("2026-07-15T01:30:00Z"));
+    expect(parseTaskDateTime("2026-07-15T09:30:00+08:00").getTime()).toBe(Date.parse("2026-07-15T09:30:00+08:00"));
+    expect(Number.isNaN(parseTaskDateTime("not-a-date").getTime())).toBe(true);
   });
 });
