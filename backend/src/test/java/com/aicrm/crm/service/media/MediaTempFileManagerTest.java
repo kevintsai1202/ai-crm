@@ -2,11 +2,13 @@ package com.aicrm.crm.service.media;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
@@ -68,6 +70,55 @@ class MediaTempFileManagerTest {
         assertThat(manager.ownedCount()).isZero();
         assertThat(manager.pendingCount()).isZero();
         assertThat(outside).exists();
+    }
+
+    @Test
+    void initialize_rejectsDirectorySymlinkWithoutDeletingExternalFile() throws IOException {
+        Path external = root.resolve("external");
+        Files.createDirectory(external);
+        Path externalFile = external.resolve("ai-crm-33333333-3333-3333-3333-333333333333.wav");
+        Files.write(externalFile, new byte[] {1});
+        Files.setLastModifiedTime(externalFile, FileTime.from(Instant.now().minus(Duration.ofHours(25))));
+        Path configured = root.resolve("configured-link");
+        try { Files.createSymbolicLink(configured, external); }
+        catch (UnsupportedOperationException | IOException | SecurityException exception) {
+            assumeTrue(false, "此執行環境不允許建立 symlink");
+        }
+
+        MediaTempFileManager manager = new MediaTempFileManager(configured, Duration.ofHours(24));
+
+        assertThatThrownBy(manager::initialize).isInstanceOf(IOException.class);
+        assertThat(externalFile).exists();
+    }
+
+    @Test
+    void create_rejectsDirectoryIdentityReplacement() throws IOException {
+        MediaTempFileManager manager = initializedManager();
+        Files.delete(manager.tempDirectory());
+        Files.createDirectory(manager.tempDirectory());
+
+        assertThatThrownBy(() -> manager.create(".wav")).isInstanceOf(IOException.class)
+                .hasMessage("媒體暫存目錄 identity 已變更");
+    }
+
+    @Test
+    void posixDirectoryAndFilePermissions_areOwnerOnly() throws IOException {
+        MediaTempFileManager manager = initializedManager();
+        assumeTrue(Files.getFileStore(manager.tempDirectory()).supportsFileAttributeView("posix"));
+
+        Path created = manager.create(".mp3");
+
+        assertThat(Files.getPosixFilePermissions(manager.tempDirectory()))
+                .isEqualTo(PosixFilePermissions.fromString("rwx------"));
+        assertThat(Files.getPosixFilePermissions(created))
+                .isEqualTo(PosixFilePermissions.fromString("rw-------"));
+    }
+
+    @Test
+    void constructor_rejectsStaleAgeBelowOneMinute() {
+        assertThatThrownBy(() -> new MediaTempFileManager(root.resolve("short"), Duration.ofSeconds(59)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("暫存檔 stale age 不可小於 1 分鐘");
     }
 
     /** 建立已初始化且使用測試隔離目錄的 manager。 */
