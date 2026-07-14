@@ -6,6 +6,14 @@
 
 ## 範圍
 
+### V21 AI model capability governance
+
+- Candidate models store explicit `VISION` and/or `AUDIO_TRANSCRIPTION` capabilities with `AUTO`, `MANUAL`, or `UNKNOWN` provenance.
+- Provider metadata is authoritative only when it contains reliable input modalities; model names are never used for capability inference.
+- The Admin UI displays `👁`/`👂` capability markers and the provenance badge. `UNKNOWN` and `MANUAL` entries can be governed with checkboxes; `AUTO` entries remain read-only.
+- OCR selectors contain only `VISION` models and transcription selectors contain only `AUDIO_TRANSCRIPTION` models. Both frontend and backend reject stale or incompatible assignments.
+- V21 migrates legacy model options to empty capabilities with `UNKNOWN`, preserving existing values where valid.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。

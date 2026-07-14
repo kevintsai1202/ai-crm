@@ -2,7 +2,7 @@
 
 > 本文件是所有子專案（SP）進度的**唯一真實來源**。每個 session 開始前先讀本檔，結束後更新狀態。
 > 依據：`docs/consulting-review.md`、`docs/crm-ai-consultant-analysis.md`
-> 最後更新：2026-06-19（SP1 完成上線，下一個 SP2）
+> 最後更新：2026-07-15（V21 AI model capability governance 完成）
 
 ## 狀態圖例
 `⬜ 未開始` ｜ `🟡 設計中(spec)` ｜ `🔵 計畫中(plan)` ｜ `🟠 實作中` ｜ `✅ 完成`
@@ -11,6 +11,13 @@
 
 > **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅、SP8 ✅、SP9-A 示範資料/漏斗 ✅、SP9-B 工作檯個人 AI ✅**　｜　最後完成：SP9-B  
 > **下一階段程式：** SP10–SP15 優化修正（見 `docs/superpowers/plans/2026-07-10-post-sp9-optimization-program.md`）；**不含**金鑰輪替。建議序：SP10 → SP11 →（SP12 ∥ SP13）→ SP14 → SP15。
+
+### Intelligent sales workflows (V21–V27)
+
+| Phase | Status | Delivery |
+|---|---|---|
+| V21 | ✅ Complete | Explicit Vision/audio capabilities, AUTO/MANUAL/UNKNOWN provenance, governed OCR/transcription assignments, Admin UI and real API E2E |
+| V22–V27 | ⬜ Not started | Continue only after the V21 migration, regression, PostgreSQL `15432`, and E2E gates pass |
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|

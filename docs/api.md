@@ -2,6 +2,26 @@
 
 Base URL：`http://127.0.0.1:18080/api`
 
+## V21 AI model capability governance
+
+All endpoints below require the `ADMIN` role. Model capabilities are explicit and never inferred from model names.
+
+- `GET /admin/settings/ai` returns model options with `capabilities` (`VISION`, `AUDIO_TRANSCRIPTION`) and `capabilitySource` (`AUTO`, `MANUAL`, `UNKNOWN`), plus OCR/transcription assignments.
+- `POST /admin/settings/ai/providers/{id}/models/refresh` refreshes the provider catalog. Reliable input-modality metadata produces `AUTO`; missing metadata produces `UNKNOWN`.
+- `PUT /admin/settings/ai/models/{model}/capabilities` accepts `{ "providerId": 1, "capabilities": ["VISION"] }` and records `MANUAL`.
+- `PUT /admin/settings/ai/assignments` updates Chat/OCR/transcription model-provider pairs. OCR requires `VISION`; transcription requires `AUDIO_TRANSCRIPTION`; incompatible assignments return `400`.
+
+```json
+{
+  "chatModel": "gpt-5-mini",
+  "chatProviderId": 1,
+  "ocrModel": "gpt-4o",
+  "ocrProviderId": 1,
+  "transcriptionModel": "whisper-1",
+  "transcriptionProviderId": 1
+}
+```
+
 ## Health
 
 `GET /health`

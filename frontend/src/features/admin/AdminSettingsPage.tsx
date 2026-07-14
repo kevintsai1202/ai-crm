@@ -5,16 +5,18 @@ import {
   fetchAiSettings, saveAiSettings, streamModelTest,
   streamModelScore, fetchModelScoreCalls,
   createAiProvider, updateAiProvider, deleteAiProvider,
+  refreshAiProviderModels, saveModelCapabilities, saveAiModelAssignments,
   logModelTest, fetchModelTestCalls,
-} from "../../api";
+} from "../../api/index";
 import type {
   AiSettingsResponse, AiCallHistoryItem, ModelResultItem,
-  AiProviderItem, ModelOptionItem,
+  AiProviderItem, ModelOptionItem, ModelCapability,
 } from "../../types";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { downloadMarkdown, downloadZip } from "../../lib/download";
+import { filterModelsForCapability, hasCapability } from "./modelCapabilities";
 
 /** 單一模型的競速測試結果。 */
 interface ModelRaceResult {
@@ -56,6 +58,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [settingError, setSettingError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [ocrModel, setOcrModel] = useState("");
+  const [transcriptionModel, setTranscriptionModel] = useState("");
 
   /* ── Provider 管理狀態 ─────────────────────────────── */
   /** 已設定的 AI 供應商清單 */
@@ -120,6 +124,8 @@ export default function AdminSettingsPage() {
       setCurrentProviderId(data.currentProviderId);
       setOptions(data.modelOptions);
       setProviders(data.providers);
+      setOcrModel(data.ocrModel ?? "");
+      setTranscriptionModel(data.transcriptionModel ?? "");
       syncParams(data);
     } catch (e) {
       setSettingError(e instanceof Error ? e.message : "載入失敗");
@@ -167,7 +173,12 @@ export default function AdminSettingsPage() {
     const m = newModel.trim();
     if (!m) return;
     if (!options.find(o => o.model === m)) {
-      setOptions(prev => [...prev, { model: m, providerId: newModelProviderId }]);
+      setOptions(prev => [...prev, {
+        model: m,
+        providerId: newModelProviderId,
+        capabilities: [],
+        capabilitySource: "UNKNOWN",
+      }]);
       setRaceModels(prev => new Set([...prev, m]));
     }
     setNewModel("");
@@ -254,6 +265,68 @@ export default function AdminSettingsPage() {
       await saveAiSettings(currentModel, cleanedProviderId, cleanedOptions, paramsPayload());
     } catch (e) {
       setProviderError(e instanceof Error ? e.message : "刪除失敗");
+    }
+  }
+
+  /** 重新查詢 Provider 模型目錄並以後端回傳能力更新候選清單。 */
+  async function handleRefreshProviderModels(id: number) {
+    setSavingProvider(true);
+    setProviderError(null);
+    try {
+      const refreshedOptions = await refreshAiProviderModels(id);
+      setOptions(refreshedOptions);
+      setActionMsg("模型目錄與能力已更新。");
+    } catch (e) {
+      setProviderError(e instanceof Error ? e.message : "模型目錄更新失敗");
+    } finally {
+      setSavingProvider(false);
+    }
+  }
+
+  /** 切換人工模型能力；AUTO metadata 為唯讀，避免覆蓋 Provider 可信資料。 */
+  async function toggleCapability(option: ModelOptionItem, capability: ModelCapability, enabled: boolean) {
+    if (option.providerId == null || option.capabilitySource === "AUTO") return;
+    setSaving(true);
+    setSettingError(null);
+    try {
+      const nextCapabilities = enabled
+        ? Array.from(new Set([...option.capabilities, capability]))
+        : option.capabilities.filter((item) => item !== capability);
+      const updated = await saveModelCapabilities(option.model, option.providerId, nextCapabilities);
+      setOptions((current) => current.map((item) =>
+        item.model === option.model && item.providerId === option.providerId ? updated : item));
+      setActionMsg(`已更新 ${option.model} 的模型能力。`);
+    } catch (e) {
+      setSettingError(e instanceof Error ? e.message : "模型能力儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** 儲存 OCR／Transcription assignment，並以目前 Chat model 一併送出完整契約。 */
+  async function saveAssignments() {
+    const selectedOcr = options.find((option) => option.model === ocrModel) ?? null;
+    const selectedTranscription = options.find((option) => option.model === transcriptionModel) ?? null;
+    setSaving(true);
+    setSettingError(null);
+    try {
+      const data = await saveAiModelAssignments({
+        chatModel: currentModel,
+        chatProviderId: currentProviderId,
+        ocrModel: selectedOcr?.model ?? null,
+        ocrProviderId: selectedOcr?.providerId ?? null,
+        transcriptionModel: selectedTranscription?.model ?? null,
+        transcriptionProviderId: selectedTranscription?.providerId ?? null,
+      });
+      setSettings(data);
+      setOptions(data.modelOptions);
+      setOcrModel(data.ocrModel ?? "");
+      setTranscriptionModel(data.transcriptionModel ?? "");
+      setActionMsg("OCR 與語音轉錄模型已儲存。");
+    } catch (e) {
+      setSettingError(e instanceof Error ? e.message : "用途模型儲存失敗");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -431,6 +504,13 @@ export default function AdminSettingsPage() {
   const hasRaceResults = Object.keys(raceResults).length > 0;
   const allDone = hasRaceResults && Object.values(raceResults).every((r) => r.status === "done" || r.status === "error");
   const hasDoneResults = hasRaceResults && Object.values(raceResults).some((r) => r.status === "done");
+  /** OCR 與語音轉錄下拉各自只保留後端已確認相容的模型。 */
+  const visionOptions = filterModelsForCapability(options, "VISION");
+  const transcriptionOptions = filterModelsForCapability(options, "AUDIO_TRANSCRIPTION");
+  /** 能力被移除後保留的舊 assignment 不得再提交，須由 Admin 改選或清除。 */
+  const hasInvalidAssignment =
+    (ocrModel !== "" && !visionOptions.some((option) => option.model === ocrModel))
+    || (transcriptionModel !== "" && !transcriptionOptions.some((option) => option.model === transcriptionModel));
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 900 }}>
@@ -494,6 +574,11 @@ export default function AdminSettingsPage() {
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
+                    <button type="button" className="btn-secondary"
+                      aria-label={`重新查詢 ${p.name} 模型`}
+                      disabled={savingProvider}
+                      style={{ fontSize: 12, padding: "3px 10px" }}
+                      onClick={() => handleRefreshProviderModels(p.id)}>更新模型</button>
                     <button type="button" className="btn-secondary"
                       style={{ fontSize: 12, padding: "3px 10px" }}
                       onClick={() => startEditProvider(p)}>編輯</button>
@@ -580,6 +665,8 @@ export default function AdminSettingsPage() {
                 return (
                   <div
                     key={`${opt.model}-${opt.providerId ?? "none"}`}
+                    data-model-name={opt.model}
+                    data-provider-id={opt.providerId ?? ""}
                     onClick={() => { if (!saving) selectModel(opt.model, opt.providerId ?? null); }}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -619,7 +706,44 @@ export default function AdminSettingsPage() {
                           {providerName}
                         </span>
                       )}
+                      {hasCapability(opt, "VISION") && (
+                        <span title="支援圖片輸入" aria-label="Vision capability">👁</span>
+                      )}
+                      {hasCapability(opt, "AUDIO_TRANSCRIPTION") && (
+                        <span title="支援語音轉錄" aria-label="Audio transcription capability">👂</span>
+                      )}
+                      <span data-testid={`capability-source-${opt.model}`} style={{
+                        fontSize: 10, color: opt.capabilitySource === "UNKNOWN" ? "#b45309" : "#475569",
+                        background: opt.capabilitySource === "UNKNOWN" ? "#fef3c7" : "#e2e8f0",
+                        padding: "1px 6px", borderRadius: 4,
+                      }}>{opt.capabilitySource}</span>
                     </div>
+                    {opt.capabilitySource !== "AUTO" && opt.providerId != null && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", marginRight: 10 }}>
+                        <label style={{ fontSize: 11, color: "#475569" }}>
+                          <input type="checkbox"
+                            aria-label={`${opt.model} Vision`}
+                            checked={hasCapability(opt, "VISION")}
+                            disabled={saving}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              void toggleCapability(opt, "VISION", event.target.checked);
+                            }} /> Vision
+                        </label>
+                        <label style={{ fontSize: 11, color: "#475569" }}>
+                          <input type="checkbox"
+                            aria-label={`${opt.model} Audio transcription`}
+                            checked={hasCapability(opt, "AUDIO_TRANSCRIPTION")}
+                            disabled={saving}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              void toggleCapability(opt, "AUDIO_TRANSCRIPTION", event.target.checked);
+                            }} /> Audio
+                        </label>
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="btn-danger"
@@ -655,6 +779,43 @@ export default function AdminSettingsPage() {
               <button type="button" className="btn-secondary" style={{ whiteSpace: "nowrap", padding: "8px 16px" }} onClick={addModel}>
                 + 新增
               </button>
+            </div>
+
+            {/* OCR／語音轉錄用途模型只顯示已確認相容的候選。 */}
+            <div data-testid="model-assignments" style={{ paddingTop: 12, borderTop: "1px solid #f1f5f9", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>AI 用途模型</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
+                  OCR（僅 👁 Vision）
+                  <select data-testid="ocr-model-select" value={ocrModel} onChange={(event) => setOcrModel(event.target.value)}
+                    style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
+                    <option value="">未設定</option>
+                    {visionOptions.map((option) => (
+                      <option key={`${option.model}-${option.providerId}`} value={option.model}>{option.model}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
+                  Transcription（僅 👂 Audio）
+                  <select data-testid="transcription-model-select" value={transcriptionModel}
+                    onChange={(event) => setTranscriptionModel(event.target.value)}
+                    style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
+                    <option value="">未設定</option>
+                    {transcriptionOptions.map((option) => (
+                      <option key={`${option.model}-${option.providerId}`} value={option.model}>{option.model}</option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="btn-assess" data-testid="save-model-assignments"
+                  disabled={saving || hasInvalidAssignment} onClick={saveAssignments} style={{ padding: "9px 18px" }}>
+                  儲存用途模型
+                </button>
+              </div>
+              {hasInvalidAssignment && (
+                <p role="alert" style={{ color: "#b91c1c", fontSize: 12, margin: "8px 0 0" }}>
+                  已指派模型不再具備所需能力，請先清除或改選相容模型。
+                </p>
+              )}
             </div>
 
             {/* 模型參數（留空＝用預設；套用於 AI 呼叫與模型測試） */}

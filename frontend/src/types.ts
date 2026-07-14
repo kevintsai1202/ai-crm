@@ -432,10 +432,18 @@ export interface ManagerInsightResponse {
 }
 
 
-/** 模型設定項目（含供應商關聯）。 */
+/** 後端可治理的模型輸入能力。 */
+export type ModelCapability = "VISION" | "AUDIO_TRANSCRIPTION";
+
+/** 模型能力的可信來源；UNKNOWN 不得由模型名稱推測。 */
+export type CapabilitySource = "AUTO" | "MANUAL" | "UNKNOWN";
+
+/** 模型設定項目（含供應商關聯與已確認能力）。 */
 export interface ModelOptionItem {
   model: string;
   providerId: number | null;
+  capabilities: ModelCapability[];
+  capabilitySource: CapabilitySource;
 }
 
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
@@ -458,6 +466,10 @@ export interface AiSettingsResponse {
   temperature: number | null;
   maxCompletionTokens: number | null;
   reasoningEffort: string | null;
+  ocrModel: string | null;
+  ocrProviderId: number | null;
+  transcriptionModel: string | null;
+  transcriptionProviderId: number | null;
 }
 
 /** 單一模型競速測試結果（供評分 API 傳送）。 */

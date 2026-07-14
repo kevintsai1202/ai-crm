@@ -864,6 +864,43 @@ export async function deleteAiProvider(id: number) {
   await apiClient.delete(`/admin/settings/ai/providers/${id}`);
 }
 
+/** 從 Provider 目錄重新取得模型與可靠能力 metadata。 */
+export async function refreshAiProviderModels(id: number) {
+  const { data } = await apiClient.post<import("../types").ModelOptionItem[]>(
+    `/admin/settings/ai/providers/${id}/models/refresh`,
+  );
+  return data;
+}
+
+/** 由 Admin 人工覆寫 UNKNOWN／MANUAL 模型能力。 */
+export async function saveModelCapabilities(
+  model: string,
+  providerId: number,
+  capabilities: import("../types").ModelCapability[],
+) {
+  const { data } = await apiClient.put<import("../types").ModelOptionItem>(
+    `/admin/settings/ai/models/${encodeURIComponent(model)}/capabilities`,
+    { providerId, capabilities },
+  );
+  return data;
+}
+
+/** 儲存 Chat、OCR 與語音轉錄用途模型，後端會再次驗證能力。 */
+export async function saveAiModelAssignments(assignments: {
+  chatModel: string;
+  chatProviderId: number | null;
+  ocrModel: string | null;
+  ocrProviderId: number | null;
+  transcriptionModel: string | null;
+  transcriptionProviderId: number | null;
+}) {
+  const { data } = await apiClient.put<import("../types").AiSettingsResponse>(
+    "/admin/settings/ai/assignments",
+    assignments,
+  );
+  return data;
+}
+
 /**
  * 模型競速測試（SSE 串流）：以指定 model 對問題發起 LLM 呼叫，限 ADMIN。
  * 函式級註解：message 與 model 均傳入後端；前端並行呼叫多次以比較不同模型速度。
