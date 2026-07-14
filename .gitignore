@@ -35,3 +35,8 @@ Thumbs.db
 
 # === Git Worktrees ===
 .worktrees/
+
+# === Superpowers 任務暫存與 E2E 測試產物 ===
+/.superpowers/
+/frontend/test-results/
+/frontend/playwright-report/
