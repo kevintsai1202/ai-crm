@@ -7,7 +7,6 @@ import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,8 +51,8 @@ public class CrmTaskService {
                 .orElseThrow(() -> new EntityNotFoundException("查無此商機：" + request.opportunityId()));
         var contact = request.contactId() == null ? null : contacts.findById(request.contactId())
                 .orElseThrow(() -> new EntityNotFoundException("查無此聯絡人：" + request.contactId()));
-        if (opportunity != null && !opportunity.getCustomer().getId().equals(customer.getId())) throw new IllegalArgumentException("商機不屬於指定客戶");
-        if (contact != null && !contact.getCustomer().getId().equals(customer.getId())) throw new IllegalArgumentException("聯絡人不屬於指定客戶");
+        if (opportunity != null && !opportunity.getCustomer().getId().equals(customer.getId())) throw new com.aicrm.crm.service.task.TaskValidationException("商機不屬於指定客戶");
+        if (contact != null && !contact.getCustomer().getId().equals(customer.getId())) throw new com.aicrm.crm.service.task.TaskValidationException("聯絡人不屬於指定客戶");
         var task = new CrmTask(customer, opportunity, contact, request.type(), request.priority(), request.title().trim(),
                 request.description(), assignee, request.scheduledStart(), request.scheduledEnd(), request.source());
         return toResponse(tasks.save(task));
@@ -63,27 +62,29 @@ public class CrmTaskService {
     public Dtos.TaskResponse update(AuthPrincipal principal, Long id, Dtos.UpdateTaskRequest request) {
         validateSchedule(request.scheduledStart(), request.scheduledEnd());
         var task = findVisible(principal, id);
-        if (task.getVersion() != request.version()) throw new OptimisticLockingFailureException("任務已被其他使用者更新");
+        assertVersion(task, request.version());
         var assignee = users.findById(request.assigneeId()).orElseThrow(() -> new EntityNotFoundException("查無此帳號：" + request.assigneeId()));
         assertCanAssign(principal, assignee);
         task.update(request.type(), request.priority(), request.title().trim(), request.description(), assignee,
                 request.scheduledStart(), request.scheduledEnd());
-        return toResponse(tasks.saveAndFlush(task));
+        return toResponse(saveMutation(task));
     }
 
     /** 延期 scope 內尚未結束的任務。 */
     public Dtos.TaskResponse postpone(AuthPrincipal principal, Long id, Dtos.PostponeTaskRequest request) {
         validateSchedule(request.scheduledStart(), request.scheduledEnd());
         var task = findVisible(principal, id);
+        assertVersion(task, request.version());
         task.postpone(request.scheduledStart(), request.scheduledEnd());
-        return toResponse(tasks.saveAndFlush(task));
+        return toResponse(saveMutation(task));
     }
 
     /** 完成 scope 內尚未結束的任務。 */
-    public Dtos.TaskResponse complete(AuthPrincipal principal, Long id) {
+    public Dtos.TaskResponse complete(AuthPrincipal principal, Long id, Dtos.CompleteTaskRequest request) {
         var task = findVisible(principal, id);
+        assertVersion(task, request.version());
         task.complete(LocalDateTime.now());
-        return toResponse(tasks.saveAndFlush(task));
+        return toResponse(saveMutation(task));
     }
 
     /** 驗證 SALES 只能指派自己；管理角色沿用既有全團隊可見性。 */
@@ -104,7 +105,23 @@ public class CrmTaskService {
 
     /** 驗證排程結束時間嚴格晚於開始時間。 */
     private void validateSchedule(LocalDateTime start, LocalDateTime end) {
-        if (start == null || end == null || !end.isAfter(start)) throw new IllegalArgumentException("任務結束時間必須晚於開始時間");
+        if (start == null || end == null || !end.isAfter(start)) throw new com.aicrm.crm.service.task.TaskValidationException("任務結束時間必須晚於開始時間");
+    }
+
+    /** mutation 前比對 client version，拒絕順序式 stale UI。 */
+    private void assertVersion(CrmTask task, Long requestedVersion) {
+        if (requestedVersion == null || task.getVersion() != requestedVersion) {
+            throw new com.aicrm.crm.service.task.TaskConflictException();
+        }
+    }
+
+    /** 將 Task 的資料庫競爭式 optimistic lock 轉為 Task 專屬安全衝突。 */
+    private CrmTask saveMutation(CrmTask task) {
+        try {
+            return tasks.saveAndFlush(task);
+        } catch (org.springframework.dao.OptimisticLockingFailureException ex) {
+            throw new com.aicrm.crm.service.task.TaskConflictException();
+        }
     }
 
     /** 將任務實體轉為 API DTO。 */
@@ -114,6 +131,7 @@ public class CrmTaskService {
                 task.getContact() == null ? null : task.getContact().getId(), task.getType(), task.getStatus(),
                 task.getPriority(), task.getTitle(), task.getDescription(), task.getAssignee().getId(),
                 task.getAssignee().getDisplayName(), task.getScheduledStart(), task.getScheduledEnd(),
-                task.getCompletedAt(), task.getPostponeCount(), task.getSource(), task.getVersion());
+                task.getCompletedAt(), task.getPostponeCount(), task.getSource(), task.getVersion(),
+                task.getUpdatedAt() == null ? java.time.Instant.EPOCH : task.getUpdatedAt());
     }
 }

@@ -36,7 +36,8 @@ public class TaskController {
             @Valid @RequestBody Dtos.UpdateTaskRequest request) { return tasks.update(principal, id, request); }
 
     /** 完成 scope 內任務。 */
-    @PostMapping("/{id}/complete") public Dtos.TaskResponse complete(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id) { return tasks.complete(principal, id); }
+    @PostMapping("/{id}/complete") public Dtos.TaskResponse complete(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id,
+            @Valid @RequestBody Dtos.CompleteTaskRequest request) { return tasks.complete(principal, id, request); }
 
     /** 延後 scope 內任務。 */
     @PostMapping("/{id}/postpone") public Dtos.TaskResponse postpone(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id,

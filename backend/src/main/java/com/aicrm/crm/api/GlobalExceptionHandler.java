@@ -8,7 +8,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -70,16 +69,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "Forbidden", "目前角色沒有執行此操作的權限", request);
     }
 
-    /** 將任務狀態或排程規則違反轉為 400，而非洩漏成 500。 */
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
-    ResponseEntity<ProblemDetail> handleBusinessRule(RuntimeException ex, HttpServletRequest request) {
-        return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
+    /** CRM 任務規則驗證失敗只回固定安全訊息。 */
+    @ExceptionHandler(com.aicrm.crm.service.task.TaskValidationException.class)
+    ResponseEntity<ProblemDetail> handleTaskValidation(HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad Request", "CRM 任務資料不符合規則", request);
     }
 
     /** 將過期版本或資料庫樂觀鎖衝突轉為 409。 */
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest request) {
-        return problem(HttpStatus.CONFLICT, "Conflict", ex.getMessage(), request);
+    @ExceptionHandler(com.aicrm.crm.service.task.TaskConflictException.class)
+    ResponseEntity<ProblemDetail> handleTaskConflict(HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "CRM 任務已被其他使用者更新，請重新載入", request);
     }
 
     /**

@@ -493,7 +493,11 @@ public final class Dtos {
 
     /** CRM 任務延期請求。 */
     public record PostponeTaskRequest(@NotNull LocalDateTime scheduledStart,
-                                      @NotNull LocalDateTime scheduledEnd) {}
+                                      @NotNull LocalDateTime scheduledEnd,
+                                      @NotNull Long version) {}
+
+    /** 完成 CRM 任務請求，version 用來拒絕順序式舊畫面更新。 */
+    public record CompleteTaskRequest(@NotNull Long version) {}
 
     /** CRM 任務 API 回應。 */
     public record TaskResponse(
@@ -503,7 +507,8 @@ public final class Dtos {
             com.aicrm.crm.domain.CrmTaskPriority priority,
             String title, String description, Long assigneeId, String assigneeName,
             LocalDateTime scheduledStart, LocalDateTime scheduledEnd, LocalDateTime completedAt,
-            int postponeCount, com.aicrm.crm.domain.CrmTaskSource source, long version) {}
+            int postponeCount, com.aicrm.crm.domain.CrmTaskSource source, long version,
+            Instant revisionTimestamp) {}
 
     /** 模型設定項目（含供應商關聯、已確認能力及能力來源）。 */
     public record ModelOptionItem(

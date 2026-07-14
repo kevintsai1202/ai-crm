@@ -53,20 +53,20 @@ public class CrmTask extends AuditableEntity {
 
     /** 延後尚未結束的任務並累加延期次數。 */
     public void postpone(LocalDateTime start, LocalDateTime end) {
-        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new IllegalStateException("已結束任務不可延期");
+        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new com.aicrm.crm.service.task.TaskValidationException("已結束任務不可延期");
         this.scheduledStart = start; this.scheduledEnd = end; this.postponeCount++;
     }
 
     /** 將尚未結束的任務標記完成。 */
     public void complete(LocalDateTime at) {
-        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new IllegalStateException("任務已結束");
+        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new com.aicrm.crm.service.task.TaskValidationException("任務已結束");
         this.status = CrmTaskStatus.COMPLETED; this.completedAt = at;
     }
 
     /** 編輯任務可變欄位，狀態轉換另由明確操作處理。 */
     public void update(CrmTaskType type, CrmTaskPriority priority, String title, String description,
                        AppUser assignee, LocalDateTime start, LocalDateTime end) {
-        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new IllegalStateException("已結束任務不可編輯");
+        if (status == CrmTaskStatus.COMPLETED || status == CrmTaskStatus.CANCELLED) throw new com.aicrm.crm.service.task.TaskValidationException("已結束任務不可編輯");
         this.type = type; this.priority = priority; this.title = title; this.description = description;
         this.assignee = assignee; this.scheduledStart = start; this.scheduledEnd = end;
     }
