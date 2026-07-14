@@ -43,6 +43,14 @@ public class TaskController {
     @PostMapping("/{id}/postpone") public Dtos.TaskResponse postpone(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id,
             @Valid @RequestBody Dtos.PostponeTaskRequest request) { return tasks.postpone(principal, id, request); }
 
+    /** 顯式刪除 scope 內單一任務；version 防止刪除過期畫面所指的版本。 */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id,
+                       @RequestParam Long version) {
+        tasks.delete(principal, id, version);
+    }
+
     /** 即時產生 UTF-8 iCalendar 附件，不保存衍生檔案。 */
     @GetMapping("/{id}/calendar.ics")
     public ResponseEntity<byte[]> calendar(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id) {

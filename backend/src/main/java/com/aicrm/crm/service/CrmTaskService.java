@@ -87,6 +87,14 @@ public class CrmTaskService {
         return toResponse(saveMutation(task));
     }
 
+    /** 依 owner scope 與 optimistic-lock version 顯式刪除單一任務。 */
+    public void delete(AuthPrincipal principal, Long id, Long version) {
+        var task = findVisible(principal, id);
+        assertVersion(task, version);
+        tasks.delete(task);
+        tasks.flush();
+    }
+
     /** 驗證 SALES 只能指派自己；管理角色沿用既有全團隊可見性。 */
     private void assertCanAssign(AuthPrincipal principal, AppUser assignee) {
         if (principal.role() == Role.SALES && !principal.username().equals(assignee.getUsername())) {

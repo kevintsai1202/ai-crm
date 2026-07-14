@@ -25,7 +25,49 @@ import type {
   SentimentRadarResponse,
   UsageSummaryResponse
 } from "../types";
+import type { CreateCrmTaskRequest, CrmTask } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
+
+/** 取得登入者可見的正式 CRM 任務。 */
+export async function fetchTasks() {
+  const { data } = await apiClient.get<CrmTask[]>("/tasks");
+  return data;
+}
+
+/** 建立正式 CRM 任務。 */
+export async function createTask(request: CreateCrmTaskRequest) {
+  const { data } = await apiClient.post<CrmTask>("/tasks", request);
+  return data;
+}
+
+/** 依 API 回傳的最新 version 延期任務。 */
+export async function postponeTask(task: CrmTask, scheduledStart: string, scheduledEnd: string) {
+  const { data } = await apiClient.post<CrmTask>(`/tasks/${task.id}/postpone`, {
+    scheduledStart,
+    scheduledEnd,
+    version: task.version,
+  });
+  return data;
+}
+
+/** 依 API 回傳的最新 version 完成任務。 */
+export async function completeTask(task: CrmTask) {
+  const { data } = await apiClient.post<CrmTask>(`/tasks/${task.id}/complete`, { version: task.version });
+  return data;
+}
+
+/** 下載後端即時產生的 iCalendar 檔案，保留瀏覽器 download event。 */
+export async function downloadTaskIcs(task: CrmTask) {
+  const { data } = await apiClient.get<Blob>(`/tasks/${task.id}/calendar.ics`, { responseType: "blob" });
+  const objectUrl = URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `crm-task-${task.id}.ics`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
 
 /**
  * 呼叫健康檢查 API。

@@ -446,6 +446,43 @@ export interface ModelOptionItem {
   capabilitySource: CapabilitySource;
 }
 
+/** CRM 正式任務，狀態唯一來自 `/api/tasks`。 */
+export interface CrmTask {
+  id: number;
+  customerId: number;
+  opportunityId: number | null;
+  contactId: number | null;
+  type: "PHONE_CALL" | "EMAIL" | "MEETING" | "GENERAL";
+  status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  title: string;
+  description: string | null;
+  assigneeId: number;
+  assigneeName: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  completedAt: string | null;
+  postponeCount: number;
+  source: "MANUAL" | "BUSINESS_CARD" | "MEETING_AI" | "FOLLOW_UP_AI";
+  version: number;
+  revisionTimestamp: string;
+}
+
+/** 建立正式 CRM 任務的輸入。 */
+export interface CreateCrmTaskRequest {
+  customerId: number;
+  opportunityId: number | null;
+  contactId: number | null;
+  type: CrmTask["type"];
+  priority: CrmTask["priority"];
+  title: string;
+  description: string | null;
+  assigneeId: number;
+  scheduledStart: string;
+  scheduledEnd: string;
+  source: CrmTask["source"];
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

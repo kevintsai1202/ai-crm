@@ -14,6 +14,14 @@
 - OCR selectors contain only `VISION` models and transcription selectors contain only `AUDIO_TRANSCRIPTION` models. Both frontend and backend reject stale or incompatible assignments.
 - V21 migrates legacy model options to empty capabilities with `UNKNOWN`, preserving existing values where valid.
 
+### V22 CRM task/activity
+
+- `crm_tasks` is the single source of truth for OPEN, IN_PROGRESS, COMPLETED, and CANCELLED task state.
+- Customer and workspace contexts can create a manual `PHONE_CALL` task; the workspace keeps rule recommendations visually separate from persisted tasks.
+- Active tasks are ordered by `scheduledStart`, completed/cancelled tasks are hidden from the work queue, and overdue display state is derived from `scheduledEnd`.
+- Postpone, complete, update, and explicit delete operations enforce owner scope and optimistic-lock `version`.
+- Calendar export is generated on demand as UTF-8 RFC 5545 content with CRLF, stable UID, deterministic revision timestamp, and Asia/Taipei wall-clock times.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。

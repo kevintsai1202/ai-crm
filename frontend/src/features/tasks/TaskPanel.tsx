@@ -1,0 +1,56 @@
+import { useCallback, useEffect, useState } from "react";
+import { completeTask, downloadTaskIcs, fetchTasks, postponeTask } from "../../api/index";
+import type { CrmTask } from "../../types";
+import { mergePostponedTask, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
+
+interface TaskPanelProps {
+  customerId?: number;
+  refreshKey?: number;
+  compact?: boolean;
+}
+
+/** 格式化工作檯顯示時間。 */
+function formatTaskTime(value: string): string {
+  return new Intl.DateTimeFormat("zh-TW", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
+}
+
+/** 顯示正式 CRM 任務；規則式 AI 建議由外層另列，絕不冒充持久狀態。 */
+export function TaskPanel({ customerId, refreshKey = 0, compact = false }: TaskPanelProps) {
+  const [tasks, setTasks] = useState<CrmTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  /** 從正式 `/api/tasks` 重新載入任務。 */
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
+    try { setTasks(await fetchTasks()); setError(""); }
+    catch { setError("任務載入失敗。"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void loadTasks(); }, [loadTasks, refreshKey]);
+
+  /** 將任務順延一天，使用後端完整回應更新 optimistic-lock version。 */
+  async function handlePostpone(task: CrmTask) {
+    const schedule = shiftTaskScheduleOneDay(task);
+    const updated = await postponeTask(task, schedule.scheduledStart, schedule.scheduledEnd);
+    setTasks((current) => mergePostponedTask(current, updated));
+  }
+
+  /** 完成後直接移除 API 回應已標示 COMPLETED 的正式任務。 */
+  async function handleComplete(task: CrmTask) {
+    const completed = await completeTask(task);
+    setTasks((current) => current.map((item) => item.id === completed.id ? completed : item));
+  }
+
+  const scoped = customerId ? tasks.filter((task) => task.customerId === customerId) : tasks;
+  const rows = selectActiveTasks(scoped);
+  return <section className={`task-panel${compact ? " task-panel-compact" : ""}`} data-testid="crm-task-panel">
+    <div className="task-panel-head"><h4>CRM 正式任務</h4><button type="button" className="btn-secondary" onClick={() => void loadTasks()}>重新整理</button></div>
+    {loading ? <p>載入任務中…</p> : error ? <p role="alert">{error}</p> : rows.length === 0 ? <p className="workspace-empty">目前沒有待處理的正式任務。</p> :
+      <ul className="task-list">{rows.map(({ task, overdue }) => <li key={task.id} data-task-id={task.id} className={overdue ? "task-overdue" : ""}>
+        <div><strong>{task.title}</strong><span>{task.type === "PHONE_CALL" ? "電話" : task.type} · 客戶 #{task.customerId}</span><time>{formatTaskTime(task.scheduledStart)}{overdue ? " · 已逾期" : ""}</time></div>
+        <div className="task-actions"><button type="button" onClick={() => void handlePostpone(task)}>延期一天</button><button type="button" onClick={() => void downloadTaskIcs(task)}>下載行事曆</button><button type="button" onClick={() => void handleComplete(task)}>完成</button></div>
+      </li>)}</ul>}
+  </section>;
+}

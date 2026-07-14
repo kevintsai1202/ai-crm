@@ -119,3 +119,15 @@ All endpoints below require the `ADMIN` role. Model capabilities are explicit an
 - `ownerLeaderboard`：業務排行榜，含客戶數、商機金額、高風險客戶數。
 - `renewalForecast`：依續約月份彙總的續約客戶數與商機金額。
 - `recentActivities`：近期關鍵互動紀錄。
+
+## V22 CRM tasks and iCalendar
+
+- `GET /api/tasks`: list formal tasks in the authenticated user's scope. SALES sees only assigned tasks; MANAGER/ADMIN use the existing management scope.
+- `POST /api/tasks`: create a task with customer, optional opportunity/contact, assignee, local scheduled times, priority, type, and source.
+- `GET/PUT /api/tasks/{id}`: read or update one visible task. Mutations require the current `version`.
+- `POST /api/tasks/{id}/postpone`: move start/end and increment `postponeCount`; body includes `version`.
+- `POST /api/tasks/{id}/complete`: mark the task completed; body includes `version`.
+- `GET /api/tasks/{id}/calendar.ics`: download a stable UTF-8, CRLF, Asia/Taipei iCalendar event with UID `crm-task-{id}@ai-crm`.
+- `DELETE /api/tasks/{id}?version={version}`: explicitly delete one visible task, primarily for deliberate cleanup; stale versions return `409` and owner scope is enforced.
+
+The workspace may display rule-based recommendations beside formal tasks, but only `/api/tasks` represents persistent task status.

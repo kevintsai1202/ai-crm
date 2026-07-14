@@ -2,6 +2,7 @@ package com.aicrm.crm.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -184,6 +185,26 @@ class TaskSecurityIntegrationTest extends PostgresTestBase {
     void mutations_admin_otherAssigneeAllSucceed() throws Exception {
         var task = createOtherAssigneeTask("ADMIN 正向矩陣");
         assertMutationMatrix(adminToken, task, task.assigneeId());
+    }
+
+    /** 顯式刪除任務要求正確 version，並沿用 owner scope。 */
+    @Test
+    void delete_requiresFreshVersionAndOwnerScope() throws Exception {
+        var owner = users.findByUsername("sales@aurora.local").orElseThrow();
+        var ownTask = service.create(new JwtService.AuthPrincipal(owner.getUsername(), owner.getDisplayName(), Role.SALES),
+                request(customers.findAll().getFirst().getId(), owner.getId(), "刪除正向"));
+        mvc.perform(delete("/api/tasks/{id}", ownTask.id()).param("version", String.valueOf(ownTask.version() + 1))
+                .header("Authorization", "Bearer " + salesToken)).andExpect(status().isConflict());
+        mvc.perform(delete("/api/tasks/{id}", ownTask.id()).param("version", String.valueOf(ownTask.version()))
+                .header("Authorization", "Bearer " + salesToken)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/tasks/{id}", ownTask.id()).header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isNotFound());
+
+        var otherTask = createOtherAssigneeTask("刪除跨 owner");
+        mvc.perform(delete("/api/tasks/{id}", otherTask.id()).param("version", String.valueOf(otherTask.version()))
+                .header("Authorization", "Bearer " + salesToken)).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/tasks/{id}", otherTask.id()).param("version", String.valueOf(otherTask.version()))
+                .header("Authorization", "Bearer " + adminToken)).andExpect(status().isNoContent());
     }
 
     /** 以固定排程建立測試任務請求。 */

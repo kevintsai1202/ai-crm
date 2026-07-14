@@ -1,3 +1,15 @@
+# AI CRM Intelligent Sales Assistant
+
+AI CRM is a teaching and demonstration full-stack CRM built with Spring Boot 4.1, Java 21, React 19, PostgreSQL, and governed AI workflows. V22 adds first-class CRM tasks: users can schedule phone follow-ups from a customer or workspace context, postpone or complete tasks, and download a stable UTF-8 iCalendar (`.ics`) event. Formal task state always comes from `/api/tasks`; AI workspace recommendations remain non-persistent suggestions.
+
+Run the V22 phase gate with PowerShell 7+:
+
+```powershell
+pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.spec.ts
+```
+
+## 中文說明
+
 # AI CRM 智慧業務助理
 
 本專案依據 Hahow 教學站的單元與 AI 協作提示詞建立，是一套教學／示範用全端 AI CRM。專案採用 monorepo：
@@ -60,6 +72,12 @@ pnpm run dev -- --port 5175 --host 127.0.0.1
 - `GET /api/customers/{id}`
 - `PUT /api/customers/{id}/status`
 - `POST /api/customers/{id}/interactions`
+- `GET /api/tasks`
+- `POST /api/tasks`
+- `POST /api/tasks/{id}/postpone`
+- `POST /api/tasks/{id}/complete`
+- `GET /api/tasks/{id}/calendar.ics`
+- `DELETE /api/tasks/{id}?version={version}`
 - `GET /api/dashboard/summary`
 - `GET /api/dashboard/reports`
 - `POST /api/ai/chat`
