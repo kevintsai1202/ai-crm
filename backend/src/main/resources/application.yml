@@ -59,6 +59,18 @@ spring:
           max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:2000}
 
 app:
+  media:
+    # 暫存媒體內容只放 S3-compatible storage；DB 僅保存 metadata。
+    s3:
+      endpoint: ${MEDIA_S3_ENDPOINT:http://127.0.0.1:19000}
+      access-key: ${MEDIA_S3_ACCESS_KEY:minioadmin}
+      secret-key: ${MEDIA_S3_SECRET_KEY:minioadmin}
+      bucket: ${MEDIA_S3_BUCKET:ai-crm-temporary-media}
+      region: ${MEDIA_S3_REGION:us-east-1}
+    retention: ${MEDIA_RETENTION:PT24H}
+    cleanup:
+      enabled: ${MEDIA_CLEANUP_ENABLED:true}
+      fixed-delay: ${MEDIA_CLEANUP_FIXED_DELAY:PT1H}
   security:
     # JWT 簽章密鑰：務必以環境變數 APP_SECURITY_JWT_SECRET 提供高強度隨機值（≥32 bytes）。
     # 預設留空，啟動時由 JwtService 做 fail-fast 檢查，杜絕使用公開預設值（避免認證繞過）。
