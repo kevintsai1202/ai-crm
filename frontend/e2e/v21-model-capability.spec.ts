@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { newPhaseDataPrefix } from "./fixtures/phase-data";
 import type { AiSettingsResponse } from "../src/types";
+import { executeV21Cleanup } from "./fixtures/v21-cleanup";
 
 /** 以 seed ADMIN 登入真實前後端。 */
 async function loginAsAdmin(page: Page): Promise<void> {
@@ -20,62 +21,47 @@ async function addUnknownModel(page: Page, model: string): Promise<void> {
   await expect(page.locator(`[data-model-name="${model}"]`)).toContainText("UNKNOWN");
 }
 
-/** 先清空用途 assignment，再以精確 prefix 移除測試模型；各步失敗仍繼續後續清理。 */
+/** 先清空用途 assignment，再以精確 prefix 移除測試模型；前置步驟失敗時停止相依刪除。 */
 async function cleanupV21Models(page: Page, prefix: string): Promise<void> {
-  const cleanupErrors: string[] = [];
   const token = await page.evaluate(() => localStorage.getItem("ai-crm-token")).catch(() => null);
-  let settings: AiSettingsResponse | null = null;
-
-  try {
-    const response = await page.request.get("/api/admin/settings/ai", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok()) throw new Error(`讀取設定 HTTP ${response.status()}`);
-    settings = await response.json() as AiSettingsResponse;
-  } catch (error) {
-    cleanupErrors.push(error instanceof Error ? error.message : String(error));
-  }
-
-  try {
-    if (!settings) throw new Error("缺少設定，無法安全保留 Chat assignment");
-    const response = await page.request.put("/api/admin/settings/ai/assignments", {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        chatModel: settings.currentModel,
-        chatProviderId: settings.currentProviderId,
-        ocrModel: null,
-        ocrProviderId: null,
-        transcriptionModel: null,
-        transcriptionProviderId: null,
-      },
-    });
-    if (!response.ok()) throw new Error(`清空用途 assignment HTTP ${response.status()}`);
-  } catch (error) {
-    cleanupErrors.push(error instanceof Error ? error.message : String(error));
-  }
-
-  try {
-    if (!settings) throw new Error("缺少設定，無法以 API 移除 prefix 模型");
-    const currentIsTestModel = settings.currentModel.startsWith(prefix);
-    const response = await page.request.put("/api/admin/settings/ai", {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        model: currentIsTestModel ? "" : settings.currentModel,
-        providerId: currentIsTestModel ? null : settings.currentProviderId,
-        modelOptions: settings.modelOptions.filter((option) => !option.model.startsWith(prefix)),
-        temperature: settings.temperature,
-        maxCompletionTokens: settings.maxCompletionTokens,
-        reasoningEffort: settings.reasoningEffort,
-      },
-    });
-    if (!response.ok()) throw new Error(`移除 prefix 模型 HTTP ${response.status()}`);
-  } catch (error) {
-    cleanupErrors.push(error instanceof Error ? error.message : String(error));
-  }
-
-  if (cleanupErrors.length > 0) {
-    throw new Error(`V21 E2E cleanup 失敗：${cleanupErrors.join("；")}`);
-  }
+  await executeV21Cleanup<AiSettingsResponse>({
+    readSettings: async () => {
+      const response = await page.request.get("/api/admin/settings/ai", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok()) throw new Error(`讀取設定 HTTP ${response.status()}`);
+      return response.json() as Promise<AiSettingsResponse>;
+    },
+    clearAssignments: async (settings) => {
+      const response = await page.request.put("/api/admin/settings/ai/assignments", {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          chatModel: settings.currentModel,
+          chatProviderId: settings.currentProviderId,
+          ocrModel: null,
+          ocrProviderId: null,
+          transcriptionModel: null,
+          transcriptionProviderId: null,
+        },
+      });
+      if (!response.ok()) throw new Error(`清空用途 assignment HTTP ${response.status()}`);
+    },
+    removeModels: async (settings) => {
+      const currentIsTestModel = settings.currentModel.startsWith(prefix);
+      const response = await page.request.put("/api/admin/settings/ai", {
+        headers: { Authorization: `Bearer ${token}` },
+        data: {
+          model: currentIsTestModel ? "" : settings.currentModel,
+          providerId: currentIsTestModel ? null : settings.currentProviderId,
+          modelOptions: settings.modelOptions.filter((option) => !option.model.startsWith(prefix)),
+          temperature: settings.temperature,
+          maxCompletionTokens: settings.maxCompletionTokens,
+          reasoningEffort: settings.reasoningEffort,
+        },
+      });
+      if (!response.ok()) throw new Error(`移除 prefix 模型 HTTP ${response.status()}`);
+    },
+  });
 }
 
 test("ADMIN 以真實 UI 治理 Vision／Transcription 能力與用途模型", async ({ page }) => {
