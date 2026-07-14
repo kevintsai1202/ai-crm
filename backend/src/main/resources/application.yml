@@ -9,6 +9,11 @@ logging:
 spring:
   application:
     name: ai-crm-backend
+  servlet:
+    multipart:
+      # 音訊業務上限為 100 MB；額外 5 MB 保留 multipart framing overhead。
+      max-file-size: 105MB
+      max-request-size: 106MB
   # 匯入專案根目錄的 .env 作為設定來源（OPENAI_API_KEY、MODEL 等）。
   # optional 表示檔案不存在也不報錯；[.properties] 提示以 KEY=VALUE 格式解析。
   # 同時嘗試 backend 工作目錄與其上層（repo 根），相容不同啟動位置。
@@ -63,8 +68,8 @@ app:
     # 暫存媒體內容只放 S3-compatible storage；DB 僅保存 metadata。
     s3:
       endpoint: ${MEDIA_S3_ENDPOINT:http://127.0.0.1:19000}
-      access-key: ${MEDIA_S3_ACCESS_KEY:minioadmin}
-      secret-key: ${MEDIA_S3_SECRET_KEY:minioadmin}
+      access-key: ${MEDIA_S3_ACCESS_KEY}
+      secret-key: ${MEDIA_S3_SECRET_KEY}
       bucket: ${MEDIA_S3_BUCKET:ai-crm-temporary-media}
       region: ${MEDIA_S3_REGION:us-east-1}
     retention: ${MEDIA_RETENTION:PT24H}

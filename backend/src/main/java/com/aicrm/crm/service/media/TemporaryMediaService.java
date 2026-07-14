@@ -46,6 +46,7 @@ public class TemporaryMediaService {
 
     /** 驗證完整內容後上傳 object，再寫 metadata；DB 失敗時補償刪除 object。 */
     public TemporaryMedia stage(MultipartFile file, MediaPurpose purpose, AuthPrincipal principal) {
+        rejectDeclaredOversize(file, purpose);
         byte[] bytes = readBytes(file);
         String mime = normalizeMime(file.getContentType());
         validate(bytes, mime, purpose);
@@ -62,6 +63,13 @@ public class TemporaryMediaService {
             }
             throw exception;
         }
+    }
+
+    /** 先用 multipart 宣告大小阻擋明顯超限內容，實際 bytes 仍會再次驗證以防偽造。 */
+    private void rejectDeclaredOversize(MultipartFile file, MediaPurpose purpose) {
+        if (file == null) throw new IllegalArgumentException("媒體檔案不可為空");
+        long max = purpose == MediaPurpose.BUSINESS_CARD ? IMAGE_MAX : AUDIO_MAX;
+        if (file.getSize() > max) throw new IllegalArgumentException("媒體檔案超過大小限制");
     }
 
     /** 逐筆刪除到期 uploaded/failed 物件，物件刪除失敗時保留 metadata 供下次重試。 */
@@ -121,40 +129,141 @@ public class TemporaryMediaService {
         if (!signatureMatches) throw new IllegalArgumentException("媒體內容與 MIME 不符");
     }
 
-    /** 驗證 JPEG SOI/marker 與至少一段內容。 */
-    private boolean jpeg(byte[] b) { return b.length >= 8 && u(b[0]) == 0xff && u(b[1]) == 0xd8 && u(b[2]) == 0xff && u(b[b.length - 2]) == 0xff && u(b[b.length - 1]) == 0xd9; }
-    /** 驗證 PNG signature 與必要的首個 IHDR chunk，拒絕只有假 header 的短檔。 */
-    private boolean png(byte[] b) { return b.length >= 24 && u(b[0]) == 0x89 && b[1]=='P' && b[2]=='N' && b[3]=='G' && b[4]==13 && b[5]==10 && b[6]==26 && b[7]==10 && ascii(b, 12, "IHDR"); }
-    /** 驗證 RIFF/WEBP 與有效的首個影像 chunk。 */
-    private boolean webp(byte[] b) { return b.length >= 16 && riff(b, "WEBP") && (ascii(b, 12, "VP8 ") || ascii(b, 12, "VP8L") || ascii(b, 12, "VP8X")); }
-    /** 驗證 RIFF/WAVE 與必要的 fmt chunk，拒絕只有 12-byte header 的偽檔。 */
-    private boolean wav(byte[] b) { return b.length >= 44 && riff(b, "WAVE") && ascii(b, 12, "fmt "); }
-    /** 驗證 RIFF 宣告長度不超出檔案並符合 form type。 */
-    private boolean riff(byte[] b, String type) {
-        if (b.length < 12 || !ascii(b, 0, "RIFF") || !ascii(b, 8, type)) return false;
-        long declared = Integer.toUnsignedLong(ByteBuffer.wrap(b, 4, 4).order(ByteOrder.LITTLE_ENDIAN).getInt());
-        return declared >= 4 && declared + 8L <= b.length;
-    }
-    /** 驗證 ISO BMFF ftyp box 與常見 M4A major brand。 */
-    private boolean m4a(byte[] b) {
-        if (b.length < 12 || !ascii(b, 4, "ftyp")) return false;
-        long boxSize = Integer.toUnsignedLong(ByteBuffer.wrap(b, 0, 4).getInt());
-        if (boxSize < 12 || boxSize > b.length) return false;
-        String brand = new String(b, 8, 4, java.nio.charset.StandardCharsets.US_ASCII);
-        return Set.of("M4A ", "M4B ", "isom", "mp41", "mp42", "qt  ").contains(brand);
-    }
-    /** 驗證 ID3 header/declared size 或 MPEG audio frame sync。 */
-    private boolean mp3(byte[] b) {
-        if (b.length >= 4 && u(b[0]) == 0xff && (u(b[1]) & 0xe0) == 0xe0 && (u(b[1]) & 0x18) != 0x08) {
-            int bitrateIndex = (u(b[2]) >>> 4) & 0x0f;
-            int sampleRateIndex = (u(b[2]) >>> 2) & 0x03;
-            return bitrateIndex > 0 && bitrateIndex < 15 && sampleRateIndex < 3;
+    /** 解析 JPEG marker/segment，必須包含有 entropy payload 的 SOS 並以 EOI 結束。 */
+    private boolean jpeg(byte[] b) {
+        if (b.length < 11 || u(b[0]) != 0xff || u(b[1]) != 0xd8) return false;
+        int position = 2;
+        while (position + 1 < b.length && u(b[position]) == 0xff) {
+            while (position < b.length && u(b[position]) == 0xff) position++;
+            if (position >= b.length) return false;
+            int marker = u(b[position++]);
+            if (marker == 0xd9) return false;
+            if (marker == 0x01 || marker >= 0xd0 && marker <= 0xd7) continue;
+            if (position + 2 > b.length) return false;
+            int segmentLength = (u(b[position]) << 8) | u(b[position + 1]);
+            if (segmentLength < 2 || position + segmentLength > b.length) return false;
+            if (marker == 0xda && segmentLength < 6) return false;
+            position += segmentLength;
+            if (marker == 0xda) {
+                int payload = 0;
+                while (position < b.length) {
+                    if (u(b[position]) != 0xff) { payload++; position++; continue; }
+                    if (position + 1 >= b.length) return false;
+                    int next = u(b[position + 1]);
+                    if (next == 0x00) { payload++; position += 2; continue; }
+                    return next == 0xd9 && payload > 0 && position + 2 == b.length;
+                }
+            }
         }
-        if (b.length < 10 || !ascii(b, 0, "ID3")) return false;
-        for (int i = 6; i < 10; i++) if ((u(b[i]) & 0x80) != 0) return false;
-        int tagSize = (u(b[6]) << 21) | (u(b[7]) << 14) | (u(b[8]) << 7) | u(b[9]);
-        return 10L + tagSize <= b.length;
+        return false;
     }
+
+    /** 解析 PNG chunk 邊界，要求合法 IHDR、非空 IDAT 與最後 IEND。 */
+    private boolean png(byte[] b) {
+        if (b.length < 57 || u(b[0]) != 0x89 || !ascii(b, 1, "PNG") || b[4]!=13 || b[5]!=10 || b[6]!=26 || b[7]!=10) return false;
+        int position = 8;
+        boolean ihdr = false, idat = false;
+        while (position + 12 <= b.length) {
+            long length = uint32be(b, position);
+            if (length > Integer.MAX_VALUE || position + 12L + length > b.length) return false;
+            String type = asciiValue(b, position + 4, 4);
+            int payload = position + 8;
+            if (!ihdr) {
+                if (!"IHDR".equals(type) || length != 13 || uint32be(b, payload) == 0 || uint32be(b, payload + 4) == 0) return false;
+                ihdr = true;
+            } else if ("IDAT".equals(type) && length > 0) {
+                idat = true;
+            } else if ("IEND".equals(type)) {
+                return length == 0 && idat && position + 12 == b.length;
+            }
+            position += 12 + (int) length;
+        }
+        return false;
+    }
+
+    /** 解析 WebP RIFF chunk，宣告大小須完全一致且主要影像 chunk 必須有 payload。 */
+    private boolean webp(byte[] b) {
+        if (!riffExact(b, "WEBP")) return false;
+        int position = 12;
+        while (position + 8 <= b.length) {
+            String type = asciiValue(b, position, 4);
+            long length = uint32le(b, position + 4);
+            long end = position + 8L + length;
+            if (length == 0 || end > b.length) return false;
+            int minimum = "VP8X".equals(type) ? 10 : "VP8L".equals(type) ? 5 : "VP8 ".equals(type) ? 10 : Integer.MAX_VALUE;
+            if (length >= minimum) return end + (length & 1) == b.length;
+            position = (int) (end + (length & 1));
+        }
+        return false;
+    }
+
+    /** 解析 WAV RIFF chunks，要求 fmt 結構與非空 data chunk。 */
+    private boolean wav(byte[] b) {
+        if (!riffExact(b, "WAVE")) return false;
+        int position = 12;
+        boolean format = false, data = false;
+        while (position + 8 <= b.length) {
+            String type = asciiValue(b, position, 4);
+            long length = uint32le(b, position + 4);
+            long end = position + 8L + length;
+            if (end > b.length) return false;
+            if ("fmt ".equals(type)) format = length >= 16;
+            if ("data".equals(type)) data = length > 0;
+            position = (int) (end + (length & 1));
+        }
+        return format && data && position == b.length;
+    }
+
+    /** 驗證 RIFF 宣告大小必須與實際 bytes 完全一致。 */
+    private boolean riffExact(byte[] b, String type) {
+        return b.length >= 12 && ascii(b, 0, "RIFF") && ascii(b, 8, type) && uint32le(b, 4) + 8L == b.length;
+    }
+
+    /** 解析 ISO BMFF box，要求有效 ftyp、非空 moov 與非空 mdat。 */
+    private boolean m4a(byte[] b) {
+        int position = 0;
+        boolean ftyp = false, moov = false, mdat = false;
+        while (position + 8 <= b.length) {
+            long size = uint32be(b, position);
+            String type = asciiValue(b, position + 4, 4);
+            if (size < 8 || size > Integer.MAX_VALUE || position + size > b.length) return false;
+            int payloadLength = (int) size - 8;
+            if ("ftyp".equals(type)) {
+                if (payloadLength < 8) return false;
+                String brand = asciiValue(b, position + 8, 4);
+                ftyp = Set.of("M4A ", "M4B ", "isom", "mp41", "mp42", "qt  ").contains(brand);
+            } else if ("moov".equals(type)) moov = payloadLength > 0;
+            else if ("mdat".equals(type)) mdat = payloadLength > 0;
+            position += (int) size;
+        }
+        return position == b.length && ftyp && moov && mdat;
+    }
+
+    /** 解析選填 ID3 後的 MPEG-1 Layer III frame，要求完整 frame payload。 */
+    private boolean mp3(byte[] b) {
+        int offset = 0;
+        if (b.length >= 10 && ascii(b, 0, "ID3")) {
+            for (int i = 6; i < 10; i++) if ((u(b[i]) & 0x80) != 0) return false;
+            int tagSize = (u(b[6]) << 21) | (u(b[7]) << 14) | (u(b[8]) << 7) | u(b[9]);
+            offset = 10 + tagSize;
+        }
+        if (offset + 4 > b.length || u(b[offset]) != 0xff || (u(b[offset + 1]) & 0xfe) != 0xfa) return false;
+        int bitrateIndex = (u(b[offset + 2]) >>> 4) & 0x0f;
+        int sampleRateIndex = (u(b[offset + 2]) >>> 2) & 0x03;
+        if (bitrateIndex == 0 || bitrateIndex == 15 || sampleRateIndex == 3) return false;
+        int[] bitrates = {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320};
+        int[] sampleRates = {44100,48000,32000};
+        int padding = (u(b[offset + 2]) >>> 1) & 1;
+        int frameLength = 144 * bitrates[bitrateIndex] * 1000 / sampleRates[sampleRateIndex] + padding;
+        return frameLength > 4 && offset + frameLength <= b.length;
+    }
+
+    /** 讀取 big-endian unsigned 32-bit。 */
+    private long uint32be(byte[] b, int offset) { return Integer.toUnsignedLong(ByteBuffer.wrap(b, offset, 4).getInt()); }
+    /** 讀取 little-endian unsigned 32-bit。 */
+    private long uint32le(byte[] b, int offset) { return Integer.toUnsignedLong(ByteBuffer.wrap(b, offset, 4).order(ByteOrder.LITTLE_ENDIAN).getInt()); }
+    /** 取得固定長度 ASCII 值。 */
+    private String asciiValue(byte[] b, int offset, int length) { return new String(b, offset, length, java.nio.charset.StandardCharsets.US_ASCII); }
     /** 比對固定 ASCII signature。 */
     private boolean ascii(byte[] b, int offset, String value) {
         if (offset + value.length() > b.length) return false;

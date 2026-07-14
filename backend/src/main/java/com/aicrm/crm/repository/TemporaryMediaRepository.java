@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 /** 暫存媒體 metadata 存取介面。 */
 public interface TemporaryMediaRepository extends JpaRepository<TemporaryMedia, Long> {
-    /** 取得已到期且仍可清理的媒體，confirmed/processing/review pending 不在清理範圍。 */
+    /** 取得已到期且狀態由呼叫端限定為待處理或失敗的清理候選。 */
     @Query("select m from TemporaryMedia m where m.expiresAt <= :now and m.status in :statuses order by m.id")
     List<TemporaryMedia> findCleanupCandidates(@Param("now") Instant now, @Param("statuses") Collection<MediaStatus> statuses);
 }

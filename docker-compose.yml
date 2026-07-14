@@ -15,13 +15,19 @@ services:
     container_name: ai-crm-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MEDIA_S3_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MEDIA_S3_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in .env}
     ports:
       - "19000:9000"
       - "19001:9001"
     volumes:
       - ai-crm-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
 
 volumes:
   ai-crm-postgres-data:

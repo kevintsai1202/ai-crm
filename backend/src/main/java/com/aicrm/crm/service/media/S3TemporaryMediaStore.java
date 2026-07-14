@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -15,7 +16,6 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.BucketAlreadyExistsException;
 import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -36,6 +36,7 @@ public class S3TemporaryMediaStore implements TemporaryMediaStore, AutoCloseable
     private final S3Client client;
 
     /** 由應用設定建立 path-style S3 client，避免 MinIO 虛擬主機解析問題。 */
+    @Autowired
     public S3TemporaryMediaStore(
             @Value("${app.media.s3.endpoint}") String endpoint,
             @Value("${app.media.s3.access-key}") String accessKey,
@@ -49,6 +50,13 @@ public class S3TemporaryMediaStore implements TemporaryMediaStore, AutoCloseable
                 .region(Region.of(region))
                 .forcePathStyle(true)
                 .build();
+        ensureBucket();
+    }
+
+    /** 注入既有 client 以測試 bucket bootstrap 的權限與競爭分支。 */
+    S3TemporaryMediaStore(S3Client client, String bucket) {
+        this.client = client;
+        this.bucket = bucket;
         ensureBucket();
     }
 
@@ -71,8 +79,9 @@ public class S3TemporaryMediaStore implements TemporaryMediaStore, AutoCloseable
     private void createBucketConcurrentlySafe() {
         try {
             client.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
-        } catch (BucketAlreadyExistsException | BucketAlreadyOwnedByYouException ignored) {
-            // 多 instance 冷啟動競爭時，另一 instance 已建立即符合預期。
+        } catch (BucketAlreadyOwnedByYouException ignored) {
+            // 多 instance 使用同一帳號競爭建立時，再確認目前帳號確實可存取。
+            client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
         }
     }
 
