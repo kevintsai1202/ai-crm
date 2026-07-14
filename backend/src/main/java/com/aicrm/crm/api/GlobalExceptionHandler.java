@@ -81,6 +81,24 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Conflict", "CRM 任務已被其他使用者更新，請重新載入", request);
     }
 
+    /** OCR assignment 缺少或不相容時回 503。 */
+    @ExceptionHandler(com.aicrm.crm.service.businesscard.BusinessCardUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleBusinessCardUnavailable(HttpServletRequest request) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", "尚未設定可用的名片 Vision 模型", request);
+    }
+
+    /** 名片確認狀態或冪等 payload 衝突回 409。 */
+    @ExceptionHandler(com.aicrm.crm.service.businesscard.BusinessCardConflictException.class)
+    ResponseEntity<ProblemDetail> handleBusinessCardConflict(HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "名片確認請求與目前狀態衝突", request);
+    }
+
+    /** multipart 內容超過伺服器限制時回 413。 */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ProblemDetail> handleUploadTooLarge(HttpServletRequest request) {
+        return problem(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large", "上傳檔案超過大小限制", request);
+    }
+
     /**
      * 建立 ProblemDetail 回應。
      *

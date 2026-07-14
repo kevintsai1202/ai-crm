@@ -173,6 +173,9 @@ public class DemoDataService {
     /** CRM 任務存取：示範資料清除重建時須先明確刪除，正式外鍵不做 cascade。 */
     private final com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository;
 
+    /** 名片 intake 存取：reset 時須先刪除，避免其結果 FK 阻擋正式資料清除。 */
+    private final com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -198,6 +201,7 @@ public class DemoDataService {
                            ContactRepository contactRepository,
                            ChatMessageRepository chatMessageRepository,
                            com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository,
+                           com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -211,6 +215,7 @@ public class DemoDataService {
         this.contactRepository = contactRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.crmTaskRepository = crmTaskRepository;
+        this.businessCardIntakeRepository = businessCardIntakeRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -310,11 +315,12 @@ public class DemoDataService {
     }
 
     /**
-     * 依 FK 順序清除「業務資料」：任務 → 互動分析 → 互動 → 商機 → 客戶。
+     * 依 FK 順序清除「業務資料」：名片 intake → 任務 → 互動分析 → 互動 → 商機 → 客戶。
      * 帳號、系統設定、AI 歷程、對話記憶不在清除範圍。
      */
     private void clearBusinessData() {
         // 正式 FK 刻意禁止 cascade；只有已明確啟用的示範 reset 流程可主動清除歷史任務。
+        businessCardIntakeRepository.deleteAllInBatch();
         crmTaskRepository.deleteAllInBatch();
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();

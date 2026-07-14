@@ -77,6 +77,15 @@ public class TemporaryMedia extends AuditableEntity {
         return media;
     }
 
+    /** 更新處理狀態。 */
+    public void transition(MediaStatus status) { this.status = status; }
+
+    /** 記錄物件已刪除；metadata 保留供 audit。 */
+    public void markDeleted() { this.status = MediaStatus.DELETED; this.deletedAt = Instant.now(); this.errorSummary = null; }
+
+    /** 記錄刪除失敗的安全摘要供 cleanup retry。 */
+    public void deletionFailed(String summary) { this.status = MediaStatus.FAILED; this.errorSummary = summary; }
+
     public Long getId() { return id; }
     public String getObjectKey() { return objectKey; }
     public String getOriginalFilename() { return originalFilename; }

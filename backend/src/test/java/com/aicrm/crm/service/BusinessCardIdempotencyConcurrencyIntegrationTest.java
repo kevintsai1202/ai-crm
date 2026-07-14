@@ -1,0 +1,81 @@
+package com.aicrm.crm.service;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import com.aicrm.crm.api.Dtos;
+import com.aicrm.crm.domain.*;
+import com.aicrm.crm.repository.*;
+import com.aicrm.crm.service.businesscard.BusinessCardConflictException;
+import com.aicrm.crm.service.media.*;
+import com.aicrm.crm.service.vision.BusinessCardRecognitionClient;
+import com.aicrm.crm.support.PostgresTestBase;
+import java.awt.image.BufferedImage;
+import java.io.*;
+import java.math.BigDecimal;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import javax.imageio.ImageIO;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+/** 真實 PostgreSQL 鎖與唯一約束下的名片確認併發冪等測試。 */
+@org.springframework.boot.test.context.SpringBootTest(properties={"app.media.enabled=true","app.media.s3.endpoint=http://unused","app.media.s3.access-key=x","app.media.s3.secret-key=x"})
+class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase {
+    @Autowired BusinessCardIntakeService service; @Autowired SystemSettingService settings;
+    @Autowired AiProviderRepository providers; @Autowired AppUserRepository users; @Autowired CustomerRepository customers;
+    @Autowired ContactRepository contacts; @Autowired OpportunityRepository opportunities; @Autowired CrmTaskRepository tasks;
+    @MockitoBean TemporaryMediaStore store; @MockitoBean BusinessCardRecognitionClient vision;
+    private byte[] png; private JwtService.AuthPrincipal principal; private Customer mergeCustomer;
+
+    /** 建立 Vision assignment、owner customer 與 deterministic 媒體 fake。 */
+    @BeforeEach void setup() throws Exception {
+        ByteArrayOutputStream out=new ByteArrayOutputStream();ImageIO.write(new BufferedImage(2,2,BufferedImage.TYPE_INT_RGB),"png",out);png=out.toByteArray();
+        var owner=users.findByUsername("sales@aurora.local").orElseThrow();principal=new JwtService.AuthPrincipal(owner.getUsername(),owner.getDisplayName(),owner.getRole());
+        String suffix=String.format("%08d",Math.abs(UUID.randomUUID().hashCode())%100_000_000);
+        mergeCustomer=new Customer("併發測試客戶"+suffix,"merge"+suffix+"@example.com","09"+suffix,
+                suffix,"科技",owner.getDisplayName());mergeCustomer.assignOwner(owner);mergeCustomer=customers.save(mergeCustomer);
+        var provider=providers.findAll().stream().filter(p->p.getName().equals("ConcurrencyCardTest")).findFirst().orElseGet(()->providers.save(new AiProvider("ConcurrencyCardTest","http://unused","secret","test")));
+        settings.updateAiSettings("",null,List.of(new Dtos.ModelOptionItem("vision-concurrency",provider.getId(),Set.of(),CapabilitySource.UNKNOWN)),null,null,null,"test");
+        settings.updateModelCapabilities("vision-concurrency",provider.getId(),Set.of(ModelCapability.VISION),"test");
+        settings.updateAssignments(new Dtos.AiModelAssignments("",null,"vision-concurrency",provider.getId(),"",null),"test");
+        when(store.put(any())).thenAnswer(inv->{MediaUpload u=inv.getArgument(0);return new StoredMedia("temporary/"+UUID.randomUUID(),u.bytes().length,"0".repeat(64));});
+        when(store.get(anyString())).thenAnswer(inv->new ByteArrayInputStream(png));
+        when(vision.recognize(any(),anyString(),any())).thenReturn(new Dtos.RecognizedBusinessCard("王小明","採購","buyer@example.com","0912345678","測試公司",null,Map.of(),List.of()));
+    }
+
+    /** 同 key 同 payload 雙執行緒只建立一組 CRM，兩者回相同結果。 */
+    @Test void sameKeySamePayload_replaysSingleCommittedResult() throws Exception {
+        long intake=createIntake(), c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
+        var results=runPair(intake,request("併發同內容"),request("併發同內容"));
+        assertThat(results).allMatch(Result::success); assertThat(results.get(0).response()).isEqualTo(results.get(1).response());
+        assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
+    }
+
+    /** 同 key 不同 payload 只能一筆成功，另一筆衝突且仍只建立一組 CRM。 */
+    @Test void sameKeyDifferentPayload_oneWinsOneConflictsWithoutPartialDuplicate() throws Exception {
+        long intake=createIntake(),c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
+        var results=runPair(intake,request("版本A"),request("版本B"));
+        assertThat(results.stream().filter(Result::success)).hasSize(1);assertThat(results.stream().filter(r->r.error() instanceof BusinessCardConflictException)).hasSize(1);
+        assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
+    }
+
+    /** 以 barrier 同時送出兩筆確認。 */
+    private List<Result> runPair(long intake,Dtos.ConfirmBusinessCardRequest a,Dtos.ConfirmBusinessCardRequest b) throws Exception {
+        CyclicBarrier barrier=new CyclicBarrier(2);ExecutorService executor=Executors.newFixedThreadPool(2);
+        String key="same-key-"+intake;
+        try {var f1=executor.submit(()->invoke(barrier,intake,a,key));var f2=executor.submit(()->invoke(barrier,intake,b,key));return List.of(f1.get(30,TimeUnit.SECONDS),f2.get(30,TimeUnit.SECONDS));}
+        finally {executor.shutdownNow();}
+    }
+    /** 單一併發呼叫轉成可斷言結果。 */
+    private Result invoke(CyclicBarrier barrier,long intake,Dtos.ConfirmBusinessCardRequest request,String key){try{barrier.await();return new Result(service.confirm(intake,request,principal,key),null);}catch(Throwable e){return new Result(null,e);}}
+    /** 建立 REVIEW_PENDING intake。 */
+    private long createIntake(){return service.create(new MockMultipartFile("file","card.png","image/png",png),principal).id();}
+    /** 建立固定 hash 輸入，僅商機名可變。 */
+    private Dtos.ConfirmBusinessCardRequest request(String name){return new Dtos.ConfirmBusinessCardRequest("MERGE",mergeCustomer.getId(),mergeCustomer.getName(),mergeCustomer.getEmail(),mergeCustomer.getPhone(),mergeCustomer.getTaxId(),mergeCustomer.getIndustry(),"王小明","採購","buyer@example.com",name,new BigDecimal("1000"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
+    /** 併發呼叫結果。 */ private record Result(Dtos.BusinessCardConfirmResponse response,Throwable error){boolean success(){return response!=null;}}
+}

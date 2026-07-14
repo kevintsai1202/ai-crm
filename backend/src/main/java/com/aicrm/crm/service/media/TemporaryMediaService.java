@@ -7,6 +7,7 @@ import com.aicrm.crm.repository.TemporaryMediaRepository;
 import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -98,6 +99,21 @@ public class TemporaryMediaService {
 
     /** 供既有 cleanup job 每輪重試刪除媒體解析暫存檔。 */
     public int retryPendingTempFiles() { return tempFiles.retryPending(); }
+
+    /** 從 object storage 讀取已驗證媒體內容。 */
+    public byte[] read(TemporaryMedia media) {
+        try (InputStream input = store.get(media.getObjectKey())) { return input.readAllBytes(); }
+        catch (IOException exception) { throw new IllegalStateException("無法讀取暫存媒體", exception); }
+    }
+
+    /** commit 後刪除 object；失敗保留 CONFIRMED metadata 供 cleanup 重試。 */
+    public void deleteConfirmed(TemporaryMedia media) {
+        try { store.delete(media.getObjectKey()); media.markDeleted(); repository.save(media); }
+        catch (RuntimeException exception) {
+            media.deletionFailed("暫存物件刪除失敗"); repository.save(media);
+            log.warn("確認後暫存媒體刪除失敗，保留 metadata：mediaId={}", media.getId());
+        }
+    }
 
     /** 一次讀取 multipart 並將 IO 錯誤轉為輸入驗證錯誤。 */
     private byte[] readBytes(MultipartFile file) {

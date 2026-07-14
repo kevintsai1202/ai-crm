@@ -534,6 +534,34 @@ public final class Dtos {
             String transcriptionModel,
             Long transcriptionProviderId) {}
 
+    /** Vision 模型辨識後的標準化名片欄位。 */
+    public record RecognizedBusinessCard(String personName, String title, String email, String phone,
+                                         String companyName, String website, Map<String, Double> confidence,
+                                         List<String> warnings) {}
+
+    /** 可能重複的客戶候選，不自動選擇合併。 */
+    public record BusinessCardDuplicateCandidate(Long customerId, String customerName,
+                                                  List<String> matchedBy) {}
+
+    /** 名片 intake 查詢與建立回應。 */
+    public record BusinessCardIntakeResponse(Long id, String status, Long mediaId,
+                                              RecognizedBusinessCard recognized,
+                                              List<BusinessCardDuplicateCandidate> duplicateCandidates,
+                                              String errorSummary) {}
+
+    /** 人工確認名片建檔請求；CREATE 與 MERGE 必須明確選擇。 */
+    public record ConfirmBusinessCardRequest(
+            @NotBlank String customerAction, Long customerId,
+            @NotBlank String customerName, @NotBlank @Email String customerEmail,
+            @NotBlank String customerPhone, @NotBlank String taxId, @NotBlank String industry,
+            @NotBlank String contactName, @NotBlank String contactTitle, @NotBlank @Email String contactEmail,
+            @NotBlank String opportunityName, @NotNull @PositiveOrZero BigDecimal opportunityAmount,
+            LocalDate expectedCloseDate, @NotNull LocalDateTime callAt) {}
+
+    /** 名片確認後所有正式 CRM 關聯 ID。 */
+    public record BusinessCardConfirmResponse(Long intakeId, Long customerId, Long contactId,
+                                               Long opportunityId, Long taskId) {}
+
     /** Admin 人工覆寫指定 Provider 模型能力的請求。 */
     public record ModelCapabilitiesRequest(
             @jakarta.validation.constraints.NotNull Long providerId,

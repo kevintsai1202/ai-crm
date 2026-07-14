@@ -279,6 +279,22 @@ public class SystemSettingService {
         return value.isBlank() ? null : Long.valueOf(value);
     }
 
+    /** 解析並再次驗證 OCR assignment 必須是同一 Provider/model pair 且具有 VISION。 */
+    @Transactional(readOnly = true)
+    public com.aicrm.crm.service.vision.AiModelAssignment resolveOcrAssignment() {
+        String model = getTextSetting(KEY_AI_OCR_MODEL);
+        Long providerId = getLongSetting(KEY_AI_OCR_PROVIDER_ID);
+        if (!StringUtils.hasText(model) || providerId == null) return null;
+        var option = getModelOptions().stream()
+                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
+                .filter(item -> item.capabilities().contains(ModelCapability.VISION)).findFirst().orElse(null);
+        if (option == null) return null;
+        var provider = providerRepository.findById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
+                provider.getBaseUrl(), provider.getApiKey());
+    }
+
     /**
      * 更新 Chat、OCR 與轉錄用途 assignment，並在後端強制驗證能力。
      *
