@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createTask } from "../../api/index";
 import type { CrmTask } from "../../types";
 
@@ -27,6 +27,13 @@ export function TaskFormModal({ customerId, customerName, assigneeId, onCreated,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    /** 按 Escape 關閉 Modal，與可見關閉按鈕行為一致。 */
+    const handleEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   /** 驗證時間後建立正式 PHONE_CALL 任務。 */
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -51,8 +58,8 @@ export function TaskFormModal({ customerId, customerName, assigneeId, onCreated,
   }
 
   return <div className="modal-overlay" onClick={onClose}>
-    <form className="modal-content task-form-modal" onSubmit={handleSubmit} onClick={(event) => event.stopPropagation()}>
-      <div className="modal-header"><h3>安排電話追蹤</h3><button type="button" className="chat-close" onClick={onClose}>✕</button></div>
+    <form className="modal-content task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onSubmit={handleSubmit} onClick={(event) => event.stopPropagation()}>
+      <div className="modal-header"><h3 id="task-form-title">安排電話追蹤</h3><button type="button" className="chat-close" aria-label="關閉安排電話追蹤" onClick={onClose}>✕</button></div>
       <label>客戶<input value={customerName ?? `客戶 #${customerId}`} disabled /></label>
       <label>標題<input name="taskTitle" required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label>優先級<select name="taskPriority" value={priority} onChange={(event) => setPriority(event.target.value as CrmTask["priority"])}><option value="LOW">低</option><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label>
