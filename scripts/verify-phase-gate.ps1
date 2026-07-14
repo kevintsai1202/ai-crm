@@ -22,6 +22,7 @@ $ErrorActionPreference = 'Stop'
 function New-PhaseDataPrefix {
     param(
         [Parameter(Mandatory)]
+        [ValidateSet('V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27')]
         [string]$Phase
     )
 
