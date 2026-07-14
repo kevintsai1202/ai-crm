@@ -29,6 +29,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -46,9 +48,18 @@ import javax.sound.sampled.AudioSystem;
 class TemporaryMediaServiceTest {
     private final TemporaryMediaStore store = mock(TemporaryMediaStore.class);
     private final TemporaryMediaRepository repository = mock(TemporaryMediaRepository.class);
-    private final MediaTempFileManager tempFiles = new MediaTempFileManager();
-    private final TemporaryMediaService service = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 25_000_000L);
+    @TempDir
+    Path testDirectory;
+    private MediaTempFileManager tempFiles;
+    private TemporaryMediaService service;
     private final AuthPrincipal principal = new AuthPrincipal("sales@example.com", "業務", com.aicrm.crm.domain.Role.SALES);
+
+    @BeforeEach
+    void setUpTempFiles() throws IOException {
+        tempFiles = new MediaTempFileManager(testDirectory.resolve("media"), Duration.ofHours(24));
+        tempFiles.initialize();
+        service = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 25_000_000L);
+    }
 
     @Test
     void stage_acceptsRealImageAndRejectsSpoofedOrOversizedFiles() {
@@ -116,7 +127,8 @@ class TemporaryMediaServiceTest {
 
     @Test
     void stage_failsClosedAndRegistersRetryWhenTempDeleteFails() throws IOException {
-        MediaTempFileManager failingManager = spy(new MediaTempFileManager());
+        MediaTempFileManager failingManager = spy(new MediaTempFileManager(testDirectory.resolve("failure"), Duration.ofHours(24)));
+        failingManager.initialize();
         doThrow(new IOException("locked")).doCallRealMethod().when(failingManager).delete(any());
         TemporaryMediaService guarded = new TemporaryMediaService(store, repository, Duration.ofHours(24), failingManager, 25_000_000L);
 
@@ -127,6 +139,15 @@ class TemporaryMediaServiceTest {
         assertThat(failingManager.pendingCount()).isEqualTo(1);
         assertThat(guarded.retryPendingTempFiles()).isEqualTo(1);
         assertThat(failingManager.pendingCount()).isZero();
+    }
+
+    @Test
+    void stage_successfulAudioLeavesNoOwnedOrPendingTempFile() {
+        assertAccepted(MediaPurpose.MEETING_AUDIO, "audio/wav", wav());
+
+        assertThat(tempFiles.ownedCount()).isZero();
+        assertThat(tempFiles.pendingCount()).isZero();
+        assertThat(tempFiles.tempDirectory().toFile().list()).isEmpty();
     }
 
     @ParameterizedTest

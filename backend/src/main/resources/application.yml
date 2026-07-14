@@ -76,6 +76,10 @@ app:
     image:
       # 解碼前像素炸彈防護；預設 25MP，依實際名片影像需求調整。
       max-pixels: ${MEDIA_IMAGE_MAX_PIXELS:25000000}
+    # 音訊 parser 專屬暫存目錄；只允許服務產生的 UUID 檔名。
+    temp-dir: ${MEDIA_TEMP_DIR:${java.io.tmpdir}/ai-crm-media}
+    # 啟動時清除符合服務命名且超過此時間的 crash 遺留檔。
+    temp-stale-age: ${MEDIA_TEMP_STALE_AGE:PT24H}
     cleanup:
       enabled: ${MEDIA_CLEANUP_ENABLED:true}
       fixed-delay: ${MEDIA_CLEANUP_FIXED_DELAY:PT1H}
