@@ -168,6 +168,63 @@ public class AdminSettingController {
     }
 
     /**
+     * 從 Provider 模型目錄 refresh 候選與可靠的 input modality metadata。
+     *
+     * @param id Provider ID
+     * @param authentication 登入認證
+     * @return refresh 後完整模型候選清單
+     */
+    @PostMapping("/ai/providers/{id}/models/refresh")
+    public List<Dtos.ModelOptionItem> refreshProviderModels(@PathVariable Long id,
+                                                            Authentication authentication) {
+        try {
+            return systemSettings.refreshProviderModels(id, resolveUsername(authentication));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (org.springframework.web.client.RestClientException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Provider 模型目錄查詢失敗");
+        }
+    }
+
+    /**
+     * 由 Admin 人工設定模型能力，能力來源固定記為 MANUAL。
+     *
+     * @param model 模型名稱
+     * @param request Provider 與能力集合
+     * @param authentication 登入認證
+     * @return 更新後模型選項
+     */
+    @PutMapping("/ai/models/{model}/capabilities")
+    public Dtos.ModelOptionItem updateModelCapabilities(@PathVariable String model,
+                                                        @RequestBody Dtos.ModelCapabilitiesRequest request,
+                                                        Authentication authentication) {
+        try {
+            return systemSettings.updateModelCapabilities(model, request.providerId(), request.capabilities(),
+                    resolveUsername(authentication));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    /**
+     * 更新 Chat、OCR 與語音轉錄用途 assignment，後端再次檢查能力。
+     *
+     * @param request 三種用途 assignment
+     * @param authentication 登入認證
+     * @return 更新後 AI 設定檢視
+     */
+    @PutMapping("/ai/assignments")
+    public Dtos.AiSettingsResponse updateAssignments(@RequestBody Dtos.AiModelAssignments request,
+                                                      Authentication authentication) {
+        try {
+            systemSettings.updateAssignments(request, resolveUsername(authentication));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+        return systemSettings.getAiSettingsView();
+    }
+
+    /**
      * 取得多模型評分的 AI 歷程（MODEL_EVAL 類型）。
      *
      * @return AI 呼叫歷史清單

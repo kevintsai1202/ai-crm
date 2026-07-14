@@ -466,8 +466,34 @@ public final class Dtos {
     /** 優先關懷單筆：客戶與中文關懷理由。 */
     public record PriorityCareItem(Long customerId, String name, String reason) {}
 
-    /** 模型設定項目（含供應商關聯）。 */
-    public record ModelOptionItem(String model, Long providerId) {}
+    /** 模型設定項目（含供應商關聯、已確認能力及能力來源）。 */
+    public record ModelOptionItem(
+            String model,
+            Long providerId,
+            java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities,
+            com.aicrm.crm.domain.CapabilitySource capabilitySource) {
+        /** 正規化舊資料或缺漏欄位，禁止從模型名稱推測能力。 */
+        public ModelOptionItem {
+            capabilities = capabilities == null ? java.util.Set.of() : java.util.Set.copyOf(capabilities);
+            capabilitySource = capabilitySource == null
+                    ? com.aicrm.crm.domain.CapabilitySource.UNKNOWN
+                    : capabilitySource;
+        }
+    }
+
+    /** Chat、OCR 與轉錄三種用途的模型 assignment。 */
+    public record AiModelAssignments(
+            String chatModel,
+            Long chatProviderId,
+            String ocrModel,
+            Long ocrProviderId,
+            String transcriptionModel,
+            Long transcriptionProviderId) {}
+
+    /** Admin 人工覆寫指定 Provider 模型能力的請求。 */
+    public record ModelCapabilitiesRequest(
+            Long providerId,
+            java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities) {}
 
     /** AI 供應商檢視（apiKey 永不回傳前端，以 apiKeySet 布林代替）。 */
     public record AiProviderItem(Long id, String name, String baseUrl, boolean apiKeySet) {}
@@ -490,7 +516,11 @@ public final class Dtos {
         // 可編輯模型參數（null/空 = 未設定，沿用預設）
         Double temperature,
         Integer maxCompletionTokens,
-        String reasoningEffort
+        String reasoningEffort,
+        String ocrModel,
+        Long ocrProviderId,
+        String transcriptionModel,
+        Long transcriptionProviderId
     ) {}
 
     /** AI 設定更新請求。 */
