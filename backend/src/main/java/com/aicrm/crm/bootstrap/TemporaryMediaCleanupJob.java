@@ -13,6 +13,7 @@ public class TemporaryMediaCleanupJob {
     /** 暫存媒體服務。 */
     private final TemporaryMediaService mediaService;
 
+    /** 建立暫存媒體排程。 */
     public TemporaryMediaCleanupJob(TemporaryMediaService mediaService) {
         this.mediaService = mediaService;
     }
@@ -20,6 +21,7 @@ public class TemporaryMediaCleanupJob {
     /** 依可調整 fixed delay 執行到期清理；服務內逐筆隔離失敗。 */
     @Scheduled(fixedDelayString = "${app.media.cleanup.fixed-delay:PT1H}")
     public void cleanup() {
+        mediaService.retryPendingTempFiles();
         mediaService.deleteExpired(Instant.now());
     }
 }

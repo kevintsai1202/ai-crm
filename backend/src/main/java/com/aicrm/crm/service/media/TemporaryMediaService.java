@@ -35,7 +35,6 @@ public class TemporaryMediaService {
     private static final Logger log = LoggerFactory.getLogger(TemporaryMediaService.class);
     private static final long IMAGE_MAX = 10L * 1024 * 1024;
     private static final long AUDIO_MAX = 100L * 1024 * 1024;
-    private static final long IMAGE_MAX_PIXELS = 100_000_000L;
     private static final Set<String> IMAGE_MIMES = Set.of("image/jpeg", "image/png", "image/webp");
     private static final Set<String> AUDIO_MIMES = Set.of("audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/wav", "audio/x-wav");
     /** Object storage adapter。 */
@@ -44,13 +43,21 @@ public class TemporaryMediaService {
     private final TemporaryMediaRepository repository;
     /** pending/failed 媒體保留時間。 */
     private final Duration retention;
+    /** 媒體驗證暫存檔管理器。 */
+    private final MediaTempFileManager tempFiles;
+    /** 單張圖片可解碼的最大像素數。 */
+    private final long imageMaxPixels;
 
     /** 建立媒體服務。 */
     public TemporaryMediaService(TemporaryMediaStore store, TemporaryMediaRepository repository,
-            @Value("${app.media.retention:PT24H}") Duration retention) {
+            @Value("${app.media.retention:PT24H}") Duration retention, MediaTempFileManager tempFiles,
+            @Value("${app.media.image.max-pixels:25000000}") long imageMaxPixels) {
         this.store = store;
         this.repository = repository;
         this.retention = retention;
+        this.tempFiles = tempFiles;
+        if (imageMaxPixels <= 0) throw new IllegalArgumentException("圖片最大像素數必須大於 0");
+        this.imageMaxPixels = imageMaxPixels;
     }
 
     /** 驗證完整內容後上傳 object，再寫 metadata；DB 失敗時補償刪除 object。 */
@@ -88,6 +95,9 @@ public class TemporaryMediaService {
         }
         return deleted;
     }
+
+    /** 供既有 cleanup job 每輪重試刪除媒體解析暫存檔。 */
+    public int retryPendingTempFiles() { return tempFiles.retryPending(); }
 
     /** 一次讀取 multipart 並將 IO 錯誤轉為輸入驗證錯誤。 */
     private byte[] readBytes(MultipartFile file) {
@@ -133,7 +143,7 @@ public class TemporaryMediaService {
             try {
                 reader.setInput(input, true, true);
                 int width = reader.getWidth(0), height = reader.getHeight(0);
-                if (width <= 0 || height <= 0 || (long) width * height > IMAGE_MAX_PIXELS) return false;
+                if (width <= 0 || height <= 0 || (long) width * (long) height > imageMaxPixels) return false;
                 BufferedImage decoded = reader.read(0);
                 return decoded != null && decoded.getWidth() > 0 && decoded.getHeight() > 0;
             } finally { reader.dispose(); }
@@ -154,8 +164,8 @@ public class TemporaryMediaService {
     private boolean parseAudio(byte[] bytes, String mime) {
         Path temporary = null;
         try {
-            temporary = Files.createTempFile("ai-crm-media-", suffix(mime));
-            Files.write(temporary, bytes);
+            temporary = tempFiles.create(suffix(mime));
+            tempFiles.write(temporary, bytes);
             AudioFile audio = AudioFileIO.read(temporary.toFile());
             AudioHeader header = audio.getAudioHeader();
             return header != null && header.getPreciseTrackLength() > 0
@@ -165,8 +175,11 @@ public class TemporaryMediaService {
         } catch (Exception exception) {
             return false;
         } finally {
-            if (temporary != null) try { Files.deleteIfExists(temporary); }
-            catch (IOException exception) { log.warn("音訊驗證暫存檔刪除失敗：{}", temporary, exception); }
+            if (temporary != null) try { tempFiles.delete(temporary); }
+            catch (IOException | RuntimeException exception) {
+                tempFiles.registerRetry(temporary);
+                throw new IllegalArgumentException("音訊驗證暫存檔無法安全刪除", exception);
+            }
         }
     }
 

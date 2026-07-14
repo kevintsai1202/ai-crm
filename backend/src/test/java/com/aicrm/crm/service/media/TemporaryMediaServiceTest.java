@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +46,8 @@ import javax.sound.sampled.AudioSystem;
 class TemporaryMediaServiceTest {
     private final TemporaryMediaStore store = mock(TemporaryMediaStore.class);
     private final TemporaryMediaRepository repository = mock(TemporaryMediaRepository.class);
-    private final TemporaryMediaService service = new TemporaryMediaService(store, repository, Duration.ofHours(24));
+    private final MediaTempFileManager tempFiles = new MediaTempFileManager();
+    private final TemporaryMediaService service = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 25_000_000L);
     private final AuthPrincipal principal = new AuthPrincipal("sales@example.com", "業務", com.aicrm.crm.domain.Role.SALES);
 
     @Test
@@ -79,6 +81,52 @@ class TemporaryMediaServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> service.stage(file("bomb.png", "image/png", dimensionBombPng()), MediaPurpose.BUSINESS_CARD, principal))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void stage_enforcesConfiguredPixelLimitBeforeDecode() {
+        byte[] twoByTwo = png();
+        TemporaryMediaService exactLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 4);
+        when(store.put(any())).thenReturn(new StoredMedia("media/exact-pixels", twoByTwo.length, "hash"));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(exactLimit.stage(file("exact.png", "image/png", twoByTwo), MediaPurpose.BUSINESS_CARD, principal))
+                .isNotNull();
+        TemporaryMediaService belowLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 3);
+        assertThatThrownBy(() -> belowLimit.stage(file("over.png", "image/png", twoByTwo), MediaPurpose.BUSINESS_CARD, principal))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void stage_enforcesActualImageAndAudioByteBoundaries() {
+        byte[] imageAtLimit = Arrays.copyOf(png(), 10 * 1024 * 1024);
+        assertAccepted(MediaPurpose.BUSINESS_CARD, "image/png", imageAtLimit);
+        byte[] imageOverLimit = Arrays.copyOf(imageAtLimit, imageAtLimit.length + 1);
+        imageAtLimit = null;
+        assertThatThrownBy(() -> service.stage(file("over.png", "image/png", imageOverLimit),
+                MediaPurpose.BUSINESS_CARD, principal)).isInstanceOf(IllegalArgumentException.class);
+
+        byte[] audioAtLimit = wavExactSize(100 * 1024 * 1024);
+        assertAccepted(MediaPurpose.MEETING_AUDIO, "audio/wav", audioAtLimit);
+        audioAtLimit = null;
+        byte[] audioOverLimit = new byte[100 * 1024 * 1024 + 1];
+        assertThatThrownBy(() -> service.stage(file("over.wav", "audio/wav", audioOverLimit),
+                MediaPurpose.MEETING_AUDIO, principal)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void stage_failsClosedAndRegistersRetryWhenTempDeleteFails() throws IOException {
+        MediaTempFileManager failingManager = spy(new MediaTempFileManager());
+        doThrow(new IOException("locked")).doCallRealMethod().when(failingManager).delete(any());
+        TemporaryMediaService guarded = new TemporaryMediaService(store, repository, Duration.ofHours(24), failingManager, 25_000_000L);
+
+        assertThatThrownBy(() -> guarded.stage(file("meeting.wav", "audio/wav", wav()), MediaPurpose.MEETING_AUDIO, principal))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("音訊驗證暫存檔無法安全刪除");
+        verify(store, never()).put(any());
+        assertThat(failingManager.pendingCount()).isEqualTo(1);
+        assertThat(guarded.retryPendingTempFiles()).isEqualTo(1);
+        assertThat(failingManager.pendingCount()).isZero();
     }
 
     @ParameterizedTest
@@ -199,6 +247,17 @@ class TemporaryMediaServiceTest {
                 return output.toByteArray();
             }
         } catch (IOException exception) { throw new IllegalStateException(exception); }
+    }
+
+    /** 產生 RIFF/data 長度完全吻合的零 PCM WAV，用於實際 100MB 邊界驗證。 */
+    private byte[] wavExactSize(int size) {
+        byte[] bytes = new byte[size];
+        ByteBuffer buffer = ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        buffer.put(new byte[] {'R','I','F','F'}).putInt(size - 8).put(new byte[] {'W','A','V','E'});
+        buffer.put(new byte[] {'f','m','t',' '}).putInt(16).putShort((short) 1).putShort((short) 1)
+                .putInt(8000).putInt(16000).putShort((short) 2).putShort((short) 16);
+        buffer.put(new byte[] {'d','a','t','a'}).putInt(size - 44);
+        return bytes;
     }
 
     /** 以 ImageIO 產生具有正確 CRC/zlib 資料的 PNG。 */

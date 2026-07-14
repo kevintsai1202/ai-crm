@@ -73,6 +73,9 @@ app:
       bucket: ${MEDIA_S3_BUCKET:ai-crm-temporary-media}
       region: ${MEDIA_S3_REGION:us-east-1}
     retention: ${MEDIA_RETENTION:PT24H}
+    image:
+      # 解碼前像素炸彈防護；預設 25MP，依實際名片影像需求調整。
+      max-pixels: ${MEDIA_IMAGE_MAX_PIXELS:25000000}
     cleanup:
       enabled: ${MEDIA_CLEANUP_ENABLED:true}
       fixed-delay: ${MEDIA_CLEANUP_FIXED_DELAY:PT1H}
