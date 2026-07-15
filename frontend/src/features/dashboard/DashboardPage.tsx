@@ -216,7 +216,7 @@ export function DashboardPage() {
     ...kpiBlocks(dashboard, riskCounts, t, i18n.language),
     ...reportBlocks(reports, openDrilldown, jumpToCustomer),
     ...sentimentBlocks(sentiment, jumpToCustomer),
-    rfmBlock(rfm, jumpToCustomer),
+    rfmBlock(rfm, jumpToCustomer, t, i18n.language),
     usageBlock(usage)
   ];
   // 角色可見的區塊 id（usage 僅 MANAGER/ADMIN）
