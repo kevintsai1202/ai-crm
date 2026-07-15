@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchCustomerOptions } from "../../../api";
 import type { OwnerOption } from "../../../types";
 
@@ -16,6 +17,7 @@ export function AddCustomerModal({
   onSubmit: (data: { name: string; email: string; phone: string; taxId: string; industry: string; ownerId: number }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   // 下拉選項：產業清單與可指派業務（帳號）清單
   const [industries, setIndustries] = useState<string[]>([]);
   const [owners, setOwners] = useState<OwnerOption[]>([]);
@@ -54,32 +56,32 @@ export function AddCustomerModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>新增客戶</h3>
-        <label>名稱 <input name="name" required /></label>
-        <label>Email <input name="email" type="email" required /></label>
-        <label>電話 <input name="phone" placeholder="0912345678" required /></label>
-        <label>統編 <input name="taxId" placeholder="12345678" required /></label>
+        <h3>{t("customers:addCustomerModal.title")}</h3>
+        <label>{t("customers:form.name")} <input name="name" required /></label>
+        <label>{t("customers:form.email")} <input name="email" type="email" required /></label>
+        <label>{t("customers:form.phone")} <input name="phone" placeholder={t("customers:form.phonePlaceholder")} required /></label>
+        <label>{t("customers:form.taxId")} <input name="taxId" placeholder={t("customers:form.taxIdPlaceholder")} required /></label>
         <label>
-          產業
+          {t("customers:form.industry")}
           <select name="industry" required defaultValue="">
-            <option value="" disabled>請選擇產業</option>
+            <option value="" disabled>{t("customers:form.selectIndustry")}</option>
             {industries.map((it) => (
               <option key={it} value={it}>{it}</option>
             ))}
           </select>
         </label>
         <label>
-          負責業務
+          {t("customers:form.owner")}
           <select name="ownerId" required value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
-            {owners.length === 0 ? <option value="" disabled>無可指派業務</option> : null}
+            {owners.length === 0 ? <option value="" disabled>{t("customers:form.noAssignableOwner")}</option> : null}
             {owners.map((o) => (
-              <option key={o.id} value={o.id}>{o.id === currentUserId ? `${o.displayName}（我）` : o.displayName}</option>
+              <option key={o.id} value={o.id}>{o.id === currentUserId ? t("customers:form.ownerSelf", { name: o.displayName }) : o.displayName}</option>
             ))}
           </select>
         </label>
         <div className="modal-actions">
-          <button type="submit">建立</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("customers:addCustomerModal.submit")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
