@@ -34,6 +34,7 @@ import type {
   MeetingCopilotConfirmResponse,
   FollowUpDraftResponse,
   OutboundEmailResponse,
+  OpportunityHealthResponse,
 } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
 
@@ -138,6 +139,18 @@ export async function approveAndSendFollowUp(id: number, idempotencyKey: string)
 /** 重試先前寄送失敗（FAILED）的郵件。 */
 export async function retryOutboundEmail(id: number) {
   const { data } = await apiClient.post<OutboundEmailResponse>(`/outbound-emails/${id}/retry`, {});
+  return data;
+}
+
+/** 取得商機健康度（含分項、依據、趨勢與下一最佳行動）。 */
+export async function fetchOpportunityHealth(opportunityId: number) {
+  const { data } = await apiClient.get<OpportunityHealthResponse>(`/opportunities/${opportunityId}/health`);
+  return data;
+}
+
+/** 重算商機健康度並保留歷史 snapshot。 */
+export async function recalculateOpportunityHealth(opportunityId: number) {
+  const { data } = await apiClient.post<OpportunityHealthResponse>(`/opportunities/${opportunityId}/health/recalculate`, {});
   return data;
 }
 

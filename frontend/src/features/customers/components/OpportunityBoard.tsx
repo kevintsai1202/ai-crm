@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { CustomerDetail } from "../../../types";
 import { formatMoney, stageLabel } from "../../../lib/format";
 import { updateOpportunityStage } from "../../../api";
@@ -19,7 +20,8 @@ const CLOSE_STAGES = ["CLOSED_WON", "CLOSED_LOST"];
  * @param onEdit 點擊編輯 callback
  * @param onDelete 點擊刪除 callback
  */
-export function OpportunityBoard({ opportunities, onStageChange, onEdit, onDelete }: {
+export function OpportunityBoard({ customerId, opportunities, onStageChange, onEdit, onDelete }: {
+  customerId: number;
   opportunities: CustomerDetail["opportunities"];
   onStageChange: (opportunityId: number, newStage: string) => void;
   onEdit: (opportunity: CustomerDetail["opportunities"][number]) => void;
@@ -27,6 +29,7 @@ export function OpportunityBoard({ opportunities, onStageChange, onEdit, onDelet
 }) {
   /** 待結案的商機（選到結案階段時暫存,待 Modal 填原因後送出）。 */
   const [pendingClose, setPendingClose] = useState<{ id: number; stage: "CLOSED_WON" | "CLOSED_LOST"; current: string } | null>(null);
+  const navigate = useNavigate();
 
   /**
    * 樂觀更新本地並呼叫 API;失敗回滾。close 為結案資訊(選填)。
@@ -74,6 +77,7 @@ export function OpportunityBoard({ opportunities, onStageChange, onEdit, onDelet
               {items.map((opportunity) => (
                 <article className="opportunity-card" key={opportunity.id}>
                   <div className="card-actions">
+                    <button type="button" className="card-icon-btn" title="商機智能" data-testid={`oi-open-${opportunity.id}`} onClick={() => navigate(`/opportunities/${opportunity.id}/intelligence?customerId=${customerId}`)}>📊</button>
                     <button type="button" className="card-icon-btn" title="編輯商機" onClick={() => onEdit(opportunity)}>✏️</button>
                     <button type="button" className="card-icon-btn" title="刪除商機" onClick={() => onDelete(opportunity)}>🗑️</button>
                   </div>

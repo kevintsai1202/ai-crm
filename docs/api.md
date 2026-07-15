@@ -158,3 +158,10 @@ Low-confidence stakeholder suggestions default to unselected. After a successful
 - `POST /api/outbound-emails/{id}/retry`: retry a `FAILED` email; `SENT` cannot be retried (`409`).
 
 Credentials are read only from backend configuration and never returned to the client or written to audit/error text. Automated tests use a deterministic fake behind `app.mail.fake.enabled`; a real send is opt-in via `LIVE_SENDMAIL_TEST=true` with `E2E_MAIL_RECIPIENT`.
+
+## V26 opportunity intelligence
+
+- `GET /api/opportunities/{id}/health`: return the latest explainable health snapshot — `totalScore` (0–100), `components` (each with `score`/`maxScore`/`reason`/`evidence`), `nextBestAction`, `ruleVersion`, `model`, and a `trend` of prior snapshots. Computes and stores the first snapshot on demand if none exists. Owner-scoped.
+- `POST /api/opportunities/{id}/health/recalculate`: recompute and store a new snapshot (history retained for the trend). Owner-scoped.
+
+The score is produced by a pure, deterministic calculator (`sum(components) == total`); the LLM only phrases the next-best-action and falls back to a deterministic message. This feature never modifies opportunity stage or probability. Scoring dimensions: stage dwell, expected close date, interaction heat, sentiment/intent signals, task status, and decision-chain completeness (degrades gracefully until V27 stakeholder data exists).

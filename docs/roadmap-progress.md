@@ -2,7 +2,7 @@
 
 > 本文件是所有子專案（SP）進度的**唯一真實來源**。每個 session 開始前先讀本檔，結束後更新狀態。
 > 依據：`docs/consulting-review.md`、`docs/crm-ai-consultant-analysis.md`
-> 最後更新：2026-07-15（V25 AI follow-up email 完成）
+> 最後更新：2026-07-15（V26 opportunity intelligence 完成）
 
 ## 狀態圖例
 `⬜ 未開始` ｜ `🟡 設計中(spec)` ｜ `🔵 計畫中(plan)` ｜ `🟠 實作中` ｜ `✅ 完成`
@@ -21,7 +21,8 @@
 | V23 | ✅ Complete | Temporary media on S3/MinIO, AI business-card OCR intake, three-step wizard (upload→review/dedupe→confirm), atomic customer/contact/opportunity/phone-task creation with Idempotency-Key, post-commit image deletion (`DELETED`), deterministic fake Vision for E2E; two real MinIO-backed E2E cases pass |
 | V24 | ✅ Complete | AI meeting copilot: audio upload to temporary media, governed transcription, deterministic structured draft (interaction/task/opportunity-patch/stakeholder), side-by-side transcript + selectable CRM changes, low-confidence stakeholder default-unselected, Idempotency-Key selective confirm applying only chosen changes, post-commit audio deletion with transcript retained; fake transcription for E2E; backend 217 tests + real MinIO E2E pass |
 | V25 | ✅ Complete | AI follow-up email: grounded draft, human edits create new versions (append-only chain), approve-and-send via Zeabur Sendmail with unified company sender + owner Reply-To (blocked when owner lacks email), Idempotency-Key single-send, FAILED-only retry, credentials never returned/logged; fake mail client for E2E; backend 229 tests + real MinIO E2E pass |
-| V26–V27 | ⬜ Not started | Continue only after the V25 migration, regression, PostgreSQL `15432`, MinIO and E2E gates pass |
+| V26 | ✅ Complete | Explainable opportunity health: pure deterministic calculator (sum==total, stage dwell/close date/interaction heat/sentiment/task/decision-chain), history snapshots + trend, deterministic next-best-action, never mutates stage/probability, owner-scoped; intelligence tab with recalculate and task/follow-up entry; backend 241 tests + real E2E pass |
+| V27 | ⬜ Not started | Continue only after the V26 regression, PostgreSQL `15432` and E2E gates pass |
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|

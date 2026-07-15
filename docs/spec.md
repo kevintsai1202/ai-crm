@@ -45,6 +45,13 @@
 - Approve-and-send requires an `Idempotency-Key`: the same key sends once and returns the same result; statuses are at least `QUEUED`/`SENT`/`FAILED`; only `FAILED` may be retried.
 - Credentials are read solely from backend configuration and never returned to the client or written into audit/error text.
 
+### V26 opportunity intelligence
+
+- A pure deterministic calculator scores 0–100 with `sum(components) == total`; dimensions are stage dwell, expected close date, interaction heat, sentiment/intent signals, task status, and decision-chain completeness. Each component carries a Chinese reason and an evidence reference.
+- The calculator never calls an LLM; the LLM only phrases the next-best-action and falls back to a deterministic message. The feature must not modify opportunity stage or probability.
+- Snapshots are retained as history for a trend; the intelligence tab shows the score, component breakdown, evidence, trend, and next-best-action, and can create a task or open the follow-up composer.
+- Decision-chain completeness degrades gracefully (contact-count proxy) until V27 stakeholder data exists.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。

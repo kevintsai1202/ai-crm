@@ -185,6 +185,9 @@ public class DemoDataService {
     /** 跟進信草稿存取：reset 時須先於客戶刪除（customer_id FK 會阻擋正式資料清除）。 */
     private final com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository;
 
+    /** 商機健康度 snapshot 存取：reset 時須先於商機刪除（opportunity_id FK 會阻擋商機清除）。 */
+    private final com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -214,6 +217,7 @@ public class DemoDataService {
                            com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository,
                            com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository,
                            com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository,
+                           com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -231,6 +235,7 @@ public class DemoDataService {
         this.meetingCopilotSessionRepository = meetingCopilotSessionRepository;
         this.outboundEmailRepository = outboundEmailRepository;
         this.followUpDraftRepository = followUpDraftRepository;
+        this.opportunityHealthSnapshotRepository = opportunityHealthSnapshotRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -344,6 +349,8 @@ public class DemoDataService {
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();
         contactRepository.deleteAllInBatch();
+        // 商機健康度 snapshot 參照商機（opportunity_id FK），須先於商機刪除。
+        opportunityHealthSnapshotRepository.deleteAllInBatch();
         opportunityRepository.deleteAllInBatch();
         chatMessageRepository.deleteAllInBatch();
         customerRepository.deleteAllInBatch();

@@ -725,4 +725,42 @@ public final class Dtos {
     public record OutboundEmailResponse(Long id, Long draftId, String from, String replyTo, String recipient,
                                         String subject, String body, String status, String messageId, int retryCount,
                                         String errorSummary, Instant sentAt) {}
+
+    // ===== V26：商機健康度與下一最佳行動 =====
+
+    /**
+     * 健康度單一評分分項（可解釋）。
+     *
+     * @param key 分項代碼（穩定識別，如 STAGE_DWELL）
+     * @param label 分項中文標籤
+     * @param score 實得分數（0–maxScore）
+     * @param maxScore 分項上限
+     * @param reason 中文加/扣分理由
+     * @param evidence 佐證來源引用（引用哪筆互動/任務/階段停留天數等）
+     */
+    public record HealthComponentDto(String key, String label, int score, int maxScore, String reason, String evidence) {}
+
+    /**
+     * 健康度趨勢點（供歷史 snapshot 折線呈現）。
+     *
+     * @param totalScore 該次 snapshot 總分
+     * @param calculatedAt 計算時間
+     */
+    public record HealthTrendPoint(int totalScore, Instant calculatedAt) {}
+
+    /**
+     * 商機健康度回應（GET / recalculate 共用）。
+     *
+     * @param opportunityId 商機 id
+     * @param totalScore 最新總分（0–100，恆等於各分項總和）
+     * @param components 各分項明細（含可解釋 reason 與 evidence）
+     * @param nextBestAction 下一最佳行動文案
+     * @param ruleVersion 規則版本
+     * @param model 產生下一最佳行動的 AI 模型（deterministic 時為 null）
+     * @param calculatedAt 最新 snapshot 計算時間
+     * @param trend 歷史趨勢（時間升冪，含本次）
+     */
+    public record OpportunityHealthResponse(Long opportunityId, int totalScore, List<HealthComponentDto> components,
+                                            String nextBestAction, String ruleVersion, String model, Instant calculatedAt,
+                                            List<HealthTrendPoint> trend) {}
 }

@@ -610,6 +610,34 @@ export interface OutboundEmailResponse {
   sentAt: string | null;
 }
 
+/** 商機健康度單一分項（可解釋加/扣分）。 */
+export interface HealthComponentDto {
+  key: string;
+  label: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+  evidence: string;
+}
+
+/** 健康度趨勢點（歷史 snapshot）。 */
+export interface HealthTrendPoint {
+  totalScore: number;
+  calculatedAt: string;
+}
+
+/** 商機健康度回應（GET / recalculate 共用）。 */
+export interface OpportunityHealthResponse {
+  opportunityId: number;
+  totalScore: number;
+  components: HealthComponentDto[];
+  nextBestAction: string;
+  ruleVersion: string;
+  model: string | null;
+  calculatedAt: string;
+  trend: HealthTrendPoint[];
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

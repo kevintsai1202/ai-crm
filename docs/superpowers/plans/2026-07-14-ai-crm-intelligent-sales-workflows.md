@@ -31,7 +31,7 @@
 - [x] Phase 3 / V23：Temporary Media、MinIO 與 AI 名片辨識。
 - [x] Phase 4 / V24：音訊轉錄與 Meeting Copilot。
 - [x] Phase 5 / V25：AI 跟進信與 Zeabur Sendmail。
-- [ ] Phase 6 / V26：商機健康度與下一最佳行動。
+- [x] Phase 6 / V26：商機健康度與下一最佳行動。
 - [ ] Phase 7 / V27：Stakeholder 決策鏈與關係圖。
 - [ ] Final Audit：V21–V27 requirement-by-requirement 證據完整。
 
@@ -780,5 +780,5 @@ pnpm --dir frontend exec playwright test e2e/v21-model-capability.spec.ts e2e/v2
 | V23 | 已完成（本回合實測） | 後端 media/card 系列既有 commit + 本回合前端與修正待提交（名片精靈、fake Vision bean、afterCommit 刪除修正） | 後端全量 `mvn -pl backend test` **210 passed / 0 failed / 2 skipped**；前端 `tsc` 0、`vitest` 35 passed、`build` 綠 | Flyway `21/22/23/23.1/23.2` 皆 `success=t`（15432 實查）；確認後媒體實查為 `DELETED` | `v23-business-card.spec.ts` **2 passed**（真實 MinIO：新建客戶＋原圖 DELETED、合併既有客戶不重建） | 尚未執行 | 以 property-gated fake Vision（`app.vision.fake.enabled`）跑 E2E；修正後端缺陷：`deleteConfirmed` 於 afterCommit 改用 REQUIRES_NEW 交易，避免狀態寫入被靜默忽略 |
 | V24 | 已完成（本回合實測） | 本回合待提交：V24 migration/domain/repo、transcription client + fake、MeetingCopilotService/Controller、前端 meeting-copilot UI 與 E2E | 後端全量 `mvn -pl backend test` **217 passed / 0 failed / 2 skipped**（含 MeetingCopilotService/IntegrationTest 7）；前端 `tsc` 0、`vitest` 38 passed、`build` 綠 | Flyway `24` success；確認後音訊實查 `DELETED`、transcript 保留 | `v24-meeting-copilot.spec.ts` **1 passed**（真實 MinIO：上傳轉錄→只套用選定變更→音訊刪除→逐字稿保留、低信心 stakeholder 預設不選） | 尚未執行 | 以 `app.transcription.fake.enabled` fake 轉錄跑 E2E；草稿為 deterministic 產生（AI 僅在轉錄邊界）；stakeholder 建議暫記數不落實體待 V27 |
 | V25 | 已完成（本回合實測） | 本回合待提交：V25 migration/domain/repo、mail client + fake、FollowUpService/Controller、前端 follow-up UI 與 E2E | 後端全量 `mvn -pl backend test` **229 passed / 0 failed / 2 skipped**（含 FollowUpService/IntegrationTest 12）；前端 `tsc` 0、`vitest` 41 passed、`build` 綠 | Flyway `25` success | `v25-follow-up-email.spec.ts` **1 passed**（真實 MinIO 後端：草擬→存新版本→經 fake Sendmail 寄送→驗 Reply-To=owner／收件者=客戶 Email） | 未執行（自動測試僅用 fake；需 LIVE_SENDMAIL_TEST+E2E_MAIL_RECIPIENT 才實寄） | FAILED/retry 與冪等 send-once 由後端單元測試涵蓋（fake 無狀態故不在 UI E2E 驗）；憑證只從後端設定讀取、不回前端/audit |
-| V26 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 不適用 | 尚未執行 |
+| V26 | 已完成（本回合實測） | 本回合待提交：V26 migration/domain/repo、OpportunityHealthCalculator/IntelligenceService/Controller、前端 opportunity-intelligence UI 與 E2E | 後端全量 `mvn -pl backend test` **241 passed / 0 failed / 2 skipped**（含 Calculator 8 + Integration 4）；前端 `tsc` 0、`vitest` 12 檔綠、`build` 綠 | Flyway `26` success | `v26-opportunity-intelligence.spec.ts` **1 passed**（健康度總分/可解釋分項/重算趨勢；驗重算後 stage/probability 不變；跟進信導航） | 不適用 | Calculator 純函式 sum==total 不呼叫 LLM；下一最佳行動 deterministic；決策鏈完整度以聯絡人數 proxy，待 V27 強化 |
 | V27 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 不適用 | 尚未執行 |
