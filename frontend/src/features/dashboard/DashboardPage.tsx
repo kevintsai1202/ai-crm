@@ -165,7 +165,7 @@ export function DashboardPage() {
   /** 開啟 Portfolio 全公司整體評估報告（SSE 串流版）。 */
   function openPortfolioAssessment() {
     // 立即顯示 modal（loading=true），第一個 token 到達後轉為逐字渲染
-    setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: true, streaming: true, markdown: "" });
+    setReport({ open: true, title: t("dashboard:portfolio.assessTitle"), loading: true, streaming: true, markdown: "" });
     streamPortfolioAssessment(
       (chunk) => {
         if (chunk.type === "content" && chunk.delta) {
@@ -179,7 +179,7 @@ export function DashboardPage() {
       () => setReport((prev) => prev ? { ...prev, loading: false, streaming: false } : prev),
       (err) => {
         console.error("Portfolio 整體評估串流失敗:", err);
-        setReport({ open: true, title: "Portfolio 整體評估（全公司）", loading: false, streaming: false, markdown: "⚠️ 產生評估失敗，請稍後再試。" });
+        setReport({ open: true, title: t("dashboard:portfolio.assessTitle"), loading: false, streaming: false, markdown: t("dashboard:portfolio.assessError") });
       }
     );
   }
@@ -300,7 +300,7 @@ export function DashboardPage() {
       <section className="topbar">
         <div>
           <p>Hahow AI Full-stack Teaching Build</p>
-          <h2>儀表板</h2>
+          <h2>{t("dashboard:topbar.title")}</h2>
         </div>
         <div className="topbar-actions">
           {/* 募資課程問卷：儀表板首頁快捷入口，新分頁開啟 */}
@@ -310,16 +310,16 @@ export function DashboardPage() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            📋 募資課程問卷
+            {t("dashboard:topbar.surveyLink")}
           </a>
-          <button type="button" className="layout-btn" onClick={() => setDrawerOpen(true)}>⊞ 版面（隱藏 {hiddenBlocks.length}）</button>
+          <button type="button" className="layout-btn" onClick={() => setDrawerOpen(true)}>{t("dashboard:topbar.layoutButton", { count: hiddenBlocks.length })}</button>
           {isAdmin ? (
             <button type="button" className="btn-assess" onClick={handleGenerateDemo} disabled={generatingDemo}>
-              {generatingDemo ? "產生中…" : "🧪 產生示範資料"}
+              {generatingDemo ? t("dashboard:topbar.generatingDemo") : t("dashboard:topbar.generateDemo")}
             </button>
           ) : null}
-          <button type="button" className="btn-assess topbar-assess" onClick={openPortfolioAssessment}>📊 整體評估（全公司）<AiBadge onDark /></button>
-          <button type="button" className="btn-secondary" onClick={openPortfolioHistory}>🕘 AI 歷程</button>
+          <button type="button" className="btn-assess topbar-assess" onClick={openPortfolioAssessment}>{t("dashboard:topbar.portfolioAssess")}<AiBadge onDark /></button>
+          <button type="button" className="btn-secondary" onClick={openPortfolioHistory}>{t("dashboard:topbar.aiHistory")}</button>
         </div>
       </section>
 
@@ -346,8 +346,8 @@ export function DashboardPage() {
           return (
             <div key={it.i} id={`block-${it.i}`} className="block-wrapper">
               <div className="block-toolbar">
-                <span className="block-drag-handle" title="拖拉移動">⠿</span>
-                <button type="button" className="block-close" title="關閉區塊" onClick={() => closeBlock(it.i)}>✕</button>
+                <span className="block-drag-handle" title={t("dashboard:grid.dragHandle")}>⠿</span>
+                <button type="button" className="block-close" title={t("dashboard:grid.closeBlock")} onClick={() => closeBlock(it.i)}>✕</button>
               </div>
               {block.render()}
             </div>
@@ -358,7 +358,7 @@ export function DashboardPage() {
       {report?.open ? <ReportModal report={report} onClose={() => setReport(null)} /> : null}
       {portfolioHistoryOpen ? (
         <AiCallHistoryModal
-          title="全公司評估 AI 歷程"
+          title={t("dashboard:portfolio.historyTitle")}
           calls={portfolioCalls}
           loading={portfolioCallsLoading}
           onClose={() => setPortfolioHistoryOpen(false)}
