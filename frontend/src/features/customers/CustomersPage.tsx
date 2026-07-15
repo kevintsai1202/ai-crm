@@ -396,6 +396,7 @@ export function CustomersPage() {
       <div className="action-bar">
         <button type="button" className="btn-assess" onClick={() => setAiModalOpen(true)}>✨ AI 工作建議</button>
         <button type="button" onClick={() => setShowAddCustomer(true)}>+ 新增客戶</button>
+        <button type="button" onClick={() => navigate("/business-cards/new")}>📇 名片建檔</button>
         {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>+ 新增互動</button> : null}
         {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
         {selected ? <button type="button" onClick={() => setShowTaskForm(true)}>☎ 安排電話</button> : null}

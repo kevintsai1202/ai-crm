@@ -27,6 +27,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 /** 暫存媒體驗證、上傳、metadata 與到期清理服務。 */
@@ -48,17 +51,23 @@ public class TemporaryMediaService {
     private final MediaTempFileManager tempFiles;
     /** 單張圖片可解碼的最大像素數。 */
     private final long imageMaxPixels;
+    /** 供 afterCommit 階段以獨立交易持久化狀態變更（REQUIRES_NEW）。 */
+    private final TransactionTemplate requiresNewTx;
 
     /** 建立媒體服務。 */
     public TemporaryMediaService(TemporaryMediaStore store, TemporaryMediaRepository repository,
             @Value("${app.media.retention:PT24H}") Duration retention, MediaTempFileManager tempFiles,
-            @Value("${app.media.image.max-pixels:25000000}") long imageMaxPixels) {
+            @Value("${app.media.image.max-pixels:25000000}") long imageMaxPixels,
+            PlatformTransactionManager transactionManager) {
         this.store = store;
         this.repository = repository;
         this.retention = retention;
         this.tempFiles = tempFiles;
         if (imageMaxPixels <= 0) throw new IllegalArgumentException("圖片最大像素數必須大於 0");
         this.imageMaxPixels = imageMaxPixels;
+        // REQUIRES_NEW：afterCommit 時原交易已提交，必須另開新交易寫入才會生效。
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /** 驗證完整內容後上傳 object，再寫 metadata；DB 失敗時補償刪除 object。 */
@@ -106,12 +115,21 @@ public class TemporaryMediaService {
         catch (IOException exception) { throw new IllegalStateException("無法讀取暫存媒體", exception); }
     }
 
-    /** commit 後先持久化 DELETE_PENDING，再刪 object 並標記 DELETED。 */
+    /**
+     * commit 後先持久化 DELETE_PENDING，再刪 object 並標記 DELETED。
+     * 由 afterCommit 呼叫，此時原交易已提交，故每次狀態變更都以 REQUIRES_NEW 新交易載入並更新受管實體，
+     * 避免在已提交交易中呼叫 save 導致寫入被靜默忽略。
+     */
     public void deleteConfirmed(TemporaryMedia media) {
-        media.markDeletePending(); repository.save(media);
-        try { store.delete(media.getObjectKey()); media.markDeleted(); repository.save(media); }
-        catch (RuntimeException exception) {
-            log.warn("確認後暫存媒體刪除或完成標記失敗，DELETE_PENDING 可供重試：mediaId={}", media.getId(), exception);
+        Long id = media.getId();
+        requiresNewTx.executeWithoutResult(status ->
+                repository.findById(id).ifPresent(TemporaryMedia::markDeletePending));
+        try {
+            store.delete(media.getObjectKey());
+            requiresNewTx.executeWithoutResult(status ->
+                    repository.findById(id).ifPresent(TemporaryMedia::markDeleted));
+        } catch (RuntimeException exception) {
+            log.warn("確認後暫存媒體刪除或完成標記失敗，DELETE_PENDING 可供重試：mediaId={}", id, exception);
         }
     }
 

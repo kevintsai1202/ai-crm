@@ -2,7 +2,7 @@
 
 > 本文件是所有子專案（SP）進度的**唯一真實來源**。每個 session 開始前先讀本檔，結束後更新狀態。
 > 依據：`docs/consulting-review.md`、`docs/crm-ai-consultant-analysis.md`
-> 最後更新：2026-07-15（V22 CRM tasks and iCalendar 完成）
+> 最後更新：2026-07-15（V23 AI business card intake 完成）
 
 ## 狀態圖例
 `⬜ 未開始` ｜ `🟡 設計中(spec)` ｜ `🔵 計畫中(plan)` ｜ `🟠 實作中` ｜ `✅ 完成`
@@ -18,7 +18,8 @@
 |---|---|---|
 | V21 | ✅ Complete | Explicit Vision/audio capabilities, AUTO/MANUAL/UNKNOWN provenance, governed OCR/transcription assignments, Admin UI and real API E2E |
 | V22 | ✅ Complete | Formal CRM task work queue, customer/workspace phone follow-up entry, postpone/complete, stable UTF-8 `.ics`, owner/version-safe explicit cleanup and real download E2E |
-| V23–V27 | ⬜ Not started | Continue only after the V22 migration, regression, PostgreSQL `15432`, and E2E gates pass |
+| V23 | ✅ Complete | Temporary media on S3/MinIO, AI business-card OCR intake, three-step wizard (upload→review/dedupe→confirm), atomic customer/contact/opportunity/phone-task creation with Idempotency-Key, post-commit image deletion (`DELETED`), deterministic fake Vision for E2E; two real MinIO-backed E2E cases pass |
+| V24–V27 | ⬜ Not started | Continue only after the V23 migration, regression, PostgreSQL `15432`, MinIO and E2E gates pass |
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|

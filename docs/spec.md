@@ -22,6 +22,14 @@
 - Postpone, complete, update, and explicit delete operations enforce owner scope and optimistic-lock `version`.
 - Calendar export is generated on demand as UTF-8 RFC 5545 content with CRLF, stable UID, deterministic revision timestamp, and Asia/Taipei wall-clock times.
 
+### V23 AI business card intake
+
+- Card images are stored only in S3-compatible object storage (MinIO locally); PostgreSQL keeps just metadata and the recognized-field transcript.
+- Recognition uses the governed V21 OCR (`VISION`) model assignment; a deterministic fake client is available behind `app.vision.fake.enabled` for E2E/local runs.
+- The three-step wizard is upload → review/dedupe → confirm: low-confidence fields are flagged, and when duplicate customers are detected the user must explicitly choose CREATE or MERGE before proceeding.
+- Confirm requires an `Idempotency-Key` and atomically creates/merges the customer then creates the contact, opportunity and a `PHONE_CALL` task; resubmitting the same key returns the original result.
+- After a successful confirm the stored image is deleted post-commit and the media transitions to `DELETED`; deletion failures stay `DELETE_PENDING` for idempotent cleanup retry.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。

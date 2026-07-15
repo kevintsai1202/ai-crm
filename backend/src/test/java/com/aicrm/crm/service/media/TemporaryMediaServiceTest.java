@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -51,6 +52,9 @@ import javax.sound.sampled.AudioSystem;
 class TemporaryMediaServiceTest {
     private final TemporaryMediaStore store = mock(TemporaryMediaStore.class);
     private final TemporaryMediaRepository repository = mock(TemporaryMediaRepository.class);
+    /** 這些單元測試不觸發 afterCommit 刪除路徑，交易管理器僅需一個佔位 mock。 */
+    private final org.springframework.transaction.PlatformTransactionManager txManager =
+            mock(org.springframework.transaction.PlatformTransactionManager.class);
     @TempDir
     Path testDirectory;
     private MediaTempFileManager tempFiles;
@@ -61,7 +65,7 @@ class TemporaryMediaServiceTest {
     void setUpTempFiles() throws IOException {
         tempFiles = new MediaTempFileManager(testDirectory.resolve("media"), Duration.ofHours(24));
         tempFiles.initialize();
-        service = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 25_000_000L);
+        service = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 25_000_000L, txManager);
     }
 
     @Test
@@ -100,13 +104,13 @@ class TemporaryMediaServiceTest {
     @Test
     void stage_enforcesConfiguredPixelLimitBeforeDecode() {
         byte[] twoByTwo = png();
-        TemporaryMediaService exactLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 4);
+        TemporaryMediaService exactLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 4L, txManager);
         when(store.put(any())).thenReturn(new StoredMedia("media/exact-pixels", twoByTwo.length, "hash"));
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(exactLimit.stage(file("exact.png", "image/png", twoByTwo), MediaPurpose.BUSINESS_CARD, principal))
                 .isNotNull();
-        TemporaryMediaService belowLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 3);
+        TemporaryMediaService belowLimit = new TemporaryMediaService(store, repository, Duration.ofHours(24), tempFiles, 3L, txManager);
         assertThatThrownBy(() -> belowLimit.stage(file("over.png", "image/png", twoByTwo), MediaPurpose.BUSINESS_CARD, principal))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -133,7 +137,7 @@ class TemporaryMediaServiceTest {
         MediaTempFileManager failingManager = spy(new MediaTempFileManager(testDirectory.resolve("failure"), Duration.ofHours(24)));
         failingManager.initialize();
         doThrow(new IOException("locked")).doCallRealMethod().when(failingManager).delete(any());
-        TemporaryMediaService guarded = new TemporaryMediaService(store, repository, Duration.ofHours(24), failingManager, 25_000_000L);
+        TemporaryMediaService guarded = new TemporaryMediaService(store, repository, Duration.ofHours(24), failingManager, 25_000_000L, txManager);
 
         assertThatThrownBy(() -> guarded.stage(file("meeting.wav", "audio/wav", wav()), MediaPurpose.MEETING_AUDIO, principal))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -229,21 +233,32 @@ class TemporaryMediaServiceTest {
         verify(repository, org.mockito.Mockito.times(2)).delete(retry);
     }
 
-    /** object 已刪但最終 DB save 失敗時，先前 DELETE_PENDING 可由下一輪冪等重試完成。 */
+    /**
+     * deleteConfirmed 以獨立交易（REQUIRES_NEW）載入受管實體並推進 DELETE_PENDING → DELETED；
+     * object 刪除失敗時保留 DELETE_PENDING 供下一輪 cleanup 冪等重試。
+     */
     @Test
-    void deleteConfirmed_finalSaveFailureRemainsRetryableThenBecomesDeleted() {
-        TemporaryMedia media=TemporaryMedia.restoreForCleanup(9L,"media/pending",MediaStatus.CONFIRMED,Instant.EPOCH);
-        List<MediaStatus> saved=new ArrayList<>();
-        when(repository.save(any())).thenAnswer(inv->{TemporaryMedia value=inv.getArgument(0);saved.add(value.getStatus());if(saved.size()==2)throw new IllegalStateException("db down");return value;});
+    void deleteConfirmed_marksDeletedAndStaysPendingWhenStoreDeleteFails() {
+        // 成功路徑：載入受管實體並標記為 DELETED。
+        TemporaryMedia media = TemporaryMedia.restoreForCleanup(9L, "media/pending", MediaStatus.CONFIRMED, Instant.EPOCH);
+        when(repository.findById(9L)).thenReturn(java.util.Optional.of(media));
         service.deleteConfirmed(media);
-        assertThat(saved).containsExactly(MediaStatus.DELETE_PENDING,MediaStatus.DELETED);
+        assertThat(media.getStatus()).isEqualTo(MediaStatus.DELETED);
+        verify(store).delete("media/pending");
 
-        TemporaryMedia pending=TemporaryMedia.restoreForCleanup(9L,"media/pending",MediaStatus.DELETE_PENDING,Instant.EPOCH);
-        Instant now=Instant.now();
-        when(repository.findCleanupCandidates(eq(now),any())).thenReturn(List.of(pending));
+        // 失敗路徑：object 刪除拋錯，狀態停在 DELETE_PENDING 供重試。
+        TemporaryMedia failing = TemporaryMedia.restoreForCleanup(10L, "media/fail", MediaStatus.CONFIRMED, Instant.EPOCH);
+        when(repository.findById(10L)).thenReturn(java.util.Optional.of(failing));
+        doThrow(new IllegalStateException("s3 down")).when(store).delete("media/fail");
+        service.deleteConfirmed(failing);
+        assertThat(failing.getStatus()).isEqualTo(MediaStatus.DELETE_PENDING);
+
+        // 後續 cleanup 重試：DELETE_PENDING 完成刪除並標記 DELETED。
+        Instant now = Instant.now();
+        when(repository.findCleanupCandidates(eq(now), any())).thenReturn(List.of(failing));
+        doNothing().when(store).delete("media/fail");
         assertThat(service.deleteExpired(now)).isEqualTo(1);
-        assertThat(pending.getStatus()).isEqualTo(MediaStatus.DELETED);
-        verify(store,times(2)).delete("media/pending");
+        assertThat(failing.getStatus()).isEqualTo(MediaStatus.DELETED);
     }
 
     private void assertAccepted(MediaPurpose purpose, String mime, byte[] bytes) {

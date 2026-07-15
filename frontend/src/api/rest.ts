@@ -26,11 +26,51 @@ import type {
   UsageSummaryResponse
 } from "../types";
 import type { CreateCrmTaskRequest, CrmTask } from "../types";
+import type {
+  BusinessCardConfirmResponse,
+  BusinessCardIntakeResponse,
+  ConfirmBusinessCardRequest,
+} from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
 
 /** 取得登入者可見的正式 CRM 任務。 */
 export async function fetchTasks() {
   const { data } = await apiClient.get<CrmTask[]>("/tasks");
+  return data;
+}
+
+/** 上傳名片圖片並建立辨識工作，回傳初始 intake（狀態多為 PROCESSING）。 */
+export async function createBusinessCardIntake(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await apiClient.post<BusinessCardIntakeResponse>(
+    "/business-card-intakes",
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return data;
+}
+
+/** 輪詢名片辨識結果，直到後端狀態變為 REVIEW_PENDING / FAILED / CONFIRMED。 */
+export async function fetchBusinessCardIntake(id: number) {
+  const { data } = await apiClient.get<BusinessCardIntakeResponse>(`/business-card-intakes/${id}`);
+  return data;
+}
+
+/**
+ * 人工確認名片並原子寫入四類 CRM 資料。
+ * 必須帶 Idempotency-Key，後端以該 key 防止重複建檔；重送同 key 回傳原結果。
+ */
+export async function confirmBusinessCardIntake(
+  id: number,
+  request: ConfirmBusinessCardRequest,
+  idempotencyKey: string,
+) {
+  const { data } = await apiClient.post<BusinessCardConfirmResponse>(
+    `/business-card-intakes/${id}/confirm`,
+    request,
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
   return data;
 }
 

@@ -25,6 +25,7 @@ The repository is a monorepo:
 - Formal CRM tasks for phone calls, email, meetings, and general follow-up.
 - Customer and workspace task entry, due-time ordering, overdue indicators, postponement, completion, and optimistic-lock recovery.
 - Stable UTF-8 RFC 5545 `.ics` export with CRLF, an Asia/Taipei time zone, and deterministic task UID.
+- AI business-card intake: upload a card image, review AI-recognized fields, resolve duplicate customers, and confirm to atomically create a customer, contact, opportunity, and phone-call task; the source image is deleted after confirmation.
 - Rule-based workspace recommendations remain suggestions; persistent task status always comes from `/api/tasks`.
 
 ## Quick start
@@ -131,6 +132,15 @@ pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.
 ```
 
 The V22 test creates uniquely prefixed data, creates and postpones a phone task through the UI, reloads to verify persistence, reads the browser-downloaded `.ics` bytes, completes the task, verifies formal API state, and safely removes only its own task/customer aggregate.
+
+For V23 the backend also needs MinIO (`docker compose up -d minio`) and a deterministic Vision fake. Start the backend with `--app.vision.fake.enabled=true` and the MinIO credentials in `MEDIA_S3_ACCESS_KEY`/`MEDIA_S3_SECRET_KEY`, then:
+
+```powershell
+pnpm --dir frontend exec playwright test frontend/e2e/v23-business-card.spec.ts
+pwsh .\scripts\verify-phase-gate.ps1 -Phase V23 -E2ESpec frontend/e2e/v23-business-card.spec.ts
+```
+
+The V23 test provisions a governed Vision OCR assignment through the real Admin API, uploads a fixture card, reviews and confirms a brand-new customer (asserting the source image reaches `DELETED`), and in a second case merges into a pre-created duplicate customer without creating a new one.
 
 Additional verification and promotional assets:
 

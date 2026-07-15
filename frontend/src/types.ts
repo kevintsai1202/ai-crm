@@ -483,6 +483,65 @@ export interface CreateCrmTaskRequest {
   source: CrmTask["source"];
 }
 
+/** 名片辨識與人工確認生命週期，對應後端 BusinessCardStatus。 */
+export type BusinessCardStatus = "PROCESSING" | "REVIEW_PENDING" | "FAILED" | "CONFIRMED";
+
+/** Vision 模型辨識後的標準化名片欄位；confidence 以 0–1 表示各欄位信心。 */
+export interface RecognizedBusinessCard {
+  personName: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  companyName: string | null;
+  website: string | null;
+  confidence: Record<string, number>;
+  warnings: string[];
+}
+
+/** 可能重複的既有客戶候選，僅供人工選擇合併，不自動套用。 */
+export interface BusinessCardDuplicateCandidate {
+  customerId: number;
+  customerName: string;
+  matchedBy: string[];
+}
+
+/** 名片 intake 建立與輪詢回應。 */
+export interface BusinessCardIntakeResponse {
+  id: number;
+  status: BusinessCardStatus;
+  mediaId: number | null;
+  recognized: RecognizedBusinessCard | null;
+  duplicateCandidates: BusinessCardDuplicateCandidate[];
+  errorSummary: string | null;
+}
+
+/** 人工確認名片建檔請求；customerAction 必須明確為 CREATE 或 MERGE。 */
+export interface ConfirmBusinessCardRequest {
+  customerAction: "CREATE" | "MERGE";
+  customerId: number | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  taxId: string;
+  industry: string;
+  contactName: string;
+  contactTitle: string;
+  contactEmail: string;
+  opportunityName: string;
+  opportunityAmount: number;
+  expectedCloseDate: string | null;
+  callAt: string;
+}
+
+/** 名片確認後所有正式 CRM 關聯 ID。 */
+export interface BusinessCardConfirmResponse {
+  intakeId: number;
+  customerId: number;
+  contactId: number;
+  opportunityId: number;
+  taskId: number;
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

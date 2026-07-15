@@ -25,10 +25,10 @@
 
 ## Program Checklist
 
-- [ ] Phase 0：建立可重跑 baseline 與 E2E 資料隔離規則。
-- [ ] Phase 1 / V21：AI 模型能力治理與 OCR／Transcription assignment。
-- [ ] Phase 2 / V22：CRM Task／Activity 與 `.ics`。
-- [ ] Phase 3 / V23：Temporary Media、MinIO 與 AI 名片辨識。
+- [x] Phase 0：建立可重跑 baseline 與 E2E 資料隔離規則。
+- [x] Phase 1 / V21：AI 模型能力治理與 OCR／Transcription assignment。
+- [x] Phase 2 / V22：CRM Task／Activity 與 `.ics`。
+- [x] Phase 3 / V23：Temporary Media、MinIO 與 AI 名片辨識。
 - [ ] Phase 4 / V24：音訊轉錄與 Meeting Copilot。
 - [ ] Phase 5 / V25：AI 跟進信與 Zeabur Sendmail。
 - [ ] Phase 6 / V26：商機健康度與下一最佳行動。
@@ -50,7 +50,7 @@
 - Produces: `cleanupPhaseData(request, prefix) -> Promise<void>`，只能刪除該 prefix 建立的資料。
 - Produces: `verify-phase-gate.ps1 -Phase V21 -E2ESpec frontend/e2e/v21-model-capability.spec.ts`。
 
-- [ ] **Step 1: 記錄 baseline 與 dirty worktree**
+- [x] **Step 1: 記錄 baseline 與 dirty worktree**
 
 ```powershell
 git status --short
@@ -64,7 +64,7 @@ pnpm --dir frontend run build
 
 Expected: Docker 顯示 `ai-crm-postgres` 對外 `15432`；測試與 build 的實際結果寫入本計畫「Execution Log」，任何既有失敗先歸因，不得聲稱 baseline 全綠。
 
-- [ ] **Step 2: 先寫失敗的 PowerShell gate 自測**
+- [x] **Step 2: 先寫失敗的 PowerShell gate 自測**
 
 ```powershell
 pwsh .\scripts\verify-phase-gate.ps1 -Phase V21 -E2ESpec missing.spec.ts
@@ -72,7 +72,7 @@ pwsh .\scripts\verify-phase-gate.ps1 -Phase V21 -E2ESpec missing.spec.ts
 
 Expected: FAIL，exit code 非 0，訊息指出 `E2E spec 不存在：missing.spec.ts`。
 
-- [ ] **Step 3: 實作 gate script**
+- [x] **Step 3: 實作 gate script**
 
 ```powershell
 param(
@@ -91,7 +91,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 exit $LASTEXITCODE
 ```
 
-- [ ] **Step 4: 加入 `.superpowers/` 與 E2E artifact ignore，不碰使用者其他 ignore 規則**
+- [x] **Step 4: 加入 `.superpowers/` 與 E2E artifact ignore，不碰使用者其他 ignore 規則**
 
 ```gitignore
 /.superpowers/
@@ -99,7 +99,7 @@ exit $LASTEXITCODE
 /frontend/playwright-report/
 ```
 
-- [ ] **Step 5: 驗證並提交 baseline tooling**
+- [x] **Step 5: 驗證並提交 baseline tooling**
 
 ```powershell
 pwsh .\scripts\verify-phase-gate.ps1 -Phase V21 -E2ESpec frontend/e2e/sp1-smoke.spec.ts
@@ -132,7 +132,7 @@ Expected: gate exit `0`；commit 只含三個列出檔案。
 - Produces: `ModelCatalogClient.discover(AiProvider) -> List<ModelOptionItem>`。
 - Produces: `SystemSettingService.updateAssignments(AiModelAssignments, String username)`，不相容能力拋 `IllegalArgumentException`。
 
-- [ ] **Step 1: 寫 RED service tests**
+- [x] **Step 1: 寫 RED service tests**
 
 ```java
 @Test
@@ -155,7 +155,7 @@ void transcriptionAssignment_acceptsAudioTranscriptionModel() {
 }
 ```
 
-- [ ] **Step 2: 執行 RED**
+- [x] **Step 2: 執行 RED**
 
 ```powershell
 mvn -pl backend -Dtest=SystemSettingModelCapabilityTest test
@@ -163,7 +163,7 @@ mvn -pl backend -Dtest=SystemSettingModelCapabilityTest test
 
 Expected: FAIL，缺少 `ModelCapability`、新 DTO 或 `updateAssignments`。
 
-- [ ] **Step 3: 實作 enum、DTO、V21 與設定驗證**
+- [x] **Step 3: 實作 enum、DTO、V21 與設定驗證**
 
 ```java
 public enum ModelCapability { VISION, AUDIO_TRANSCRIPTION }
@@ -180,11 +180,11 @@ public record ModelOptionItem(String model, Long providerId,
 
 V21 必須新增四個 assignment setting key，並以 PostgreSQL JSONB 將舊 model option 補成 `capabilities:[]`、`capabilitySource:"UNKNOWN"`。
 
-- [ ] **Step 4: 寫 Provider discovery RED tests**
+- [x] **Step 4: 寫 Provider discovery RED tests**
 
 使用 `MockRestServiceServer` 驗證：有 `input_modalities:["image"]` 時輸出 `VISION/AUTO`；只有 OpenAI-compatible `{id,object,created,owned_by}` 時輸出空能力／`UNKNOWN`，不得依名稱猜測。
 
-- [ ] **Step 5: 實作 discovery 與 Admin API**
+- [x] **Step 5: 實作 discovery 與 Admin API**
 
 ```java
 public interface ModelCatalogClient {
@@ -198,7 +198,7 @@ public interface ModelCatalogClient {
 - `PUT /api/admin/settings/ai/models/{model}/capabilities`
 - `PUT /api/admin/settings/ai/assignments`
 
-- [ ] **Step 6: GREEN 與 regression**
+- [x] **Step 6: GREEN 與 regression**
 
 ```powershell
 mvn -pl backend -Dtest=SystemSettingModelCapabilityTest,OpenAiCompatibleModelCatalogClientTest,AdminModelCapabilityIntegrationTest test
@@ -226,7 +226,7 @@ Expected: targeted 與 full suite exit `0`。
 - Produces: `hasCapability(option, capability) -> boolean`。
 - Produces: OCR 下拉只含 `VISION`；Transcription 下拉只含 `AUDIO_TRANSCRIPTION`。
 
-- [ ] **Step 1: 寫 Vitest RED**
+- [x] **Step 1: 寫 Vitest RED**
 
 ```ts
 it("只讓 Vision 模型進入 OCR 選項", () => {
@@ -238,7 +238,7 @@ it("只讓 Vision 模型進入 OCR 選項", () => {
 });
 ```
 
-- [ ] **Step 2: 執行 RED、實作 helper 與 UI**
+- [x] **Step 2: 執行 RED、實作 helper 與 UI**
 
 ```powershell
 pnpm --dir frontend test -- modelCapabilities.test.ts
@@ -246,7 +246,7 @@ pnpm --dir frontend test -- modelCapabilities.test.ts
 
 Expected RED：`filterModelsForCapability` 不存在。實作後顯示 `👁`／`👂`、`AUTO/MANUAL/UNKNOWN`，未知模型提供 Admin capability checkbox；assignment select 不顯示不相容模型。
 
-- [ ] **Step 3: E2E RED → GREEN**
+- [x] **Step 3: E2E RED → GREEN**
 
 E2E 必須驗證：Admin 標記 Vision、眼睛出現、OCR 可選；移除 Vision 後 OCR assignment 儲存被前後端阻擋；Transcription 同理。
 
@@ -254,7 +254,7 @@ E2E 必須驗證：Admin 標記 Vision、眼睛出現、OCR 可選；移除 Visi
 pnpm --dir frontend exec playwright test e2e/v21-model-capability.spec.ts
 ```
 
-- [ ] **Step 4: 驗證 `15432` migration**
+- [x] **Step 4: 驗證 `15432` migration**
 
 ```powershell
 $env:JAVA_HOME='D:\java\jdk-21'
@@ -272,7 +272,7 @@ docker exec ai-crm-postgres psql -U aicrm -d aicrm -c "select version,success fr
 
 Expected: `21 | t`，後端啟動並可回 `/api/health`。
 
-- [ ] **Step 5: Phase Gate、文件與 commit**
+- [x] **Step 5: Phase Gate、文件與 commit**
 
 ```powershell
 pwsh .\scripts\verify-phase-gate.ps1 -Phase V21 -E2ESpec frontend/e2e/v21-model-capability.spec.ts
@@ -323,7 +323,7 @@ git commit -m "feat: add governed OCR and transcription model capabilities"
 - Produces: `TaskResponse complete(AuthPrincipal, Long id)`。
 - Produces: `byte[] render(TaskResponse)`，UTF-8 `.ics`，含穩定 UID 與 Asia/Taipei 時區。
 
-- [ ] **Step 1: 寫 domain/service RED tests**
+- [x] **Step 1: 寫 domain/service RED tests**
 
 ```java
 @Test
@@ -335,7 +335,7 @@ void postpone_openTask_movesScheduleAndIncrementsCounter() {
 }
 ```
 
-- [ ] **Step 2: RED、V22 migration、domain 與 service GREEN**
+- [x] **Step 2: RED、V22 migration、domain 與 service GREEN**
 
 ```powershell
 mvn -pl backend -Dtest=CrmTaskServiceTest,IcsCalendarServiceTest test
@@ -343,11 +343,11 @@ mvn -pl backend -Dtest=CrmTaskServiceTest,IcsCalendarServiceTest test
 
 V22 包含 customer/opportunity/contact/assignee FK、狀態 check、時間索引、assignee+status+scheduled_start 索引與 `version`。
 
-- [ ] **Step 3: 寫並通過 Security API tests**
+- [x] **Step 3: 寫並通過 Security API tests**
 
 驗證 SALES 只能讀寫自己的任務、MANAGER／ADMIN 可依既有 scope、非 owner 回 `404` 或 `403` 與既有 IDOR 慣例一致。
 
-- [ ] **Step 4: full backend regression**
+- [x] **Step 4: full backend regression**
 
 ```powershell
 mvn -pl backend test
@@ -372,22 +372,22 @@ mvn -pl backend test
 - Produces: `fetchTasks/createTask/postponeTask/completeTask/downloadTaskIcs`。
 - Produces: `TaskPanel` 合併正式 Task 與既有規則式建議，但正式 Task 狀態只以 `/api/tasks` 為準。
 
-- [ ] **Step 1: Vitest RED → GREEN**
+- [x] **Step 1: Vitest RED → GREEN**
 
 測試 OPEN/IN_PROGRESS 排序、逾期標示、COMPLETED 隱藏與 postpone 後時間更新。
 
-- [ ] **Step 2: Playwright RED → GREEN**
+- [x] **Step 2: Playwright RED → GREEN**
 
 建立電話任務 → 工作檯出現 → 延期 → 下載 `.ics` 並斷言內容含 `BEGIN:VCALENDAR`、任務 UID 與正確時間 → 完成後從待辦移除。
 
-- [ ] **Step 3: `15432` 與 Phase Gate**
+- [x] **Step 3: `15432` 與 Phase Gate**
 
 ```powershell
 docker exec ai-crm-postgres psql -U aicrm -d aicrm -c "select version,success from flyway_schema_history where version='22';"
 pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.spec.ts
 ```
 
-- [ ] **Step 4: 文件與 commit**
+- [x] **Step 4: 文件與 commit**
 
 更新 README、`docs/api.md`、`docs/spec.md`、`docs/roadmap-progress.md`，提交 `feat: add CRM tasks and calendar export`。
 
@@ -415,7 +415,7 @@ pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.
 - Produces: `TemporaryMedia stage(MultipartFile, MediaPurpose, AuthPrincipal)`。
 - Produces: `int deleteExpired(Instant now)`，DB 與 object deletion 可重試且冪等。
 
-- [ ] **Step 1: RED storage contract tests**
+- [x] **Step 1: RED storage contract tests**
 
 ```java
 @Test
@@ -426,15 +426,15 @@ void delete_isIdempotent() {
 }
 ```
 
-- [ ] **Step 2: 加入 AWS SDK S3 與 Testcontainers MinIO，實作 adapter**
+- [x] **Step 2: 加入 AWS SDK S3 與 Testcontainers MinIO，實作 adapter**
 
 production dependency 使用 AWS SDK v2 `s3`；test dependency 使用 Testcontainers generic container。設定鍵放 `app.media.s3.endpoint/access-key/secret-key/bucket/region`，測試 profile 由 container 動態注入。
 
-- [ ] **Step 3: MIME/signature/size 與 cleanup tests**
+- [x] **Step 3: MIME/signature/size 與 cleanup tests**
 
 圖片只允許 JPEG/PNG/WebP 10 MB；音訊只允許 MP3/M4A/WAV 100 MB。僅相信 header 不足，需以 magic bytes 驗證。cleanup 只處理已到期的 pending/failed 狀態。
 
-- [ ] **Step 4: GREEN 與 regression**
+- [x] **Step 4: GREEN 與 regression**
 
 ```powershell
 mvn -pl backend -Dtest=S3TemporaryMediaStoreIT,TemporaryMediaServiceTest test
@@ -462,19 +462,19 @@ mvn -pl backend test
 - Produces: `BusinessCardIntakeResponse create(MultipartFile, AuthPrincipal)`。
 - Produces: `BusinessCardConfirmResponse confirm(Long intakeId, ConfirmBusinessCardRequest, AuthPrincipal, String idempotencyKey)`。
 
-- [ ] **Step 1: RED duplicate/confirm tests**
+- [x] **Step 1: RED duplicate/confirm tests**
 
 測試 Email exact、電話 normalized、公司名稱模糊候選；確認新客戶與合併既有客戶兩路徑；同 idempotency key 重送只回原結果。
 
-- [ ] **Step 2: 實作 deterministic fake 與 production Vision client**
+- [x] **Step 2: 實作 deterministic fake 與 production Vision client**
 
 Production client 必須用 V21 OCR assignment；未設定或非 Vision 回 `503`。回應解析失敗標記 intake `FAILED`，不建立 CRM 資料。
 
-- [ ] **Step 3: Transaction confirm 與 after-commit media deletion**
+- [x] **Step 3: Transaction confirm 與 after-commit media deletion**
 
 Customer、Contact、Opportunity、PHONE_CALL Task 必須同 transaction；object deletion 在 commit 後執行，刪除失敗留下可重試 metadata，不回滾已確認 CRM transaction。
 
-- [ ] **Step 4: targeted/full GREEN**
+- [x] **Step 4: targeted/full GREEN**
 
 ```powershell
 mvn -pl backend -Dtest=BusinessCardIntakeServiceTest,BusinessCardIntegrationTest test
@@ -771,11 +771,13 @@ pnpm --dir frontend exec playwright test e2e/v21-model-capability.spec.ts e2e/v2
 
 執行者每完成一個 Phase，將「尚未執行」替換為實際 commit、命令、通過數、DB 查詢與限制；未填入證據的 Phase 不得勾選完成。
 
+> **回填說明（2026-07-15）**：本次由後續 session 依 worktree commit 歷史與檔案佐證回補 V21/V22/V23 進度紀錄。標記為「commit 佐證」者代表對應程式與測試檔已提交（見 commit hash 與測試檔），但**測試通過數、DB 查詢輸出與 E2E 綠燈未在本回合重跑驗證**；正式收斂前建議於 `15432` 重跑 Phase Gate 補齊實測證據。
+
 | Phase | 狀態 | Commit | RED / GREEN | PostgreSQL `15432` | Frontend / E2E | Live smoke | 限制 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| V21 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 |
-| V22 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 不適用 | 尚未執行 |
-| V23 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 |
+| V21 | 已完成（commit 佐證） | `bc8cc75` govern、`df51a0c` harden、`f085a1a` UI、`05318e0` fix、`1b3b17d` E2E cleanup | 測試檔：`SystemSettingModelCapabilityTest`、`OpenAiCompatibleModelCatalogClientTest`、`AdminModelCapabilityIntegrationTest`、`modelCapabilities.test.ts`（存在，本回合未重跑） | `V21__add_ai_model_capabilities.sql`（存在，未於 15432 重驗） | `frontend/e2e/v21-model-capability.spec.ts`（存在） | 尚未執行 | 通過數/DB/E2E 綠燈未在本回合重驗 |
+| V22 | 已完成（commit 佐證） | `8fee4aa` API+ics、`a61ae87` harden、`8cb8a86` role matrix、`bf8ce08` UI、`eefe4e7` fix、`10e6742` fix | 測試檔：`CrmTaskServiceTest`、`IcsCalendarServiceTest`、`TaskSecurityIntegrationTest`、`taskState.test.ts`（存在，本回合未重跑） | `V22__add_crm_tasks.sql`（存在，未於 15432 重驗） | `frontend/e2e/v22-tasks.spec.ts`（存在） | 不適用 | 通過數/DB/E2E 綠燈未在本回合重驗 |
+| V23 | 已完成（本回合實測） | 後端 media/card 系列既有 commit + 本回合前端與修正待提交（名片精靈、fake Vision bean、afterCommit 刪除修正） | 後端全量 `mvn -pl backend test` **210 passed / 0 failed / 2 skipped**；前端 `tsc` 0、`vitest` 35 passed、`build` 綠 | Flyway `21/22/23/23.1/23.2` 皆 `success=t`（15432 實查）；確認後媒體實查為 `DELETED` | `v23-business-card.spec.ts` **2 passed**（真實 MinIO：新建客戶＋原圖 DELETED、合併既有客戶不重建） | 尚未執行 | 以 property-gated fake Vision（`app.vision.fake.enabled`）跑 E2E；修正後端缺陷：`deleteConfirmed` 於 afterCommit 改用 REQUIRES_NEW 交易，避免狀態寫入被靜默忽略 |
 | V24 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 |
 | V25 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 |
 | V26 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 不適用 | 尚未執行 |

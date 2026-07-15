@@ -131,3 +131,13 @@ All endpoints below require the `ADMIN` role. Model capabilities are explicit an
 - `DELETE /api/tasks/{id}?version={version}`: explicitly delete one visible task, primarily for deliberate cleanup; stale versions return `409` and owner scope is enforced.
 
 The workspace may display rule-based recommendations beside formal tasks, but only `/api/tasks` represents persistent task status.
+
+## V23 AI business card intake
+
+- `POST /api/business-card-intakes` (multipart `file`): upload a business-card image, stage it to temporary media, and run the governed Vision OCR model. Returns the intake with `status` `REVIEW_PENDING`/`FAILED` and recognized fields plus duplicate-customer candidates. Requires an OCR model with `VISION` capability assigned (V21); otherwise `503`.
+- `GET /api/business-card-intakes/{id}`: poll one intake visible to the caller (SALES sees only its own). Includes recognized fields, per-field confidence, duplicate candidates and any `errorSummary`.
+- `POST /api/business-card-intakes/{id}/confirm` (header `Idempotency-Key`): human-confirmed creation. Atomically creates or merges the customer, then creates the contact, opportunity and a `PHONE_CALL` task in one transaction. Resending the same `Idempotency-Key` returns the original result; a different payload under the same key returns `409`.
+
+The uploaded image lives only in S3-compatible storage; after a successful confirm the object is deleted and the media metadata transitions to `DELETED` in a post-commit transaction, while the transcript of recognized fields remains on the intake for audit.
+
+For local/E2E verification without a real Vision provider, start the backend with `--app.vision.fake.enabled=true` to activate a deterministic fake recognition client.
