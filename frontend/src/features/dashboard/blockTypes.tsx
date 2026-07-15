@@ -20,11 +20,13 @@ export interface DashboardBlock {
 
 /**
  * 資料尚未載入時的佔位卡片，維持區塊在網格中的位置。
+ * @param loadingText 載入中提示文字（已翻譯）；未提供時 fallback 英文 "Loading..."，
+ * 避免呼叫端忘記傳入時整頁空白（正式呼叫端一律會傳 t('dashboard.loading')）。
  */
-export function LoadingCard({ title, wide }: { title: string; wide?: boolean }) {
+export function LoadingCard({ title, wide, loadingText = "Loading..." }: { title: string; wide?: boolean; loadingText?: string }) {
   return (
     <article className={`panel report-card${wide ? " wide" : ""}`}>
-      <div className="loading-line">{title}載入中...</div>
+      <div className="loading-line">{title}{loadingText}</div>
     </article>
   );
 }
