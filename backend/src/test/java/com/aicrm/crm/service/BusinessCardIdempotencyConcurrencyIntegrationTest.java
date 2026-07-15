@@ -60,6 +60,15 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
         assertThat(contacts.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);assertThat(tasks.count()).isEqualTo(t0+1);
     }
 
+    /** CREATE 忽略輸入 customerId，跨 intake 仍只建立一個新客戶與一組 CRM。 */
+    @Test void create_ignoredCustomerIdDifferenceReplays() throws Exception {
+        long first=createIntake(),second=createIntake(),c0=customers.count(),o0=opportunities.count();
+        var base=createRequest(null,"CREATE canonical");var ignoredId=createRequest(mergeCustomer.getId(),"CREATE canonical");
+        var results=runPair(first,second,base,ignoredId);
+        assertThat(results).allMatch(Result::success);assertThat(results.get(0).response()).isEqualTo(results.get(1).response());
+        assertThat(customers.count()).isEqualTo(c0+1);assertThat(opportunities.count()).isEqualTo(o0+1);
+    }
+
     /** 同 key 不同 payload 只能一筆成功，另一筆衝突且仍只建立一組 CRM。 */
     @Test void sameKeyDifferentPayload_oneWinsOneConflictsWithoutPartialDuplicate() throws Exception {
         long first=createIntake(),second=createIntake(),c0=contacts.count(),o0=opportunities.count(),t0=tasks.count();
@@ -100,6 +109,8 @@ class BusinessCardIdempotencyConcurrencyIntegrationTest extends PostgresTestBase
     /** 建立固定 hash 輸入，僅商機名可變。 */
     private Dtos.ConfirmBusinessCardRequest request(String name){return new Dtos.ConfirmBusinessCardRequest("MERGE",mergeCustomer.getId(),mergeCustomer.getName(),mergeCustomer.getEmail(),mergeCustomer.getPhone(),mergeCustomer.getTaxId(),mergeCustomer.getIndustry(),"王小明","採購","buyer@example.com",name,new BigDecimal("1000"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
     /** 空白、action case、email case、電話格式及金額 scale 不影響 canonical payload。 */
-    private Dtos.ConfirmBusinessCardRequest semanticEquivalent(String name){return new Dtos.ConfirmBusinessCardRequest(" merge ",mergeCustomer.getId()," "+mergeCustomer.getName()+" ",mergeCustomer.getEmail().toUpperCase(Locale.ROOT),"+886 "+mergeCustomer.getPhone().substring(1)," "+mergeCustomer.getTaxId()+" "," "+mergeCustomer.getIndustry()+" "," 王小明 "," 採購 "," BUYER@EXAMPLE.COM "," "+name+" ",new BigDecimal("1000.00"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
+    private Dtos.ConfirmBusinessCardRequest semanticEquivalent(String name){return new Dtos.ConfirmBusinessCardRequest(" merge ",mergeCustomer.getId(),"ignored customer","not-an-email","x","ignored-tax","ignored-industry"," 王小明 "," 採購 "," BUYER@EXAMPLE.COM "," "+name+" ",new BigDecimal("1000.00"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
+    /** 建立 CREATE command，customerId 是應被忽略的輸入。 */
+    private Dtos.ConfirmBusinessCardRequest createRequest(Long ignoredCustomerId,String name){return new Dtos.ConfirmBusinessCardRequest(" create ",ignoredCustomerId,"新客戶","new@example.com","+886 912-345-678","87654321","科技","王小明","採購","buyer@example.com",name,new BigDecimal("1000.0"),LocalDate.of(2026,12,1),LocalDateTime.of(2026,8,1,10,0));}
     /** 併發呼叫結果。 */ private record Result(Dtos.BusinessCardConfirmResponse response,Throwable error){boolean success(){return response!=null;}}
 }

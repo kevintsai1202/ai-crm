@@ -18,9 +18,11 @@ public record CanonicalConfirmCommand(String customerAction,Long customerId,Stri
         if(action.equals("MERGE")&&r.customerId()==null)throw new IllegalArgumentException("MERGE 必須提供 customerId");
         BigDecimal amount=r.opportunityAmount()==null?BigDecimal.ZERO:r.opportunityAmount();if(amount.signum()<0)throw new IllegalArgumentException("opportunityAmount 不可為負數");
         amount=amount.signum()==0?BigDecimal.ZERO:amount.stripTrailingZeros();
-        String customerEmail=email(required(r.customerEmail(),"customerEmail")),contactEmail=email(required(r.contactEmail(),"contactEmail"));
-        return new CanonicalConfirmCommand(action,r.customerId(),required(r.customerName(),"customerName"),customerEmail,
-                phone(required(r.customerPhone(),"customerPhone")),required(r.taxId(),"taxId"),required(r.industry(),"industry"),
+        String contactEmail=email(required(r.contactEmail(),"contactEmail"));
+        boolean create=action.equals("CREATE");
+        return new CanonicalConfirmCommand(action,create?null:r.customerId(),create?required(r.customerName(),"customerName"):null,
+                create?email(required(r.customerEmail(),"customerEmail")):null,
+                create?phone(required(r.customerPhone(),"customerPhone")):null,create?required(r.taxId(),"taxId"):null,create?required(r.industry(),"industry"):null,
                 required(r.contactName(),"contactName"),required(r.contactTitle(),"contactTitle"),contactEmail,
                 required(r.opportunityName(),"opportunityName"),amount,r.expectedCloseDate(),
                 java.util.Objects.requireNonNull(r.callAt(),"callAt"));
