@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchAiUsage, fetchDashboard, fetchDashboardLayout, fetchDashboardReports, fetchDrilldown, fetchPortfolioCalls, fetchRfm, fetchSentimentRadar, generateDemoData, saveDashboardLayout, streamPortfolioAssessment } from "../../api";
 import type { AiCallHistoryItem, DashboardReports, DashboardSummary, DrilldownResponse, DrilldownSource, RfmResponse, SentimentRadarResponse, UsageSummaryResponse } from "../../types";
@@ -28,6 +29,7 @@ const GridLayout = WidthProvider(RGL);
  * 區塊以座標型大網格呈現：每張卡記錄自己在哪一格（col,row），格子可留空、關閉不回補。
  */
 export function DashboardPage() {
+  const { t, i18n } = useTranslation(["dashboard", "common"]);
   const navigate = useNavigate();
   const location = useLocation();
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
@@ -211,7 +213,7 @@ export function DashboardPage() {
 
   // 完整區塊目錄（一律含 usage）：提供穩定的 id 與跨度供版面幾何/預設使用
   const fullCatalog: DashboardBlock[] = [
-    ...kpiBlocks(dashboard, riskCounts),
+    ...kpiBlocks(dashboard, riskCounts, t, i18n.language),
     ...reportBlocks(reports, openDrilldown, jumpToCustomer),
     ...sentimentBlocks(sentiment, jumpToCustomer),
     rfmBlock(rfm, jumpToCustomer),
