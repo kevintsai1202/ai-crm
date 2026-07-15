@@ -1,3 +1,6 @@
 
 # TypeScript 增量建置快取(生成物,不進版控)
 *.tsbuildinfo
+
+# 設計討論用截圖(scripts/screenshot-*.mjs 產出,生成物,不進版控)
+.design-review-screenshots/
