@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next";
  * 結案原因 Modal：商機階段選到 CLOSED_WON / CLOSED_LOST 時，收集輸贏原因、備註與實際成交日。
  * 函式級註解：依 won/lost 顯示對應的 closeReason 子集；實際成交日預設本地今天（避免 UTC 位移）。
  * 這裡的原因短標籤（closeReasonsShort）是給選單用的精簡版，與 format.ts 的 closeReasonLabel
- * （完整版，如「贏-價格」，用於其他頁面顯示已結案商機）是兩組獨立維護的翻譯，故意不共用。
+ * （完整版，如「贏-價格」）是兩組獨立維護、故意不共用的翻譯 key 集合；closeReasonLabel 目前尚無
+ * 呼叫端使用，僅作為未來其他頁面若需顯示已結案商機原因時可直接沿用的備用工具函式。
  *
  * @param stage 結案階段（CLOSED_WON 或 CLOSED_LOST）
  * @param onSubmit 送出 callback（回傳 closeReason / closeReasonNote / actualCloseDate）
@@ -16,7 +17,7 @@ export function CloseOpportunityModal({ stage, onSubmit, onClose }: {
   onSubmit: (data: { closeReason: string; closeReasonNote: string; actualCloseDate: string }) => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation("customers");
+  const { t } = useTranslation(["customers", "common"]);
   const won = stage === "CLOSED_WON";
   // 依輸贏顯示對應原因子集
   const options: [string, string][] = won

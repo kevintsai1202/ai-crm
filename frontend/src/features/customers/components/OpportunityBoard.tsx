@@ -83,7 +83,7 @@ export function OpportunityBoard({ customerId, opportunities, onStageChange, onE
                     <button type="button" className="card-icon-btn" title={t("customers:opportunityBoard.editOpportunity")} onClick={() => onEdit(opportunity)}>✏️</button>
                     <button type="button" className="card-icon-btn" title={t("customers:opportunityBoard.deleteOpportunity")} onClick={() => onDelete(opportunity)}>🗑️</button>
                   </div>
-                  <span>{opportunity.type}</span>
+                  <span>{t(`customers:enumsOpportunityType.${opportunity.type}`)}</span>
                   <b>{opportunity.name}</b>
                   <small>{formatMoney(opportunity.amount, i18n.language)}</small>
                   {/* 負責業務(SP8);未指派時不顯示 */}

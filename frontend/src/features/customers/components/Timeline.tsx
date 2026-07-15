@@ -84,9 +84,9 @@ export function Timeline({
                 key={d.item.id}
                 className={`tl-dot ${sentimentClass(d.item.sentiment)} ${selectedId === d.item.id ? "sel" : ""}`}
                 style={{ left: `${d.left}%` }}
-                title={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))}｜${d.item.type}`}
+                title={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))}｜${t(`customers:enumsInteractionType.${d.item.type}`)}`}
                 onClick={() => setSelectedId(selectedId === d.item.id ? null : d.item.id)}
-                aria-label={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))} ${d.item.type}`}
+                aria-label={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))} ${t(`customers:enumsInteractionType.${d.item.type}`)}`}
               />
             ))}
           </div>
@@ -96,7 +96,7 @@ export function Timeline({
             <article className="tl-detail">
               <span className="timeline-meta">
                 {selected.sentiment ? <i className={`sr-dot ${sentimentClass(selected.sentiment)}`} title={selected.sentiment} /> : null}
-                {selected.type}
+                {t(`customers:enumsInteractionType.${selected.type}`)}
                 {intentLabel(selected.intent) ? <span className="sr-tag">{t(intentLabel(selected.intent))}</span> : null}
               </span>
               <strong>{formatDateTime(selected.occurredAt, i18n.language, t("common:noData"))}</strong>

@@ -26,7 +26,7 @@ export interface DashboardBlock {
 export function LoadingCard({ title, wide, loadingText = "Loading..." }: { title: string; wide?: boolean; loadingText?: string }) {
   return (
     <article className={`panel report-card${wide ? " wide" : ""}`}>
-      <div className="loading-line">{title}{loadingText}</div>
+      <div className="loading-line">{title} {loadingText}</div>
     </article>
   );
 }
