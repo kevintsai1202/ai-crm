@@ -542,6 +542,42 @@ export interface BusinessCardConfirmResponse {
   taskId: number;
 }
 
+/** 會議 Copilot session 生命週期，對應後端 MeetingCopilotStatus。 */
+export type MeetingCopilotStatus = "UPLOADED" | "PROCESSING" | "REVIEW_PENDING" | "FAILED" | "CONFIRMED";
+
+/** 會議草稿中的單一 CRM 變更；低信心的 STAKEHOLDER 建議預設不勾選。 */
+export interface MeetingChange {
+  changeId: string;
+  type: "INTERACTION" | "TASK" | "OPPORTUNITY_PATCH" | "STAKEHOLDER_SUGGESTION";
+  description: string;
+  lowConfidence: boolean;
+  selectedByDefault: boolean;
+  detail: Record<string, string>;
+}
+
+/** 會議 Copilot session 建立與輪詢回應。 */
+export interface MeetingCopilotSessionResponse {
+  id: number;
+  status: MeetingCopilotStatus;
+  mediaId: number | null;
+  customerId: number;
+  opportunityId: number | null;
+  transcript: string | null;
+  summary: string | null;
+  changes: MeetingChange[];
+  errorSummary: string | null;
+}
+
+/** 會議 Copilot 選擇性確認結果。 */
+export interface MeetingCopilotConfirmResponse {
+  sessionId: number;
+  appliedChangeIds: string[];
+  interactionId: number | null;
+  taskIds: number[];
+  opportunityId: number | null;
+  stakeholderSuggestionCount: number;
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

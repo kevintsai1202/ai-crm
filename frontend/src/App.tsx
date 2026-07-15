@@ -7,6 +7,7 @@ import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { CustomersPage } from "./features/customers/CustomersPage";
 import { BusinessCardWizardPage } from "./features/business-card/BusinessCardWizardPage";
+import { MeetingCopilotPage } from "./features/meeting-copilot/MeetingCopilotPage";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
 import AdminSettingsPage from "./features/admin/AdminSettingsPage";
 import { TeamAnalyticsPage } from "./features/team/TeamAnalyticsPage";
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/customers/:id" element={<CustomersPage />} />
           <Route path="/business-cards/new" element={<BusinessCardWizardPage />} />
+          <Route path="/customers/:customerId/meeting-copilot" element={<MeetingCopilotPage />} />
           <Route element={<ManagerRoute />}>
             <Route path="/team" element={<TeamAnalyticsPage />} />
           </Route>

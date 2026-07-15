@@ -30,6 +30,8 @@ import type {
   BusinessCardConfirmResponse,
   BusinessCardIntakeResponse,
   ConfirmBusinessCardRequest,
+  MeetingCopilotSessionResponse,
+  MeetingCopilotConfirmResponse,
 } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
 
@@ -69,6 +71,38 @@ export async function confirmBusinessCardIntake(
   const { data } = await apiClient.post<BusinessCardConfirmResponse>(
     `/business-card-intakes/${id}/confirm`,
     request,
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return data;
+}
+
+/** 上傳會議音訊並建立轉錄/草稿 session（需已設定 Transcription 模型）。 */
+export async function createMeetingSession(file: File, customerId: number, opportunityId: number | null) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("customerId", String(customerId));
+  if (opportunityId != null) form.append("opportunityId", String(opportunityId));
+  const { data } = await apiClient.post<MeetingCopilotSessionResponse>(
+    "/meeting-copilot/sessions",
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return data;
+}
+
+/** 輪詢會議 session 的轉錄、摘要與結構化草稿。 */
+export async function fetchMeetingSession(id: number) {
+  const { data } = await apiClient.get<MeetingCopilotSessionResponse>(`/meeting-copilot/sessions/${id}`);
+  return data;
+}
+
+/**
+ * 選擇性確認會議變更並原子套用。必須帶 Idempotency-Key；重送同 key 回原結果。
+ */
+export async function confirmMeetingSession(id: number, selectedChangeIds: string[], idempotencyKey: string) {
+  const { data } = await apiClient.post<MeetingCopilotConfirmResponse>(
+    `/meeting-copilot/sessions/${id}/confirm`,
+    { selectedChangeIds },
     { headers: { "Idempotency-Key": idempotencyKey } },
   );
   return data;

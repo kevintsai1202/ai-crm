@@ -295,6 +295,22 @@ public class SystemSettingService {
                 provider.getBaseUrl(), provider.getApiKey());
     }
 
+    /** 解析並再次驗證轉錄 assignment 必須是同一 Provider/model pair 且具有 AUDIO_TRANSCRIPTION。 */
+    @Transactional(readOnly = true)
+    public com.aicrm.crm.service.vision.AiModelAssignment resolveTranscriptionAssignment() {
+        String model = getTextSetting(KEY_AI_TRANSCRIPTION_MODEL);
+        Long providerId = getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID);
+        if (!StringUtils.hasText(model) || providerId == null) return null;
+        var option = getModelOptions().stream()
+                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
+                .filter(item -> item.capabilities().contains(ModelCapability.AUDIO_TRANSCRIPTION)).findFirst().orElse(null);
+        if (option == null) return null;
+        var provider = providerRepository.findById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
+                provider.getBaseUrl(), provider.getApiKey());
+    }
+
     /**
      * 更新 Chat、OCR 與轉錄用途 assignment，並在後端強制驗證能力。
      *

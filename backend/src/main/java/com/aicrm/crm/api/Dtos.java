@@ -562,6 +562,41 @@ public final class Dtos {
     public record BusinessCardConfirmResponse(Long intakeId, Long customerId, Long contactId,
                                                Long opportunityId, Long taskId) {}
 
+    // ===== V24 AI 會議 Copilot =====
+
+    /**
+     * 會議 Copilot 草稿的單一變更項；每項有穩定 changeId，confirm 只套用被選定者。
+     *
+     * @param changeId 穩定變更識別碼
+     * @param type INTERACTION / TASK / OPPORTUNITY_PATCH / STAKEHOLDER_SUGGESTION
+     * @param description 人可讀描述
+     * @param lowConfidence 是否為低信心推測
+     * @param selectedByDefault 前端預設是否勾選（低信心預設不勾）
+     * @param detail 套用所需的型別特定欄位
+     */
+    public record MeetingChange(String changeId, String type, String description,
+                                boolean lowConfidence, boolean selectedByDefault, Map<String, String> detail) {
+        /** 正規化 detail 為不可變 map，避免 null 與外部改動。 */
+        public MeetingChange {
+            detail = detail == null ? Map.of() : Map.copyOf(detail);
+        }
+    }
+
+    /** 會議 Copilot 結構化草稿：AI 摘要與可勾選變更清單。 */
+    public record MeetingDraft(String summary, List<MeetingChange> changes) {}
+
+    /** 會議 Copilot session 建立與查詢回應。 */
+    public record MeetingCopilotSessionResponse(Long id, String status, Long mediaId, Long customerId,
+                                                Long opportunityId, String transcript, String summary,
+                                                List<MeetingChange> changes, String errorSummary) {}
+
+    /** 會議 Copilot 確認請求：選定要套用的 changeId 清單。 */
+    public record ConfirmMeetingRequest(@NotNull List<String> selectedChangeIds) {}
+
+    /** 會議 Copilot 確認結果：實際套用的變更與建立的正式 CRM 資料 ID。 */
+    public record MeetingCopilotConfirmResponse(Long sessionId, List<String> appliedChangeIds, Long interactionId,
+                                                List<Long> taskIds, Long opportunityId, int stakeholderSuggestionCount) {}
+
     /** Admin 人工覆寫指定 Provider 模型能力的請求。 */
     public record ModelCapabilitiesRequest(
             @jakarta.validation.constraints.NotNull Long providerId,

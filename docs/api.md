@@ -141,3 +141,11 @@ The workspace may display rule-based recommendations beside formal tasks, but on
 The uploaded image lives only in S3-compatible storage; after a successful confirm the object is deleted and the media metadata transitions to `DELETED` in a post-commit transaction, while the transcript of recognized fields remains on the intake for audit.
 
 For local/E2E verification without a real Vision provider, start the backend with `--app.vision.fake.enabled=true` to activate a deterministic fake recognition client.
+
+## V24 AI meeting copilot
+
+- `POST /api/meeting-copilot/sessions` (multipart `file` + `customerId`, optional `opportunityId`): upload MP3/M4A/WAV meeting audio, stage it to temporary media, transcribe with the governed transcription model (V21), and generate a structured draft. Returns the session with `status` `REVIEW_PENDING`/`FAILED`, the transcript, an AI summary, and a list of `changes` (each with a stable `changeId`, `type` in `INTERACTION`/`TASK`/`OPPORTUNITY_PATCH`/`STAKEHOLDER_SUGGESTION`, and `selectedByDefault`). Requires an `AUDIO_TRANSCRIPTION` model assignment; otherwise `503`.
+- `GET /api/meeting-copilot/sessions/{id}`: poll one session visible to the caller (SALES sees only its own).
+- `POST /api/meeting-copilot/sessions/{id}/confirm` (header `Idempotency-Key`, body `{ selectedChangeIds }`): atomically apply only the selected changes — create the interaction (keeping the transcript as the record of truth), the selected tasks, opportunity patch, and stakeholder suggestions. Resending the same key returns the original result; a different payload under the same key returns `409`.
+
+Low-confidence stakeholder suggestions default to unselected. After a successful confirm the audio object is deleted post-commit while the transcript is retained on the session for audit. Start the backend with `--app.transcription.fake.enabled=true` for a deterministic fake transcription client in local/E2E runs.

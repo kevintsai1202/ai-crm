@@ -176,6 +176,9 @@ public class DemoDataService {
     /** 名片 intake 存取：reset 時須先刪除，避免其結果 FK 阻擋正式資料清除。 */
     private final com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository;
 
+    /** 會議 Copilot session 存取：reset 時須先刪除，其 customer_id/opportunity_id FK 會阻擋正式資料清除。 */
+    private final com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -202,6 +205,7 @@ public class DemoDataService {
                            ChatMessageRepository chatMessageRepository,
                            com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository,
                            com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository,
+                           com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -216,6 +220,7 @@ public class DemoDataService {
         this.chatMessageRepository = chatMessageRepository;
         this.crmTaskRepository = crmTaskRepository;
         this.businessCardIntakeRepository = businessCardIntakeRepository;
+        this.meetingCopilotSessionRepository = meetingCopilotSessionRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -321,6 +326,7 @@ public class DemoDataService {
     private void clearBusinessData() {
         // 正式 FK 刻意禁止 cascade；只有已明確啟用的示範 reset 流程可主動清除歷史任務。
         businessCardIntakeRepository.deleteAllInBatch();
+        meetingCopilotSessionRepository.deleteAllInBatch();
         crmTaskRepository.deleteAllInBatch();
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();

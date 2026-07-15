@@ -93,6 +93,18 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.CONFLICT, "Conflict", "名片確認請求與目前狀態衝突", request);
     }
 
+    /** 轉錄 assignment 缺少或不相容時回 503。 */
+    @ExceptionHandler(com.aicrm.crm.service.meeting.MeetingCopilotUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleMeetingUnavailable(HttpServletRequest request) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", "尚未設定可用的語音轉錄模型", request);
+    }
+
+    /** 會議 Copilot 確認狀態或冪等 payload 衝突回 409。 */
+    @ExceptionHandler(com.aicrm.crm.service.meeting.MeetingCopilotConflictException.class)
+    ResponseEntity<ProblemDetail> handleMeetingConflict(HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "會議確認請求與目前狀態衝突", request);
+    }
+
     /** multipart 內容超過伺服器限制時回 413。 */
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     ResponseEntity<ProblemDetail> handleUploadTooLarge(HttpServletRequest request) {
