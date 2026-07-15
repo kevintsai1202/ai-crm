@@ -1,12 +1,16 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
+import { LanguageSwitcher } from "../../components/common/LanguageSwitcher";
 
 /**
  * 登入頁：已登入自動導向儀表板，否則顯示教學帳號登入表單。
+ * i18n 試點頁：所有可視文字改由 t() 取得，右上角提供語言切換。
  */
 export function LoginPage() {
   const { login, isAuthed } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [error, setError] = useState("");
 
@@ -27,15 +31,15 @@ export function LoginPage() {
       const detail = ax?.response?.data?.detail;
       const status = ax?.response?.status;
       if (status === 401) {
-        setError("帳號或密碼錯誤。");
+        setError(t("login.error.invalid"));
       } else if (status === 429) {
-        setError("請求過於頻繁，請稍後再試。");
+        setError(t("login.error.rateLimited"));
       } else if (detail) {
-        setError(`登入失敗：${detail}`);
+        setError(t("login.error.failedDetail", { detail }));
       } else if (!ax?.response) {
-        setError("無法連線後端，請確認服務已啟動（18080）且前端代理正常。");
+        setError(t("login.error.noBackend"));
       } else {
-        setError("登入失敗，請確認帳號與密碼。");
+        setError(t("login.error.generic"));
       }
     }
   }
@@ -43,22 +47,24 @@ export function LoginPage() {
   return (
     <section className="login-panel">
       <div className="login-copy">
-        <span>Unit 4 + Unit 5</span>
-        <h2>登入 AI CRM 工作台</h2>
-        <p>使用教學 seed 帳號進入完整工作台，驗證 JWT、角色權限、Dashboard、客戶資料、AI 助理與 Agent Trace。</p>
+        {/* 語言切換：登入為公開頁，未登入者亦可切換介面語言 */}
+        <LanguageSwitcher className="lang-switcher" />
+        <span>{t("login.badge")}</span>
+        <h2>{t("login.title")}</h2>
+        <p>{t("login.intro")}</p>
       </div>
       <form className="login-form" onSubmit={handleLogin}>
         <label>
-          帳號
+          {t("login.username")}
           <input name="username" defaultValue="sales@aurora.local" autoComplete="username" />
         </label>
         <label>
-          密碼
+          {t("login.password")}
           <input name="password" type="password" defaultValue="password123" autoComplete="current-password" />
         </label>
         {error ? <div className="error-box">{error}</div> : null}
-        <button type="submit">登入</button>
-        <small>可用帳號：sales@aurora.local / manager@aurora.local / admin@aurora.local，密碼皆為 password123。</small>
+        <button type="submit">{t("login.submit")}</button>
+        <small>{t("login.accounts")}</small>
         {/* 募資課程問卷：新分頁開啟，避免離開登入流程時遺失表單狀態 */}
         <a
           className="survey-link"
@@ -66,7 +72,7 @@ export function LoginPage() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          📋 填寫募資課程問卷
+          {t("login.surveyLink")}
         </a>
       </form>
     </section>
