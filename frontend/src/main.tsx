@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import "./styles.css";
+import "./i18n"; // 觸發 i18next 全域初始化（須早於首次 render）
 
 /**
  * React 入口，掛載 AI CRM 工作台。

@@ -1,0 +1,20 @@
+{
+  "lang": { "label": "Language", "en": "English", "zh-TW": "繁體中文" },
+  "login": {
+    "badge": "Unit 4 + Unit 5",
+    "title": "Sign in to AI CRM Workbench",
+    "intro": "Use the seed accounts to enter the full workbench and verify JWT, role permissions, Dashboard, customer data, AI assistant, and Agent Trace.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "accounts": "Available accounts: sales@aurora.local / manager@aurora.local / admin@aurora.local, password is password123.",
+    "surveyLink": "📋 Fill out the fundraising course survey",
+    "error": {
+      "invalid": "Incorrect username or password.",
+      "rateLimited": "Too many requests, please try again later.",
+      "failedDetail": "Login failed: {{detail}}",
+      "noBackend": "Cannot reach backend, please confirm the service is running (18080) and the frontend proxy works.",
+      "generic": "Login failed, please check your credentials."
+    }
+  }
+}

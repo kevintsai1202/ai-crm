@@ -1,0 +1,20 @@
+{
+  "lang": { "label": "語言", "en": "English", "zh-TW": "繁體中文" },
+  "login": {
+    "badge": "Unit 4 + Unit 5",
+    "title": "登入 AI CRM 工作台",
+    "intro": "使用教學 seed 帳號進入完整工作台，驗證 JWT、角色權限、Dashboard、客戶資料、AI 助理與 Agent Trace。",
+    "username": "帳號",
+    "password": "密碼",
+    "submit": "登入",
+    "accounts": "可用帳號：sales@aurora.local / manager@aurora.local / admin@aurora.local，密碼皆為 password123。",
+    "surveyLink": "📋 填寫募資課程問卷",
+    "error": {
+      "invalid": "帳號或密碼錯誤。",
+      "rateLimited": "請求過於頻繁，請稍後再試。",
+      "failedDetail": "登入失敗：{{detail}}",
+      "noBackend": "無法連線後端，請確認服務已啟動（18080）且前端代理正常。",
+      "generic": "登入失敗，請確認帳號與密碼。"
+    }
+  }
+}
