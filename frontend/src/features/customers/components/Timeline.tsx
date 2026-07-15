@@ -56,7 +56,7 @@ export function Timeline({
     }
     return { dots, ticks, hiddenCount: interactions.length - dots.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interactions]);
+  }, [interactions, i18n.language]);
 
   // 目前選取的互動(供下方詳情卡)
   const selected = interactions.find((i) => i.id === selectedId) ?? null;
