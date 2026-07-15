@@ -3,6 +3,7 @@
   "noData": "No data yet",
   "notFilled": "Not filled",
   "pagination": { "prev": "Previous page", "next": "Next page", "pageOf": "Page {{page}} of {{total}}" },
+  "actions": { "edit": "Edit", "delete": "Delete", "save": "Save", "cancel": "Cancel", "close": "Close", "add": "Add" },
   "enums": {
     "risk": { "LOW": "Low risk", "MEDIUM": "Medium risk", "HIGH": "High risk" },
     "intent": {

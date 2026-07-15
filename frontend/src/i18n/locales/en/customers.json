@@ -1,0 +1,71 @@
+{
+  "topbar": { "title": "Customer Workbench", "searchPlaceholder": "Name / Email / Phone / Tax ID" },
+  "filters": {
+    "allIndustries": "All industries", "allOwners": "All owners", "allStatuses": "All statuses",
+    "allRisk": "All risk levels", "renewalFrom": "Renewal due from", "renewalTo": "Renewal due to",
+    "search": "Search", "clear": "Clear"
+  },
+  "actionBar": {
+    "aiSuggestions": "✨ AI work suggestions", "addCustomer": "+ Add customer", "businessCard": "📇 Business card intake",
+    "addInteraction": "+ Add interaction", "addOpportunity": "+ Add opportunity", "scheduleCall": "☎ Schedule call",
+    "meetingCopilot": "🎙 Meeting copilot", "followUpEmail": "✉️ AI follow-up email", "stakeholderMap": "🕸 Stakeholder map"
+  },
+  "breadcrumb": { "dashboard": "Dashboard", "customerFallback": "Customer" },
+  "list": { "title": "Customer list", "countSuffix": "{{count}}", "emptyTitle": "No customers match the filters", "emptyHint": "Adjust the search or clear the filters" },
+  "pagination": { "pageOfWithTotal": "{{page}} / {{total}} (total {{count}})" },
+  "detail": {
+    "empty": "No customer selected", "loadingAria": "Loading customer detail", "updating": "Updating...",
+    "kpiAmount": "Opportunity amount", "kpiRenewal": "Renewal due", "kpiLastInteraction": "Last interaction", "kpiStatus": "Status",
+    "assess": "🩺 Overall assessment", "askAi": "💬 Ask AI assistant", "aiHistory": "🧭 AI history", "editCustomer": "✏️ Edit customer", "deleteCustomer": "Delete customer"
+  },
+  "enums": { "status": { "ACTIVE": "Active", "INACTIVE": "Inactive", "LEVERAGED": "Key account" } },
+  "confirm": {
+    "deleteCustomer": "Delete this customer? This cannot be undone.",
+    "deleteContact": "Delete contact \"{{name}}\"? This cannot be undone.",
+    "deleteInteraction": "Delete this interaction record? This cannot be undone.",
+    "deleteOpportunity": "Delete opportunity \"{{name}}\"? This cannot be undone."
+  },
+  "assessment": { "title": "Overall assessment — {{name}}", "error": "⚠️ Failed to generate assessment, please try again later.", "riskMeta": "Churn risk {{churn}} · Renewal delay risk {{renewal}}" },
+  "contacts": { "title": "Contacts", "add": "+ Add contact", "empty": "No contacts yet", "name": "Name", "title_": "Title", "email": "Email" },
+  "contactModal": { "editTitle": "Edit contact", "addTitle": "Add contact" },
+  "opportunityBoard": { "title": "Opportunity board", "subtitle": "By stage", "intelligence": "Opportunity intelligence", "editOpportunity": "Edit opportunity", "deleteOpportunity": "Delete opportunity", "ownerPrefix": "Owner: " },
+  "timeline": {
+    "title": "Interaction timeline", "recentMonths": "Last {{months}} months", "hiddenSuffix": " · {{count}} earlier",
+    "empty": "No interactions in the last {{months}} months.", "monthTick": "{{month}}",
+    "hint": "Click a dot on the timeline to view that interaction (color = sentiment)."
+  },
+  "upcoming": {
+    "title": "This week's follow-ups", "aheadDays": "Next {{days}} days", "empty": "No interactions, renewals, or opportunities due in the next {{days}} days.",
+    "kindInteraction": "Upcoming interaction", "kindRenewal": "Renewal due", "kindOpportunity": "Opportunity closing",
+    "renewalLabel": "Contract renewal due", "interactionLabel": "{{type}}: {{content}}", "opportunityLabel": "{{name}} ({{stage}} · {{amount}})"
+  },
+  "form": {
+    "name": "Name", "email": "Email", "phone": "Phone", "taxId": "Tax ID", "industry": "Industry", "owner": "Owner",
+    "phonePlaceholder": "0912345678", "taxIdPlaceholder": "12345678", "selectIndustry": "Select industry", "noAssignableOwner": "No assignable owner",
+    "ownerSelf": "{{name}} (me)", "contractStart": "Contract start date", "contractEnd": "Contract end date", "renewalDue": "Renewal due date",
+    "type": "Type", "occurredAt": "Time", "content": "Content", "opportunityName": "Opportunity name", "opportunityNamePlaceholder": "e.g. Smart factory license expansion",
+    "stage": "Stage", "amount": "Amount", "expectedCloseDate": "Expected close date", "leadSource": "Source", "probability": "Win probability (%)",
+    "amountPlaceholder": "e.g. 1500000", "probabilityPlaceholder": "Leave blank to use stage default", "closeReason": "Reason", "closeReasonNote": "Note", "closeReasonNotePlaceholder": "Optional", "actualCloseDate": "Actual close date"
+  },
+  "addCustomerModal": { "title": "Add customer", "submit": "Create" },
+  "editCustomerModal": { "title": "Edit customer — {{name}}" },
+  "addInteractionModal": { "title": "Add interaction — {{name}}", "submit": "Add" },
+  "editInteractionModal": { "title": "Edit interaction" },
+  "addOpportunityModal": { "title": "Add opportunity — {{name}}", "submit": "Add" },
+  "editOpportunityModal": { "title": "Edit opportunity — {{name}}" },
+  "closeOpportunityModal": { "wonTitle": "Mark as won", "lostTitle": "Mark as lost", "submit": "Confirm" },
+  "enumsInteractionType": { "PHONE": "Phone", "MEETING": "Meeting", "EMAIL": "Email", "SUPPORT_TICKET": "Support ticket" },
+  "enumsOpportunityType": { "NEW_BUSINESS": "New business", "RENEWAL": "Renewal" },
+  "closeReasonsShort": {
+    "won": { "WON_PRICE": "Price", "WON_FEATURE": "Feature", "WON_RELATIONSHIP": "Relationship", "WON_TIMING": "Timing" },
+    "lost": { "LOST_PRICE": "Too expensive", "LOST_COMPETITOR": "Lost to competitor", "LOST_NO_BUDGET": "No budget", "LOST_NO_DECISION": "No decision", "LOST_NO_RESPONSE": "No response" }
+  },
+  "aiHistory": {
+    "title": "AI history — {{name}}", "subtitle": "Call history and Agent decision steps", "callsHeading": "AI call history ({{count}})",
+    "loading": "Loading", "empty": "No AI calls for this customer yet. Try \"Overall assessment\" or \"Ask AI assistant\".",
+    "fallbackMode": "Template fallback", "traceHeading": "Agent decision trace",
+    "traceIntro": "How the AI assistant retrieved data, assessed risk, and produced its recommendation, step by step.",
+    "traceEmpty": "No Agent decision trace yet.",
+    "callTypes": { "CHAT": "Chat", "ASSESSMENT": "Overall assessment", "PORTFOLIO": "Portfolio assessment" }
+  }
+}

@@ -5,6 +5,8 @@ import en from "./locales/en/common.json";
 import zhTW from "./locales/zh-TW/common.json";
 import enDashboard from "./locales/en/dashboard.json";
 import zhTWDashboard from "./locales/zh-TW/dashboard.json";
+import enCustomers from "./locales/en/customers.json";
+import zhTWCustomers from "./locales/zh-TW/customers.json";
 import { SUPPORTED_LANGS, FALLBACK_LANG, detectLanguage } from "./detect";
 
 /** localStorage 儲存語言選擇的 key（與 detect/切換元件一致）。 */
@@ -47,8 +49,8 @@ void i18n
   .use(initReactI18next)
   .init({
     resources: {
-      en: { common: en, dashboard: enDashboard },
-      "zh-TW": { common: zhTW, dashboard: zhTWDashboard }
+      en: { common: en, dashboard: enDashboard, customers: enCustomers },
+      "zh-TW": { common: zhTW, dashboard: zhTWDashboard, customers: zhTWCustomers }
     },
     fallbackLng: FALLBACK_LANG,
     supportedLngs: SUPPORTED_LANGS,

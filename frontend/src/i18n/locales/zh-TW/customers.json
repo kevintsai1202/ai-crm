@@ -1,0 +1,71 @@
+{
+  "topbar": { "title": "客戶工作台", "searchPlaceholder": "名稱 / Email / 電話 / 統編" },
+  "filters": {
+    "allIndustries": "全部產業", "allOwners": "全部業務", "allStatuses": "全部狀態",
+    "allRisk": "全部風險", "renewalFrom": "續約到期日(起)", "renewalTo": "續約到期日(迄)",
+    "search": "搜尋", "clear": "清除"
+  },
+  "actionBar": {
+    "aiSuggestions": "✨ AI 工作建議", "addCustomer": "+ 新增客戶", "businessCard": "📇 名片建檔",
+    "addInteraction": "+ 新增互動", "addOpportunity": "+ 新增商機", "scheduleCall": "☎ 安排電話",
+    "meetingCopilot": "🎙 會議 Copilot", "followUpEmail": "✉️ AI 跟進信", "stakeholderMap": "🕸 決策鏈"
+  },
+  "breadcrumb": { "dashboard": "儀表板", "customerFallback": "客戶" },
+  "list": { "title": "客戶列表", "countSuffix": "{{count}} 筆", "emptyTitle": "查無符合條件的客戶", "emptyHint": "請調整搜尋條件或清除篩選" },
+  "pagination": { "pageOfWithTotal": "{{page}} / {{total}}（共 {{count}} 筆）" },
+  "detail": {
+    "empty": "尚未選取客戶", "loadingAria": "載入客戶詳情中", "updating": "資料更新中...",
+    "kpiAmount": "商機金額", "kpiRenewal": "合約到期", "kpiLastInteraction": "最近互動", "kpiStatus": "客戶狀態",
+    "assess": "🩺 整體評估", "askAi": "💬 詢問 AI 助理", "aiHistory": "🧭 AI 歷程", "editCustomer": "✏️ 編輯客戶", "deleteCustomer": "刪除客戶"
+  },
+  "enums": { "status": { "ACTIVE": "使用中", "INACTIVE": "停用", "LEVERAGED": "重點客戶" } },
+  "confirm": {
+    "deleteCustomer": "確定刪除此客戶?此動作無法復原。",
+    "deleteContact": "確定刪除聯絡人「{{name}}」?此動作無法復原。",
+    "deleteInteraction": "確定刪除此互動紀錄?此動作無法復原。",
+    "deleteOpportunity": "確定刪除商機「{{name}}」?此動作無法復原。"
+  },
+  "assessment": { "title": "整體評估 — {{name}}", "error": "⚠️ 產生評估失敗，請稍後再試。", "riskMeta": "流失風險 {{churn}} · 續約延遲 {{renewal}}" },
+  "contacts": { "title": "聯絡人", "add": "+ 新增聯絡人", "empty": "尚無聯絡人", "name": "姓名", "title_": "職稱", "email": "Email" },
+  "contactModal": { "editTitle": "編輯聯絡人", "addTitle": "新增聯絡人" },
+  "opportunityBoard": { "title": "商機看板", "subtitle": "依階段分欄", "intelligence": "商機智能", "editOpportunity": "編輯商機", "deleteOpportunity": "刪除商機", "ownerPrefix": "負責：" },
+  "timeline": {
+    "title": "互動時間線", "recentMonths": "近 {{months}} 個月", "hiddenSuffix": " · 另有 {{count}} 筆較早",
+    "empty": "近 {{months}} 個月內無互動紀錄。", "monthTick": "{{month}}月",
+    "hint": "點時間軸上的色點查看該次互動內容（顏色代表情緒）。"
+  },
+  "upcoming": {
+    "title": "本週待跟進", "aheadDays": "未來 {{days}} 天", "empty": "未來 {{days}} 天沒有排定的互動、續約或商機到期。",
+    "kindInteraction": "即將互動", "kindRenewal": "續約到期", "kindOpportunity": "商機成交",
+    "renewalLabel": "合約續約到期日", "interactionLabel": "{{type}}：{{content}}", "opportunityLabel": "{{name}}（{{stage}}・{{amount}}）"
+  },
+  "form": {
+    "name": "名稱", "email": "Email", "phone": "電話", "taxId": "統編", "industry": "產業", "owner": "負責業務",
+    "phonePlaceholder": "0912345678", "taxIdPlaceholder": "12345678", "selectIndustry": "請選擇產業", "noAssignableOwner": "無可指派業務",
+    "ownerSelf": "{{name}}（我）", "contractStart": "合約起始日", "contractEnd": "合約到期日", "renewalDue": "續約日",
+    "type": "類型", "occurredAt": "時間", "content": "內容", "opportunityName": "商機名稱", "opportunityNamePlaceholder": "例:智慧工廠擴充授權",
+    "stage": "階段", "amount": "金額(元)", "expectedCloseDate": "預計成交日", "leadSource": "來源", "probability": "成交機率(%)",
+    "amountPlaceholder": "例:1500000", "probabilityPlaceholder": "留空則依階段預設", "closeReason": "原因", "closeReasonNote": "備註", "closeReasonNotePlaceholder": "選填", "actualCloseDate": "實際成交日"
+  },
+  "addCustomerModal": { "title": "新增客戶", "submit": "建立" },
+  "editCustomerModal": { "title": "編輯客戶 — {{name}}" },
+  "addInteractionModal": { "title": "新增互動 — {{name}}", "submit": "新增" },
+  "editInteractionModal": { "title": "編輯互動" },
+  "addOpportunityModal": { "title": "新增商機 — {{name}}", "submit": "新增" },
+  "editOpportunityModal": { "title": "編輯商機 — {{name}}" },
+  "closeOpportunityModal": { "wonTitle": "成交結案", "lostTitle": "失單結案", "submit": "確認結案" },
+  "enumsInteractionType": { "PHONE": "電話", "MEETING": "會議", "EMAIL": "Email", "SUPPORT_TICKET": "客服工單" },
+  "enumsOpportunityType": { "NEW_BUSINESS": "新單", "RENEWAL": "續約" },
+  "closeReasonsShort": {
+    "won": { "WON_PRICE": "價格", "WON_FEATURE": "功能", "WON_RELATIONSHIP": "關係", "WON_TIMING": "時機" },
+    "lost": { "LOST_PRICE": "價格太高", "LOST_COMPETITOR": "輸給競品", "LOST_NO_BUDGET": "無預算", "LOST_NO_DECISION": "未決策", "LOST_NO_RESPONSE": "無回應" }
+  },
+  "aiHistory": {
+    "title": "AI 歷程 — {{name}}", "subtitle": "歷次 AI 呼叫與 Agent 決策步驟", "callsHeading": "AI 呼叫歷史（{{count}}）",
+    "loading": "載入中", "empty": "此客戶尚無 AI 呼叫紀錄。點「整體評估」或「詢問 AI 助理」後即會記錄。",
+    "fallbackMode": "樣板 fallback", "traceHeading": "Agent 決策歷程",
+    "traceIntro": "AI 助理分析此客戶的決策步驟,顯示如何一步步檢索資料、評估風險並產生建議。",
+    "traceEmpty": "尚無 Agent 決策歷程。",
+    "callTypes": { "CHAT": "對話", "ASSESSMENT": "整體評估", "PORTFOLIO": "Portfolio 評估" }
+  }
+}
