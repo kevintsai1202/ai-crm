@@ -1,0 +1,65 @@
+{
+  "topbar": {
+    "title": "Dashboard",
+    "surveyLink": "📋 Fill out the fundraising course survey",
+    "layoutButton": "⊞ Layout (hidden {{count}})",
+    "generateDemo": "🧪 Generate demo data",
+    "generatingDemo": "Generating…",
+    "portfolioAssess": "📊 Portfolio assessment (company-wide)",
+    "aiHistory": "🕘 AI history"
+  },
+  "grid": { "dragHandle": "Drag to move", "closeBlock": "Close block" },
+  "portfolio": {
+    "assessTitle": "Portfolio assessment (company-wide)",
+    "assessError": "⚠️ Failed to generate assessment, please try again later.",
+    "historyTitle": "Company-wide assessment AI history"
+  },
+  "loading": "Loading...",
+  "kpi": {
+    "customers": { "title": "KPI · Customers", "label": "Customers" },
+    "activeOpps": { "title": "KPI · Active opportunities", "label": "Active opportunities" },
+    "pipeline": { "title": "KPI · Pipeline amount", "label": "Pipeline amount" },
+    "highRisk": { "title": "KPI · High-risk customers", "label": "High-risk customers" }
+  },
+  "charts": {
+    "pipeline": {
+      "title": "Sales funnel · Pipeline", "subtitle": "Opportunity (top) → Won (bottom)",
+      "sourceAll": "All", "sourceInbound": "Inbound", "sourceOutbound": "Outbound", "sourceReferral": "Referral",
+      "hoverTitle": "Click to view {{stage}}'s {{count}} opportunities", "avgDaysSuffix": " · avg {{days}} days in stage", "overdueSuffix": " · {{count}} overdue",
+      "countSuffix": "{{count}}", "avgDaysInline": " · avg {{days}} days"
+    },
+    "forecast": {
+      "title": "Monthly revenue forecast", "subtitle": "Solid = total · Dashed = weighted forecast",
+      "ariaLabel": "Monthly revenue forecast line chart", "hoverTitle": "Click to view opportunities expected to close in {{month}}"
+    },
+    "industry": { "title": "Revenue by industry", "subtitle": "Click to view customers", "drillTitle": "Industry · {{label}}" },
+    "risk": { "title": "Customer risk breakdown", "subtitle": "Click to view customers", "drillTitle": "Risk · {{label}}" },
+    "renewal": { "title": "Renewal forecast", "subtitle": "Click month to view", "hoverTitle": "Click to view customers renewing in {{month}}", "drillTitle": "Renewal due · {{label}}" },
+    "leaderboard": { "title": "Owner leaderboard", "subtitle": "Click to view customers", "drillTitle": "Owner · {{label}}", "customersSuffix": "{{count}} customers", "highRiskSuffix": "high-risk {{count}}" },
+    "activity": { "title": "Recent key activity", "subtitle": "Click to jump to customer" }
+  },
+  "rfm": {
+    "title": "RFM customer segments", "subtitle": "Click to jump to customer · R recency / F frequency / M monetary",
+    "colCustomer": "Customer", "colSegment": "Segment", "colR": "R", "colF": "F", "colM": "M", "colAmount": "Amount",
+    "recencyTitle": "{{days}} days since last interaction", "frequencyTitle": "{{count}} interactions"
+  },
+  "usage": {
+    "title": "AI usage governance", "subtitle": "Manager / Admin only",
+    "totalCalls": "AI calls", "totalTokens": "Token usage", "realVsFallback": "Real LLM / Fallback",
+    "adopted": "Adopted", "rejected": "Rejected"
+  },
+  "sentiment": {
+    "intentTitle": "Intent distribution", "intentSubtitle": "Interaction intent breakdown", "intentEmpty": "No intent data yet", "intentOther": "Other",
+    "trendTitle": "Sentiment trend", "trendSubtitle": "Last 12 months · Positive / Neutral / Negative", "trendEmpty": "No sentiment trend data yet",
+    "trendTooltip": "{{month}}｜Positive {{positive}} / Neutral {{neutral}} / Negative {{negative}}",
+    "legendPositive": "Positive", "legendNeutral": "Neutral", "legendNegative": "Negative",
+    "highRiskTitle": "High-risk interactions", "highRiskSubtitle": "Negative sentiment with churn/complaint intent · Click to jump to customer", "highRiskEmpty": "No high-risk interactions right now",
+    "churnTitle": "Churn radar", "churnSubtitle": "Sorted by negative / churn / complaint weighted score · Click to jump to customer", "churnEmpty": "No churn-risk customers yet",
+    "churnMetaTitle": "Negative {{negative}} · Churn signal {{churn}} · Complaint {{complaint}}", "churnMetaInline": "Neg {{negative}} · Churn {{churn}} · Compl {{complaint}}",
+    "careTitle": "Priority care", "careSubtitle": "Suggested customers to contact first · Click to jump to customer", "careEmpty": "No priority care targets yet"
+  },
+  "drawer": {
+    "title": "Layout settings", "close": "Close", "hint": "Hidden blocks (click ＋ to add back)",
+    "allShown": "All blocks are currently shown", "add": "＋ Add back", "reset": "↺ Reset to default layout"
+  }
+}

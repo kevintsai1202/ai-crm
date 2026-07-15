@@ -3,6 +3,8 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import en from "./locales/en/common.json";
 import zhTW from "./locales/zh-TW/common.json";
+import enDashboard from "./locales/en/dashboard.json";
+import zhTWDashboard from "./locales/zh-TW/dashboard.json";
 import { SUPPORTED_LANGS, FALLBACK_LANG, detectLanguage } from "./detect";
 
 /** localStorage 儲存語言選擇的 key（與 detect/切換元件一致）。 */
@@ -45,8 +47,8 @@ void i18n
   .use(initReactI18next)
   .init({
     resources: {
-      en: { common: en },
-      "zh-TW": { common: zhTW }
+      en: { common: en, dashboard: enDashboard },
+      "zh-TW": { common: zhTW, dashboard: zhTWDashboard }
     },
     fallbackLng: FALLBACK_LANG,
     supportedLngs: SUPPORTED_LANGS,

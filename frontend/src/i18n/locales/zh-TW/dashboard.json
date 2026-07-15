@@ -1,0 +1,65 @@
+{
+  "topbar": {
+    "title": "儀表板",
+    "surveyLink": "📋 募資課程問卷",
+    "layoutButton": "⊞ 版面（隱藏 {{count}}）",
+    "generateDemo": "🧪 產生示範資料",
+    "generatingDemo": "產生中…",
+    "portfolioAssess": "📊 整體評估（全公司）",
+    "aiHistory": "🕘 AI 歷程"
+  },
+  "grid": { "dragHandle": "拖拉移動", "closeBlock": "關閉區塊" },
+  "portfolio": {
+    "assessTitle": "Portfolio 整體評估（全公司）",
+    "assessError": "⚠️ 產生評估失敗，請稍後再試。",
+    "historyTitle": "全公司評估 AI 歷程"
+  },
+  "loading": "載入中...",
+  "kpi": {
+    "customers": { "title": "KPI · 客戶數", "label": "客戶數" },
+    "activeOpps": { "title": "KPI · 活躍商機", "label": "活躍商機" },
+    "pipeline": { "title": "KPI · 商機總額", "label": "商機總額" },
+    "highRisk": { "title": "KPI · 高風險客戶", "label": "高風險客戶" }
+  },
+  "charts": {
+    "pipeline": {
+      "title": "銷售漏斗 Pipeline", "subtitle": "機會(上)→ 成交(下)",
+      "sourceAll": "全部", "sourceInbound": "主動上門", "sourceOutbound": "業務開發", "sourceReferral": "推薦轉介",
+      "hoverTitle": "點擊查看 {{stage}} 的 {{count}} 筆商機", "avgDaysSuffix": " · 平均停留 {{days}} 天", "overdueSuffix": " · {{count}} 筆超時",
+      "countSuffix": "{{count}} 筆", "avgDaysInline": " · 均 {{days}} 天"
+    },
+    "forecast": {
+      "title": "月度營收 Forecast", "subtitle": "實線=總額 · 虛線=加權預測",
+      "ariaLabel": "月度營收預測折線圖", "hoverTitle": "點擊查看 {{month}} 預計成交商機"
+    },
+    "industry": { "title": "產業營收分布", "subtitle": "點擊查看客戶", "drillTitle": "產業 · {{label}}" },
+    "risk": { "title": "客戶風險結構", "subtitle": "點擊查看客戶", "drillTitle": "風險 · {{label}}" },
+    "renewal": { "title": "續約到期預測", "subtitle": "點擊月份查看", "hoverTitle": "點擊查看 {{month}} 續約客戶", "drillTitle": "續約到期 · {{label}}" },
+    "leaderboard": { "title": "業務排行榜", "subtitle": "點擊查看客戶", "drillTitle": "業務 · {{label}}", "customersSuffix": "{{count}} 客戶", "highRiskSuffix": "高風險 {{count}}" },
+    "activity": { "title": "近期關鍵互動", "subtitle": "點擊跳到客戶" }
+  },
+  "rfm": {
+    "title": "RFM 客戶分群", "subtitle": "點擊跳到客戶 · R 近期 / F 頻率 / M 金額",
+    "colCustomer": "客戶", "colSegment": "分群", "colR": "R", "colF": "F", "colM": "M", "colAmount": "金額",
+    "recencyTitle": "距上次互動 {{days}} 天", "frequencyTitle": "互動 {{count}} 次"
+  },
+  "usage": {
+    "title": "AI 用量治理", "subtitle": "僅主管 / 管理員可見",
+    "totalCalls": "AI 呼叫次數", "totalTokens": "Token 用量", "realVsFallback": "真實 LLM / Fallback",
+    "adopted": "採納", "rejected": "拒絕"
+  },
+  "sentiment": {
+    "intentTitle": "意圖分布", "intentSubtitle": "互動意圖分類統計", "intentEmpty": "尚無意圖資料", "intentOther": "其他",
+    "trendTitle": "情緒趨勢", "trendSubtitle": "近 12 月 · 正向 / 中性 / 負向", "trendEmpty": "尚無情緒趨勢資料",
+    "trendTooltip": "{{month}}｜正 {{positive}} / 中 {{neutral}} / 負 {{negative}}",
+    "legendPositive": "正向", "legendNeutral": "中性", "legendNegative": "負向",
+    "highRiskTitle": "高風險互動", "highRiskSubtitle": "負向情緒且意圖為流失 / 客訴 · 點擊跳客戶", "highRiskEmpty": "目前無高風險互動",
+    "churnTitle": "流失雷達", "churnSubtitle": "負面 / 流失 / 客訴加權排序 · 點擊跳客戶", "churnEmpty": "尚無流失風險客戶",
+    "churnMetaTitle": "負面 {{negative}} · 流失 {{churn}} · 客訴 {{complaint}}", "churnMetaInline": "負 {{negative}} · 流 {{churn}} · 訴 {{complaint}}",
+    "careTitle": "優先關懷", "careSubtitle": "建議優先聯繫客戶 · 點擊跳客戶", "careEmpty": "尚無優先關懷對象"
+  },
+  "drawer": {
+    "title": "版面設定", "close": "關閉", "hint": "隱藏的區塊（點＋加回儀表板）",
+    "allShown": "目前所有區塊都已顯示", "add": "＋ 加回", "reset": "↺ 還原預設版面"
+  }
+}
