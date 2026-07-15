@@ -1,9 +1,11 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * 新增互動紀錄 Modal。
  */
 export function AddInteractionModal({ customerName, onSubmit, onClose }: { customerName: string; onSubmit: (data: { type: string; occurredAt: string; content: string }) => void; onClose: () => void }) {
+  const { t } = useTranslation(["customers", "common"]);
   function handle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -18,20 +20,20 @@ export function AddInteractionModal({ customerName, onSubmit, onClose }: { custo
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>新增互動 — {customerName}</h3>
-        <label>類型
+        <h3>{t("customers:addInteractionModal.title", { name: customerName })}</h3>
+        <label>{t("customers:form.type")}
           <select name="type" required>
-            <option value="PHONE">電話</option>
-            <option value="MEETING">會議</option>
-            <option value="EMAIL">Email</option>
-            <option value="SUPPORT_TICKET">客服工單</option>
+            <option value="PHONE">{t("customers:enumsInteractionType.PHONE")}</option>
+            <option value="MEETING">{t("customers:enumsInteractionType.MEETING")}</option>
+            <option value="EMAIL">{t("customers:enumsInteractionType.EMAIL")}</option>
+            <option value="SUPPORT_TICKET">{t("customers:enumsInteractionType.SUPPORT_TICKET")}</option>
           </select>
         </label>
-        <label>時間 <input name="occurredAt" type="datetime-local" required /></label>
-        <label>內容 <textarea name="content" rows={3} required /></label>
+        <label>{t("customers:form.occurredAt")} <input name="occurredAt" type="datetime-local" required /></label>
+        <label>{t("customers:form.content")} <textarea name="content" rows={3} required /></label>
         <div className="modal-actions">
-          <button type="submit">新增</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("customers:addInteractionModal.submit")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
