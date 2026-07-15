@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * 新增商機 Modal。
@@ -21,6 +22,7 @@ export function AddOpportunityModal({
   /** 選填預填值（供 AI 建議商機草稿帶入名稱/階段；其餘維持原預設）。 */
   initialValues?: { name?: string; stage?: string };
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   /** 解析表單並回傳資料;金額轉數字,預計成交日空字串轉 null。 */
   function handle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,36 +44,36 @@ export function AddOpportunityModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>新增商機 — {customerName}</h3>
-        <label>商機名稱 <input name="name" type="text" required placeholder="例:智慧工廠擴充授權" defaultValue={initialValues?.name ?? ""} /></label>
-        <label>階段
+        <h3>{t("customers:addOpportunityModal.title", { name: customerName })}</h3>
+        <label>{t("customers:form.opportunityName")} <input name="name" type="text" required placeholder={t("customers:form.opportunityNamePlaceholder")} defaultValue={initialValues?.name ?? ""} /></label>
+        <label>{t("customers:form.stage")}
           <select name="stage" required defaultValue={initialValues?.stage ?? "QUALIFICATION"}>
-            <option value="QUALIFICATION">資格評估</option>
-            <option value="PROPOSAL">提案</option>
-            <option value="NEGOTIATION">議價</option>
-            <option value="CLOSED_WON">已成交</option>
-            <option value="CLOSED_LOST">已流失</option>
+            <option value="QUALIFICATION">{t("common:enums.stage.QUALIFICATION")}</option>
+            <option value="PROPOSAL">{t("common:enums.stage.PROPOSAL")}</option>
+            <option value="NEGOTIATION">{t("common:enums.stage.NEGOTIATION")}</option>
+            <option value="CLOSED_WON">{t("common:enums.stage.CLOSED_WON")}</option>
+            <option value="CLOSED_LOST">{t("common:enums.stage.CLOSED_LOST")}</option>
           </select>
         </label>
-        <label>金額(元) <input name="amount" type="number" min="0" step="1000" required placeholder="例:1500000" /></label>
-        <label>預計成交日 <input name="expectedCloseDate" type="date" /></label>
-        <label>類型
+        <label>{t("customers:form.amount")} <input name="amount" type="number" min="0" step="1000" required placeholder={t("customers:form.amountPlaceholder")} /></label>
+        <label>{t("customers:form.expectedCloseDate")} <input name="expectedCloseDate" type="date" /></label>
+        <label>{t("customers:form.type")}
           <select name="type" required defaultValue="NEW_BUSINESS">
-            <option value="NEW_BUSINESS">新單</option>
-            <option value="RENEWAL">續約</option>
+            <option value="NEW_BUSINESS">{t("customers:enumsOpportunityType.NEW_BUSINESS")}</option>
+            <option value="RENEWAL">{t("customers:enumsOpportunityType.RENEWAL")}</option>
           </select>
         </label>
-        <label>來源
+        <label>{t("customers:form.leadSource")}
           <select name="leadSource" required defaultValue="OUTBOUND">
-            <option value="OUTBOUND">業務開發</option>
-            <option value="INBOUND">主動上門</option>
-            <option value="REFERRAL">推薦轉介</option>
+            <option value="OUTBOUND">{t("common:enums.leadSource.OUTBOUND")}</option>
+            <option value="INBOUND">{t("common:enums.leadSource.INBOUND")}</option>
+            <option value="REFERRAL">{t("common:enums.leadSource.REFERRAL")}</option>
           </select>
         </label>
-        <label>成交機率(%) <input name="probability" type="number" min="0" max="100" placeholder="留空則依階段預設" /></label>
+        <label>{t("customers:form.probability")} <input name="probability" type="number" min="0" max="100" placeholder={t("customers:form.probabilityPlaceholder")} /></label>
         <div className="modal-actions">
-          <button type="submit">新增</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("customers:addOpportunityModal.submit")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
