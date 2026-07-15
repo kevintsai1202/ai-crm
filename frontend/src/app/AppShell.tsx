@@ -15,7 +15,7 @@ function HealthBadge({ health, error, onRefresh }: { health: HealthResponse | nu
       <span className="pulse" />
       <div>
         <strong>{ok ? "後端連線正常" : "後端無法連線"}</strong>
-        <small>{health?.timestamp ? formatDateTime(health.timestamp) : "尚未取得健康資訊"}</small>
+        <small>{health?.timestamp ? formatDateTime(health.timestamp, "zh-TW", "尚無資料") : "尚未取得健康資訊"}</small>
       </div>
       <button type="button" onClick={onRefresh}>重測</button>
     </div>

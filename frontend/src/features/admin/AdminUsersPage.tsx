@@ -86,7 +86,7 @@ export function AdminUsersPage() {
                   <td>
                     <span className={`status-pill ${u.enabled ? "on" : "off"}`}>{u.enabled ? "啟用" : "停用"}</span>
                   </td>
-                  <td>{formatDateTime(u.createdAt)}</td>
+                  <td>{formatDateTime(u.createdAt, "zh-TW", "尚無資料")}</td>
                   <td className="admin-user-actions">
                     <button type="button" className="btn-secondary" onClick={() => setEditing(u)}>編輯</button>
                     <button type="button" className="btn-secondary" onClick={() => setResetting(u)}>重設密碼</button>

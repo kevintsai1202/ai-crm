@@ -56,7 +56,7 @@ export function AiCallHistoryModal({ title, calls, loading, onClose }: {
                   <article className={`ai-history-item ${open ? "open" : ""}`} key={call.id}>
                     <button type="button" className="ai-history-head" onClick={() => setExpandedId(open ? null : call.id)}>
                       <span className="ai-history-type">{CALL_TYPE_LABELS[call.callType] ?? call.callType}</span>
-                      <span className="ai-history-time">{formatDateTime(call.createdAt)}</span>
+                      <span className="ai-history-time">{formatDateTime(call.createdAt, "zh-TW", "尚無資料")}</span>
                       <span className={`ai-history-mode ${call.aiEnabled ? "real" : "fallback"}`}>
                         {call.aiEnabled ? (call.model ?? "LLM") : "樣板 fallback"}
                       </span>

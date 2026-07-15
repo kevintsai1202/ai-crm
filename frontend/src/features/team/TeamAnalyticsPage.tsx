@@ -61,8 +61,8 @@ export function TeamAnalyticsPage() {
 
       <div className="team-kpi-row">
         <Kpi label="客戶總數" value={String(t.totalCustomers)} />
-        <Kpi label="全團隊成交金額" value={formatCompactMoney(t.totalWonAmount)} />
-        <Kpi label="進行中商機" value={formatCompactMoney(t.totalPipeline)} />
+        <Kpi label="全團隊成交金額" value={formatCompactMoney(t.totalWonAmount, "zh-TW")} />
+        <Kpi label="進行中商機" value={formatCompactMoney(t.totalPipeline, "zh-TW")} />
         <Kpi label="高風險客戶" value={String(t.totalHighRisk)} />
         <Kpi label="平均成交率" value={`${Math.round(t.avgWinRate * 100)}%`} />
         <Kpi label="業務人數" value={String(t.ownerCount)} />
@@ -95,8 +95,8 @@ export function TeamAnalyticsPage() {
                 <td>{o.ownerName}</td>
                 <td>{o.customerCount}</td>
                 <td>{o.highRiskCount}</td>
-                <td>{formatCompactMoney(o.pipelineAmount)}（{o.activeOpportunityCount}）</td>
-                <td>{formatCompactMoney(o.wonAmount)}（{o.wonCount}）</td>
+                <td>{formatCompactMoney(o.pipelineAmount, "zh-TW")}（{o.activeOpportunityCount}）</td>
+                <td>{formatCompactMoney(o.wonAmount, "zh-TW")}（{o.wonCount}）</td>
                 <td>{Math.round(o.winRate * 100)}%</td>
                 <td>{o.avgDaysSinceInteraction == null ? "—" : `${Math.round(o.avgDaysSinceInteraction)} 天`}</td>
                 <td>{o.renewalsThisQuarter}</td>

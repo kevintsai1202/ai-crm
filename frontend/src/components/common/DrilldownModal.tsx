@@ -1,5 +1,6 @@
 import type { DrilldownResponse } from "../../types";
 import { formatMoney, formatCompactMoney, riskLabel } from "../../lib/format";
+import i18n from "../../i18n";
 
 /**
  * 圖表下鑽明細 Modal：列出某段落底層的商機/客戶，點項目可跳到客戶詳情。
@@ -12,7 +13,7 @@ export function DrilldownModal({ state, onSelectCustomer, onClose }: { state: { 
         <div className="report-header">
           <div>
             <h3>{state.title}</h3>
-            {data ? <small>{data.count} 筆 · 金額合計 {formatMoney(data.totalAmount)}</small> : null}
+            {data ? <small>{data.count} 筆 · 金額合計 {formatMoney(data.totalAmount, "zh-TW")}</small> : null}
           </div>
           <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
         </div>
@@ -31,8 +32,8 @@ export function DrilldownModal({ state, onSelectCustomer, onClose }: { state: { 
                   </div>
                   <div className="drill-meta">
                     {item.status ? <span className={`drill-status ${item.status === "已完成" ? "done" : item.status === "已流失" ? "lost" : "active"}`}>{item.status}</span> : null}
-                    {item.riskLevel ? <span className={`risk-badge ${item.riskLevel.toLowerCase()}`}>{riskLabel(item.riskLevel)}</span> : null}
-                    {item.amount ? <b>{formatCompactMoney(item.amount)}</b> : null}
+                    {item.riskLevel ? <span className={`risk-badge ${item.riskLevel.toLowerCase()}`}>{i18n.t(riskLabel(item.riskLevel), { lng: "zh-TW" })}</span> : null}
+                    {item.amount ? <b>{formatCompactMoney(item.amount, "zh-TW")}</b> : null}
                     {item.date ? <small>{item.date}</small> : null}
                   </div>
                 </button>

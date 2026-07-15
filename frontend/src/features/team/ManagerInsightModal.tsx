@@ -105,7 +105,7 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
           <div className="report-header">
             <div>
               <h3>{title} <AiBadge onDark /></h3>
-              {insight ? <small>上次分析：{formatDateTime(insight.generatedAt)}{insight.model ? `（${insight.model}）` : "（教學版摘要）"}</small> : null}
+              {insight ? <small>上次分析：{formatDateTime(insight.generatedAt, "zh-TW", "尚無資料")}{insight.model ? `（${insight.model}）` : "（教學版摘要）"}</small> : null}
             </div>
             <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
           </div>
