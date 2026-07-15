@@ -1,5 +1,28 @@
 {
   "lang": { "label": "Language", "en": "English", "zh-TW": "繁體中文" },
+  "noData": "No data yet",
+  "notFilled": "Not filled",
+  "enums": {
+    "risk": { "LOW": "Low risk", "MEDIUM": "Medium risk", "HIGH": "High risk" },
+    "intent": {
+      "ASK_PRICING": "Pricing inquiry", "COMPARE_COMPETITOR": "Competitor comparison",
+      "CHURN_SIGNAL": "Churn signal", "RENEWAL_INTEREST": "Renewal interest",
+      "UPSELL_SIGNAL": "Upsell signal", "COMPLAINT": "Complaint"
+    },
+    "stage": {
+      "QUALIFICATION": "Qualification", "PROPOSAL": "Proposal", "NEGOTIATION": "Negotiation",
+      "CLOSED_WON": "Closed won", "CLOSED_LOST": "Closed lost"
+    },
+    "leadSource": { "INBOUND": "Inbound", "OUTBOUND": "Outbound", "REFERRAL": "Referral" },
+    "closeReason": {
+      "WON_PRICE": "Won - price", "WON_FEATURE": "Won - feature", "WON_RELATIONSHIP": "Won - relationship", "WON_TIMING": "Won - timing",
+      "LOST_PRICE": "Lost - price", "LOST_COMPETITOR": "Lost - competitor", "LOST_NO_BUDGET": "Lost - no budget",
+      "LOST_NO_DECISION": "Lost - no decision", "LOST_NO_RESPONSE": "Lost - no response"
+    },
+    "rfmSegment": {
+      "champion": "Champion", "loyal": "Loyal", "potential": "Potential", "attention": "Needs attention", "atRisk": "At risk"
+    }
+  },
   "login": {
     "badge": "Unit 4 + Unit 5",
     "title": "Sign in to AI CRM Workbench",
