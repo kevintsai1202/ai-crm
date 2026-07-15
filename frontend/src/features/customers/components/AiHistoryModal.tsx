@@ -59,7 +59,7 @@ export function AiHistoryModal({ customerName, calls, trace, loading, onClose }:
                   <article className={`ai-history-item ${open ? "open" : ""}`} key={call.id}>
                     <button type="button" className="ai-history-head" onClick={() => setExpandedId(open ? null : call.id)}>
                       <span className="ai-history-type">{CALL_TYPE_LABELS[call.callType] ?? call.callType}</span>
-                      <span className="ai-history-time">{formatDateTime(call.createdAt, "zh-TW", "-")}</span>
+                      <span className="ai-history-time">{formatDateTime(call.createdAt)}</span>
                       {/* 模型 / fallback 標記:真實呼叫顯示模型名,否則標示為樣板回覆 */}
                       <span className={`ai-history-mode ${call.aiEnabled ? "real" : "fallback"}`}>
                         {call.aiEnabled ? (call.model ?? "LLM") : "樣板 fallback"}
