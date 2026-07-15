@@ -217,7 +217,7 @@ export function DashboardPage() {
     ...reportBlocks(reports, openDrilldown, jumpToCustomer),
     ...sentimentBlocks(sentiment, jumpToCustomer, t, i18n.language),
     rfmBlock(rfm, jumpToCustomer, t, i18n.language),
-    usageBlock(usage)
+    usageBlock(usage, t, i18n.language)
   ];
   // 角色可見的區塊 id（usage 僅 MANAGER/ADMIN）
   const roleAllowed = new Set(fullCatalog.filter((b) => b.id !== "usage" || canSeeUsage).map((b) => b.id));
