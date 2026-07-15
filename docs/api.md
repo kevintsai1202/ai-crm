@@ -149,3 +149,12 @@ For local/E2E verification without a real Vision provider, start the backend wit
 - `POST /api/meeting-copilot/sessions/{id}/confirm` (header `Idempotency-Key`, body `{ selectedChangeIds }`): atomically apply only the selected changes — create the interaction (keeping the transcript as the record of truth), the selected tasks, opportunity patch, and stakeholder suggestions. Resending the same key returns the original result; a different payload under the same key returns `409`.
 
 Low-confidence stakeholder suggestions default to unselected. After a successful confirm the audio object is deleted post-commit while the transcript is retained on the session for audit. Start the backend with `--app.transcription.fake.enabled=true` for a deterministic fake transcription client in local/E2E runs.
+
+## V25 AI follow-up email
+
+- `POST /api/customers/{id}/follow-ups/drafts` (body `{ opportunityId? }`): generate a grounded follow-up draft (version 1).
+- `PUT /api/follow-ups/drafts/{id}` (body `{ subject, body }`): a human edit creates a NEW draft version (versionNumber + 1, parentId chain) rather than overwriting.
+- `POST /api/follow-ups/drafts/{id}/approve-and-send` (header `Idempotency-Key`): approve and send via `MailDeliveryClient`. The sender is the unified company address (`app.mail.from`); `Reply-To` is the owning sales rep's email (opportunity owner first, else customer owner); sending is blocked (`400`) when the owner has no valid email. Returns an `OutboundEmail` with `status` `SENT`/`FAILED`. Resending the same key sends once and returns the original result; a different draft under the same key returns `409`.
+- `POST /api/outbound-emails/{id}/retry`: retry a `FAILED` email; `SENT` cannot be retried (`409`).
+
+Credentials are read only from backend configuration and never returned to the client or written to audit/error text. Automated tests use a deterministic fake behind `app.mail.fake.enabled`; a real send is opt-in via `LIVE_SENDMAIL_TEST=true` with `E2E_MAIL_RECIPIENT`.

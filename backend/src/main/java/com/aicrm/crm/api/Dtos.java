@@ -677,4 +677,52 @@ public final class Dtos {
     public record WorkspaceRecommendationResponse(String summary, String model, String generatedAt,
                                                   List<WorkspaceTodoItem> todos,
                                                   List<SuggestedOpportunityDraft> drafts) {}
+
+    // ===== V25 AI 跟進信與 Zeabur Sendmail =====
+
+    /** 產生跟進信草稿請求；opportunityId 選填（帶入時 grounding 納入該商機）。 */
+    public record CreateFollowUpDraftRequest(Long opportunityId) {}
+
+    /** 人工修改草稿請求（產生新版本）。 */
+    public record UpdateFollowUpDraftRequest(@NotBlank String subject, @NotBlank String body) {}
+
+    /**
+     * 跟進信草稿回應。
+     *
+     * @param id 草稿 id
+     * @param customerId 所屬客戶 id
+     * @param opportunityId 關聯商機 id（可空）
+     * @param versionNumber 版本號（1 起算，人工修改遞增）
+     * @param parentId 上一版本 id（第一版為 null）
+     * @param model 產生模型（deterministic 時為 null）
+     * @param grounding AI 引用依據（客戶／商機／近期互動）
+     * @param subject 主旨
+     * @param body 內文
+     * @param edited 是否為人工修改版本
+     * @param approvedBy 核准者（未核准為 null）
+     * @param approvedAt 核准時間（未核准為 null）
+     */
+    public record FollowUpDraftResponse(Long id, Long customerId, Long opportunityId, int versionNumber, Long parentId,
+                                        String model, String grounding, String subject, String body, boolean edited,
+                                        String approvedBy, Instant approvedAt) {}
+
+    /**
+     * 外寄郵件回應。
+     *
+     * @param id 外寄郵件 id
+     * @param draftId 來源草稿 id
+     * @param from 寄件者（統一公司信箱）
+     * @param replyTo Reply-To（負責業務 Email）
+     * @param recipient 收件者
+     * @param subject 主旨快照
+     * @param body 內文快照
+     * @param status QUEUED / SENT / FAILED
+     * @param messageId Zeabur message id（未寄出為 null）
+     * @param retryCount 重試次數
+     * @param errorSummary 去敏錯誤摘要（絕不含憑證）
+     * @param sentAt 寄出時間（未寄出為 null）
+     */
+    public record OutboundEmailResponse(Long id, Long draftId, String from, String replyTo, String recipient,
+                                        String subject, String body, String status, String messageId, int retryCount,
+                                        String errorSummary, Instant sentAt) {}
 }

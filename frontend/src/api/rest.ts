@@ -32,6 +32,8 @@ import type {
   ConfirmBusinessCardRequest,
   MeetingCopilotSessionResponse,
   MeetingCopilotConfirmResponse,
+  FollowUpDraftResponse,
+  OutboundEmailResponse,
 } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
 
@@ -105,6 +107,37 @@ export async function confirmMeetingSession(id: number, selectedChangeIds: strin
     { selectedChangeIds },
     { headers: { "Idempotency-Key": idempotencyKey } },
   );
+  return data;
+}
+
+/** 產生客戶（可選商機）的 AI 跟進信草稿。 */
+export async function createFollowUpDraft(customerId: number, opportunityId: number | null) {
+  const { data } = await apiClient.post<FollowUpDraftResponse>(
+    `/customers/${customerId}/follow-ups/drafts`,
+    { opportunityId },
+  );
+  return data;
+}
+
+/** 人工修改草稿並產生新版本。 */
+export async function updateFollowUpDraft(id: number, subject: string, body: string) {
+  const { data } = await apiClient.put<FollowUpDraftResponse>(`/follow-ups/drafts/${id}`, { subject, body });
+  return data;
+}
+
+/** 核准並透過 Zeabur Sendmail 寄送；必須帶 Idempotency-Key，重送同 key 回原結果。 */
+export async function approveAndSendFollowUp(id: number, idempotencyKey: string) {
+  const { data } = await apiClient.post<OutboundEmailResponse>(
+    `/follow-ups/drafts/${id}/approve-and-send`,
+    {},
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return data;
+}
+
+/** 重試先前寄送失敗（FAILED）的郵件。 */
+export async function retryOutboundEmail(id: number) {
+  const { data } = await apiClient.post<OutboundEmailResponse>(`/outbound-emails/${id}/retry`, {});
   return data;
 }
 

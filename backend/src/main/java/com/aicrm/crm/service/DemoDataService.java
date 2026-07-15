@@ -179,6 +179,12 @@ public class DemoDataService {
     /** 會議 Copilot session 存取：reset 時須先刪除，其 customer_id/opportunity_id FK 會阻擋正式資料清除。 */
     private final com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository;
 
+    /** 外寄郵件存取：reset 時須先於草稿刪除（FK 參照 follow_up_drafts）。 */
+    private final com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository;
+
+    /** 跟進信草稿存取：reset 時須先於客戶刪除（customer_id FK 會阻擋正式資料清除）。 */
+    private final com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -206,6 +212,8 @@ public class DemoDataService {
                            com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository,
                            com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository,
                            com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository,
+                           com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository,
+                           com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -221,6 +229,8 @@ public class DemoDataService {
         this.crmTaskRepository = crmTaskRepository;
         this.businessCardIntakeRepository = businessCardIntakeRepository;
         this.meetingCopilotSessionRepository = meetingCopilotSessionRepository;
+        this.outboundEmailRepository = outboundEmailRepository;
+        this.followUpDraftRepository = followUpDraftRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -325,6 +335,9 @@ public class DemoDataService {
      */
     private void clearBusinessData() {
         // 正式 FK 刻意禁止 cascade；只有已明確啟用的示範 reset 流程可主動清除歷史任務。
+        // 外寄郵件 → 跟進信草稿：先刪郵件（FK 參照草稿），再刪草稿（FK 參照客戶）。
+        outboundEmailRepository.deleteAllInBatch();
+        followUpDraftRepository.deleteAllInBatch();
         businessCardIntakeRepository.deleteAllInBatch();
         meetingCopilotSessionRepository.deleteAllInBatch();
         crmTaskRepository.deleteAllInBatch();

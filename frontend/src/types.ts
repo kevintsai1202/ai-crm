@@ -578,6 +578,38 @@ export interface MeetingCopilotConfirmResponse {
   stakeholderSuggestionCount: number;
 }
 
+/** AI 跟進信草稿；人工修改會產生新版本（versionNumber 遞增、parentId 指向前版）。 */
+export interface FollowUpDraftResponse {
+  id: number;
+  customerId: number;
+  opportunityId: number | null;
+  versionNumber: number;
+  parentId: number | null;
+  model: string | null;
+  grounding: string;
+  subject: string;
+  body: string;
+  edited: boolean;
+  approvedBy: string | null;
+  approvedAt: string | null;
+}
+
+/** 寄出郵件紀錄；狀態 QUEUED/SENT/FAILED，憑證不回傳。 */
+export interface OutboundEmailResponse {
+  id: number;
+  draftId: number;
+  from: string;
+  replyTo: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "QUEUED" | "SENT" | "FAILED";
+  messageId: string | null;
+  retryCount: number;
+  errorSummary: string | null;
+  sentAt: string | null;
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

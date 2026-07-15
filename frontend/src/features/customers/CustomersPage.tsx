@@ -401,6 +401,7 @@ export function CustomersPage() {
         {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
         {selected ? <button type="button" onClick={() => setShowTaskForm(true)}>☎ 安排電話</button> : null}
         {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/meeting-copilot`)}>🎙 會議 Copilot</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/follow-up`)}>✉️ AI 跟進信</button> : null}
       </div>
 
       {selected ? <TaskPanel customerId={selected.customer.id} refreshKey={taskRefreshKey} /> : null}

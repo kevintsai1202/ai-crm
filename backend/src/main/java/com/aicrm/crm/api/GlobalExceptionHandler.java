@@ -111,6 +111,25 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large", "上傳檔案超過大小限制", request);
     }
 
+    /** 跟進信寄送前置條件不符（如負責業務缺少有效 Email）回 400。 */
+    @ExceptionHandler(com.aicrm.crm.service.mail.FollowUpPreconditionException.class)
+    ResponseEntity<ProblemDetail> handleFollowUpPrecondition(com.aicrm.crm.service.mail.FollowUpPreconditionException ex,
+            HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
+    }
+
+    /** 跟進信冪等或狀態衝突（相同鍵不同 payload、已寄出不可重試）回 409。 */
+    @ExceptionHandler(com.aicrm.crm.service.mail.FollowUpConflictException.class)
+    ResponseEntity<ProblemDetail> handleFollowUpConflict(HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "跟進信寄送請求與目前狀態衝突", request);
+    }
+
+    /** 寄信服務失敗回 502（正常流程已於服務端捕捉並轉為 FAILED；此為安全網）。 */
+    @ExceptionHandler(com.aicrm.crm.service.mail.MailDeliveryException.class)
+    ResponseEntity<ProblemDetail> handleMailDelivery(HttpServletRequest request) {
+        return problem(HttpStatus.BAD_GATEWAY, "Bad Gateway", "跟進信寄送服務暫時無法使用", request);
+    }
+
     /**
      * 建立 ProblemDetail 回應。
      *

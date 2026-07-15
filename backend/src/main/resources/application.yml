@@ -110,6 +110,16 @@ app:
   # 務必以環境變數 DEMO_RESET_ENABLED=false 關閉，避免誤刪真實業務資料。
   demo:
     reset-enabled: ${DEMO_RESET_ENABLED:true}
+  # AI 跟進信與 Zeabur Sendmail 寄送設定（V25）。
+  # from：統一已驗證公司寄件者。fake.enabled=true 時啟用 deterministic FakeMailDeliveryClient（E2E/本機）。
+  # zeabur.endpoint/token：正式 Sendmail 端點與憑證；token 只從環境設定讀取，絕不回傳前端或寫入 audit。
+  mail:
+    from: ${APP_MAIL_FROM:no-reply@ai-crm.local}
+    fake:
+      enabled: ${APP_MAIL_FAKE_ENABLED:false}
+    zeabur:
+      endpoint: ${APP_MAIL_ZEABUR_ENDPOINT:}
+      token: ${APP_MAIL_ZEABUR_TOKEN:}
   # 模型測試的 max_completion_tokens 上限。推理型模型（gpt-5-mini 等）會先花大量 token 在內部
   # reasoning，上限太低（如 2000）會在輸出可見內容前就截斷成空回應；預設 8000，可以
   # MODEL_TEST_MAX_COMPLETION_TOKENS 調整。

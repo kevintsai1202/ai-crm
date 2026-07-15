@@ -38,6 +38,13 @@
 - Confirm requires an `Idempotency-Key` and applies only the selected changes in one transaction (interaction/tasks/opportunity patch/stakeholder suggestions); it never mutates opportunity stage or probability outside the explicit patch.
 - The audio is deleted post-commit while the transcript is retained on the session as the interaction record of truth.
 
+### V25 AI follow-up email
+
+- AI only drafts; a human approves before any send. Editing a draft creates a new immutable version (append-only chain) rather than overwriting.
+- Sends go through `MailDeliveryClient` (Zeabur Sendmail in production, a fake behind `app.mail.fake.enabled` for E2E). The sender is the unified verified company address; `Reply-To` is the responsible sales rep's email; a rep without a valid email blocks the send.
+- Approve-and-send requires an `Idempotency-Key`: the same key sends once and returns the same result; statuses are at least `QUEUED`/`SENT`/`FAILED`; only `FAILED` may be retried.
+- Credentials are read solely from backend configuration and never returned to the client or written into audit/error text.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。
