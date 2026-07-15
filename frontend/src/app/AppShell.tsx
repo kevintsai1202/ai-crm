@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useVersionCheck } from "../hooks/useVersionCheck";
 import type { HealthResponse } from "../types";
 import { formatDateTime } from "../lib/format";
+import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 
 /**
  * 顯示後端連線狀態，任何錯誤都以紅燈呈現。
@@ -84,6 +85,8 @@ export function AppShell() {
             <button type="button" onClick={logout}>登出</button>
           </div>
         ) : null}
+        {/* 語言切換置於側邊欄底部，登入後全站可切換介面語言 */}
+        <LanguageSwitcher className="lang-switcher" />
       </aside>
       <main className="main">
         <Outlet />
