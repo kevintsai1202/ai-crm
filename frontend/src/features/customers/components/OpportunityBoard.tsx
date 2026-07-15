@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { CustomerDetail } from "../../../types";
 import { formatMoney, stageLabel } from "../../../lib/format";
 import { updateOpportunityStage } from "../../../api";
@@ -27,6 +28,7 @@ export function OpportunityBoard({ customerId, opportunities, onStageChange, onE
   onEdit: (opportunity: CustomerDetail["opportunities"][number]) => void;
   onDelete: (opportunity: CustomerDetail["opportunities"][number]) => void;
 }) {
+  const { t, i18n } = useTranslation(["customers", "common"]);
   /** 待結案的商機（選到結案階段時暫存,待 Modal 填原因後送出）。 */
   const [pendingClose, setPendingClose] = useState<{ id: number; stage: "CLOSED_WON" | "CLOSED_LOST"; current: string } | null>(null);
   const navigate = useNavigate();
@@ -67,25 +69,25 @@ export function OpportunityBoard({ customerId, opportunities, onStageChange, onE
 
   return (
     <section className="panel">
-      <div className="panel-title"><h3>商機看板</h3><span>依階段分欄</span></div>
+      <div className="panel-title"><h3>{t("customers:opportunityBoard.title")}</h3><span>{t("customers:opportunityBoard.subtitle")}</span></div>
       <div className="kanban">
         {STAGES.map((stage) => {
           const items = opportunities.filter((o) => o.stage === stage);
           return (
             <div className="kanban-col" key={stage}>
-              <strong>{stageLabel(stage)}<span className="kanban-count">{items.length}</span></strong>
+              <strong>{t(stageLabel(stage))}<span className="kanban-count">{items.length}</span></strong>
               {items.map((opportunity) => (
                 <article className="opportunity-card" key={opportunity.id}>
                   <div className="card-actions">
-                    <button type="button" className="card-icon-btn" title="商機智能" data-testid={`oi-open-${opportunity.id}`} onClick={() => navigate(`/opportunities/${opportunity.id}/intelligence?customerId=${customerId}`)}>📊</button>
-                    <button type="button" className="card-icon-btn" title="編輯商機" onClick={() => onEdit(opportunity)}>✏️</button>
-                    <button type="button" className="card-icon-btn" title="刪除商機" onClick={() => onDelete(opportunity)}>🗑️</button>
+                    <button type="button" className="card-icon-btn" title={t("customers:opportunityBoard.intelligence")} data-testid={`oi-open-${opportunity.id}`} onClick={() => navigate(`/opportunities/${opportunity.id}/intelligence?customerId=${customerId}`)}>📊</button>
+                    <button type="button" className="card-icon-btn" title={t("customers:opportunityBoard.editOpportunity")} onClick={() => onEdit(opportunity)}>✏️</button>
+                    <button type="button" className="card-icon-btn" title={t("customers:opportunityBoard.deleteOpportunity")} onClick={() => onDelete(opportunity)}>🗑️</button>
                   </div>
                   <span>{opportunity.type}</span>
                   <b>{opportunity.name}</b>
-                  <small>{formatMoney(opportunity.amount)}</small>
+                  <small>{formatMoney(opportunity.amount, i18n.language)}</small>
                   {/* 負責業務(SP8);未指派時不顯示 */}
-                  {opportunity.ownerName ? <small className="opportunity-owner">負責：{opportunity.ownerName}</small> : null}
+                  {opportunity.ownerName ? <small className="opportunity-owner">{t("customers:opportunityBoard.ownerPrefix")}{opportunity.ownerName}</small> : null}
                   {/* 階段下拉:取代拖拽,改階段即送出(結案階段先彈 Modal) */}
                   <select
                     className="stage-select"
@@ -93,7 +95,7 @@ export function OpportunityBoard({ customerId, opportunities, onStageChange, onE
                     onChange={(e) => changeStage(opportunity.id, e.target.value, opportunity.stage)}
                   >
                     {STAGES.map((s) => (
-                      <option key={s} value={s}>{stageLabel(s)}</option>
+                      <option key={s} value={s}>{t(stageLabel(s))}</option>
                     ))}
                   </select>
                 </article>
