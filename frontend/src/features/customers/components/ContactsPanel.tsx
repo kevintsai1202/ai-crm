@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ContactResponse } from "../../../types";
 
 /**
@@ -20,14 +21,15 @@ export function ContactsPanel({
   onEdit: (contact: ContactResponse) => void;
   onDelete: (contact: ContactResponse) => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   return (
     <section className="panel">
       <div className="panel-title">
-        <h3>聯絡人</h3>
-        <button type="button" className="btn-secondary" onClick={onAdd}>+ 新增聯絡人</button>
+        <h3>{t("customers:contacts.title")}</h3>
+        <button type="button" className="btn-secondary" onClick={onAdd}>{t("customers:contacts.add")}</button>
       </div>
       {contacts.length === 0 ? (
-        <p className="contact-empty">尚無聯絡人</p>
+        <p className="contact-empty">{t("customers:contacts.empty")}</p>
       ) : (
         <div className="contact-list">
           {contacts.map((c) => (
@@ -38,8 +40,8 @@ export function ContactsPanel({
                 <small>{c.email}</small>
               </div>
               <div className="contact-actions">
-                <button type="button" className="row-btn" onClick={() => onEdit(c)}>編輯</button>
-                <button type="button" className="row-btn row-btn-danger" onClick={() => onDelete(c)}>刪除</button>
+                <button type="button" className="row-btn" onClick={() => onEdit(c)}>{t("common:actions.edit")}</button>
+                <button type="button" className="row-btn row-btn-danger" onClick={() => onDelete(c)}>{t("common:actions.delete")}</button>
               </div>
             </article>
           ))}
