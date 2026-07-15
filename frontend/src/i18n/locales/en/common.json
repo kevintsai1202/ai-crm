@@ -2,6 +2,7 @@
   "lang": { "label": "Language", "en": "English", "zh-TW": "繁體中文" },
   "noData": "No data yet",
   "notFilled": "Not filled",
+  "pagination": { "prev": "Previous page", "next": "Next page", "pageOf": "Page {{page}} of {{total}}" },
   "enums": {
     "risk": { "LOW": "Low risk", "MEDIUM": "Medium risk", "HIGH": "High risk" },
     "intent": {

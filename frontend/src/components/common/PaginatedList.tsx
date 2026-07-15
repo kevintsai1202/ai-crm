@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * 通用前端分頁清單：把超量資料切成固定每頁筆數，底部提供上一頁/下一頁。
  * 函式級註解：純前端分頁（資料已在記憶體），用於儀表板清單卡固定高度；
- * 資料量小於等於 pageSize 時不顯示分頁列。
+ * 資料量小於等於 pageSize 時不顯示分頁列。emptyText 未提供時預設用 common:noData。
  */
 interface PaginatedListProps<T> {
   /** 全部資料 */
@@ -14,11 +15,12 @@ interface PaginatedListProps<T> {
   renderRow: (item: T, index: number) => React.ReactNode;
   /** React key 產生器 */
   rowKey: (item: T, index: number) => string;
-  /** 無資料時顯示文字 */
+  /** 無資料時顯示文字；未提供則用 common:noData */
   emptyText?: string;
 }
 
-export function PaginatedList<T>({ items, pageSize = 5, renderRow, rowKey, emptyText = "尚無資料" }: PaginatedListProps<T>) {
+export function PaginatedList<T>({ items, pageSize = 5, renderRow, rowKey, emptyText }: PaginatedListProps<T>) {
+  const { t } = useTranslation("common");
   // 當前頁碼（0 起算）
   const [page, setPage] = useState(0);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
@@ -29,7 +31,7 @@ export function PaginatedList<T>({ items, pageSize = 5, renderRow, rowKey, empty
   }, [totalPages]);
 
   if (items.length === 0) {
-    return <div className="sr-empty">{emptyText}</div>;
+    return <div className="sr-empty">{emptyText ?? t("noData")}</div>;
   }
 
   const start = page * pageSize;
@@ -44,9 +46,9 @@ export function PaginatedList<T>({ items, pageSize = 5, renderRow, rowKey, empty
       </div>
       {items.length > pageSize ? (
         <div className="pagination">
-          <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>上一頁</button>
-          <span>第 {page + 1} / {totalPages} 頁</span>
-          <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}>下一頁</button>
+          <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>{t("pagination.prev")}</button>
+          <span>{t("pagination.pageOf", { page: page + 1, total: totalPages })}</span>
+          <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}>{t("pagination.next")}</button>
         </div>
       ) : null}
     </div>
