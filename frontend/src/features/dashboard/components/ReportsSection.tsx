@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { TFunction } from "i18next";
 import type { DashboardReports, DrilldownSource } from "../../../types";
 import { formatCompactMoney, formatDateTime, riskLabel, stageLabel } from "../../../lib/format";
 import { fetchDashboardReports } from "../../../api";
@@ -9,27 +10,32 @@ import { LoadingCard } from "../blockTypes";
 export type DrillFn = (type: string, key: string, title: string) => void;
 
 /**
- * 產生 7 個獨立的 CRM 報表圖表區塊（各自可拖拉與關閉）。
+ * 產生 7 個獨立的 CRM 報表圖表區塊（各自可拖拉與關閉）。非 React 元件，t/locale 由呼叫端傳入。
  * 函式級註解：reports 為 null 時各區塊以 LoadingCard 佔位；近期關鍵互動點列帶來源區塊跳客戶。
  *
  * @param reports 報表資料（可為 null）
  * @param onDrill 圖表下鑽回呼
  * @param onSelectCustomer 跳客戶回呼（帶來源區塊）
+ * @param t react-i18next 的 t 函式
+ * @param locale 目前語言，供 formatCompactMoney/formatDateTime 用
  * @returns 7 個報表區塊
  */
 export function reportBlocks(
   reports: DashboardReports | null,
   onDrill: DrillFn,
-  onSelectCustomer: (id: number, source: DrilldownSource) => void
+  onSelectCustomer: (id: number, source: DrilldownSource) => void,
+  t: TFunction,
+  locale: string
 ): DashboardBlock[] {
+  const loadingText = t("dashboard:loading");
   return [
-    { id: "chart-pipeline", title: "銷售漏斗 Pipeline", wide: true, render: () => reports ? <PipelineFunnel data={reports.pipelineByStage} onDrill={onDrill} /> : <LoadingCard title="銷售漏斗" wide /> },
-    { id: "chart-forecast", title: "月度營收 Forecast", wide: true, render: () => reports ? <MonthlyForecastChart data={reports.monthlyForecast} onDrill={onDrill} /> : <LoadingCard title="月度營收" wide /> },
-    { id: "chart-industry", title: "產業營收分布", render: () => reports ? <IndustryBreakdown data={reports.industryBreakdown} onDrill={onDrill} /> : <LoadingCard title="產業營收分布" /> },
-    { id: "chart-risk", title: "客戶風險結構", render: () => reports ? <RiskBreakdown data={reports.riskBreakdown} onDrill={onDrill} /> : <LoadingCard title="客戶風險結構" /> },
-    { id: "chart-renewal", title: "續約到期預測", render: () => reports ? <RenewalForecast data={reports.renewalForecast} onDrill={onDrill} /> : <LoadingCard title="續約到期預測" /> },
-    { id: "chart-leaderboard", title: "業務排行榜", render: () => reports ? <OwnerLeaderboard data={reports.ownerLeaderboard} onDrill={onDrill} /> : <LoadingCard title="業務排行榜" /> },
-    { id: "chart-activity", title: "近期關鍵互動", wide: true, render: () => reports ? <ActivityReportList data={reports.recentActivities} onSelectCustomer={(id) => onSelectCustomer(id, { from: "dashboard", section: "近期關鍵互動", blockId: "chart-activity" })} /> : <LoadingCard title="近期關鍵互動" wide /> }
+    { id: "chart-pipeline", title: t("dashboard:charts.pipeline.title"), wide: true, render: () => reports ? <PipelineFunnel data={reports.pipelineByStage} onDrill={onDrill} t={t} locale={locale} /> : <LoadingCard title={t("dashboard:charts.pipeline.title")} wide loadingText={loadingText} /> },
+    { id: "chart-forecast", title: t("dashboard:charts.forecast.title"), wide: true, render: () => reports ? <MonthlyForecastChart data={reports.monthlyForecast} onDrill={onDrill} t={t} /> : <LoadingCard title={t("dashboard:charts.forecast.title")} wide loadingText={loadingText} /> },
+    { id: "chart-industry", title: t("dashboard:charts.industry.title"), render: () => reports ? <IndustryBreakdown data={reports.industryBreakdown} onDrill={onDrill} t={t} locale={locale} /> : <LoadingCard title={t("dashboard:charts.industry.title")} loadingText={loadingText} /> },
+    { id: "chart-risk", title: t("dashboard:charts.risk.title"), render: () => reports ? <RiskBreakdown data={reports.riskBreakdown} onDrill={onDrill} t={t} /> : <LoadingCard title={t("dashboard:charts.risk.title")} loadingText={loadingText} /> },
+    { id: "chart-renewal", title: t("dashboard:charts.renewal.title"), render: () => reports ? <RenewalForecast data={reports.renewalForecast} onDrill={onDrill} t={t} /> : <LoadingCard title={t("dashboard:charts.renewal.title")} loadingText={loadingText} /> },
+    { id: "chart-leaderboard", title: t("dashboard:charts.leaderboard.title"), render: () => reports ? <OwnerLeaderboard data={reports.ownerLeaderboard} onDrill={onDrill} t={t} locale={locale} /> : <LoadingCard title={t("dashboard:charts.leaderboard.title")} loadingText={loadingText} /> },
+    { id: "chart-activity", title: t("dashboard:charts.activity.title"), wide: true, render: () => reports ? <ActivityReportList data={reports.recentActivities} onSelectCustomer={(id) => onSelectCustomer(id, { from: "dashboard", section: t("dashboard:charts.activity.title"), blockId: "chart-activity" })} t={t} locale={locale} /> : <LoadingCard title={t("dashboard:charts.activity.title")} wide loadingText={loadingText} /> }
   ];
 }
 
@@ -42,7 +48,7 @@ const FUNNEL_STAGE_ORDER = ["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "CLOSED_
  * 最底為實際成交(已成交)。「已流失」是掉出漏斗、非更深階段,故不納入漏斗(可在商機看板查看)。
  * 各層寬度由 CSS 階梯固定(funnel-layer-N),金額大小以橫向漸層填充比例直觀呈現。
  */
-function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByStage"]; onDrill: DrillFn }) {
+function PipelineFunnel({ data, onDrill, t, locale }: { data: DashboardReports["pipelineByStage"]; onDrill: DrillFn; t: TFunction; locale: string }) {
   // 來源切換:""=全部、INBOUND=主動上門、OUTBOUND=業務開發；非全部時 fetch 該來源的漏斗子集
   const [source, setSource] = useState<"" | "INBOUND" | "OUTBOUND" | "REFERRAL">("");
   const [stageData, setStageData] = useState(data);
@@ -73,21 +79,29 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
     { fill: "#34d399", bg: "rgba(16, 185, 129, 0.08)" }  // 已成交：翡翠綠(漏斗最底=實際成交)
   ];
 
+  // 來源切換分頁定義（value, i18n key）
+  const sourceTabs: readonly [typeof source, string][] = [
+    ["", "dashboard:charts.pipeline.sourceAll"],
+    ["INBOUND", "dashboard:charts.pipeline.sourceInbound"],
+    ["OUTBOUND", "dashboard:charts.pipeline.sourceOutbound"],
+    ["REFERRAL", "dashboard:charts.pipeline.sourceReferral"]
+  ];
+
   return (
     <article className="panel report-card wide" data-promo-chart="pipeline">
       <div className="panel-title">
-        <h3>銷售漏斗 Pipeline</h3>
-        <span>機會(上)→ 成交(下)</span>
+        <h3>{t("dashboard:charts.pipeline.title")}</h3>
+        <span>{t("dashboard:charts.pipeline.subtitle")}</span>
       </div>
       {/* 來源切換:全部 / 主動上門 / 業務開發 */}
       <div className="funnel-source-tabs">
-        {([["", "全部"], ["INBOUND", "主動上門"], ["OUTBOUND", "業務開發"], ["REFERRAL", "推薦轉介"]] as const).map(([v, label]) => (
+        {sourceTabs.map(([v, labelKey]) => (
           <button
             type="button"
             key={v}
             className={`source-tab ${source === v ? "active" : ""}`}
             onClick={() => setSource(v)}
-          >{label}</button>
+          >{t(labelKey)}</button>
         ))}
       </div>
       <div className="funnel-container">
@@ -101,27 +115,31 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
           // 組裝 CSS 漸層背景：左側亮色代表已填充數據，右側半透明代表未填充容量
           const backgroundGradient = `linear-gradient(90deg, ${colors.fill} 0%, ${colors.fill} ${amountPercent}%, ${colors.bg} ${amountPercent}%, ${colors.bg} 100%)`;
 
+          const stageText = t(stageLabel(item.stage));
+          const hoverTitle = t("dashboard:charts.pipeline.hoverTitle", { stage: stageText, count: item.count }) +
+            (item.avgDaysInStage != null ? t("dashboard:charts.pipeline.avgDaysSuffix", { days: item.avgDaysInStage }) : "") +
+            (item.overdueCount ? t("dashboard:charts.pipeline.overdueSuffix", { count: item.overdueCount }) : "");
+          const drillTitle = `${t("dashboard:charts.pipeline.title")} · ${stageText}`;
+
           return (
             <div
               className={`funnel-stage-wrapper funnel-layer-${index} clickable`}
               key={item.stage}
               style={{ background: backgroundGradient }}
-              title={`點擊查看 ${stageLabel(item.stage)} 的 ${item.count} 筆商機` +
-                (item.avgDaysInStage != null ? ` · 平均停留 ${item.avgDaysInStage} 天` : "") +
-                (item.overdueCount ? ` · ${item.overdueCount} 筆超時` : "")}
+              title={hoverTitle}
               role="button"
               tabIndex={0}
-              onClick={() => onDrill("stage", item.stage, `銷售漏斗 · ${stageLabel(item.stage)}`)}
-              onKeyDown={(e) => { if (e.key === "Enter") onDrill("stage", item.stage, `銷售漏斗 · ${stageLabel(item.stage)}`); }}
+              onClick={() => onDrill("stage", item.stage, drillTitle)}
+              onKeyDown={(e) => { if (e.key === "Enter") onDrill("stage", item.stage, drillTitle); }}
             >
               <div className="funnel-content">
-                <strong>{stageLabel(item.stage)}</strong>
+                <strong>{stageText}</strong>
                 <span>
-                  {item.count} 筆
-                  {item.avgDaysInStage != null && item.count > 0 ? ` · 均 ${item.avgDaysInStage} 天` : ""}
+                  {t("dashboard:charts.pipeline.countSuffix", { count: item.count })}
+                  {item.avgDaysInStage != null && item.count > 0 ? t("dashboard:charts.pipeline.avgDaysInline", { days: item.avgDaysInStage }) : ""}
                   {item.overdueCount ? ` · ⚠${item.overdueCount}` : ""}
                 </span>
-                <b>{formatCompactMoney(item.amount)}</b>
+                <b>{formatCompactMoney(item.amount, locale)}</b>
               </div>
             </div>
           );
@@ -134,7 +152,7 @@ function PipelineFunnel({ data, onDrill }: { data: DashboardReports["pipelineByS
 /**
  * 月度營收預測折線圖。
  */
-function MonthlyForecastChart({ data, onDrill }: { data: DashboardReports["monthlyForecast"]; onDrill: DrillFn }) {
+function MonthlyForecastChart({ data, onDrill, t }: { data: DashboardReports["monthlyForecast"]; onDrill: DrillFn; t: TFunction }) {
   // 以總額為比例基準（總額 >= 加權，確保兩條線都在繪圖範圍內）
   const max = Math.max(...data.map((item) => item.totalAmount), 1);
   const xOf = (index: number) => 24 + (index * 320) / Math.max(data.length - 1, 1);
@@ -143,8 +161,8 @@ function MonthlyForecastChart({ data, onDrill }: { data: DashboardReports["month
   const weightedPoints = data.map((item, i) => `${xOf(i)},${yOf(item.weightedAmount)}`).join(" ");
   return (
     <article className="panel report-card wide" data-promo-chart="forecast">
-      <div className="panel-title"><h3>月度營收 Forecast</h3><span>實線=總額 · 虛線=加權預測</span></div>
-      <svg className="line-chart" viewBox="0 0 368 180" role="img" aria-label="月度營收預測折線圖">
+      <div className="panel-title"><h3>{t("dashboard:charts.forecast.title")}</h3><span>{t("dashboard:charts.forecast.subtitle")}</span></div>
+      <svg className="line-chart" viewBox="0 0 368 180" role="img" aria-label={t("dashboard:charts.forecast.ariaLabel")}>
         {/* 總額 pipeline（實線） */}
         <polyline points={totalPoints} fill="none" stroke="#0f766e" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         {/* 機率加權預測（橘色虛線） */}
@@ -161,9 +179,9 @@ function MonthlyForecastChart({ data, onDrill }: { data: DashboardReports["month
             key={`hit-${item.label}`}
             className="chart-hit"
             x={xOf(index) - 16} y="0" width="32" height="180"
-            onClick={() => onDrill("forecastMonth", item.label, `月度營收 · ${item.label}`)}
+            onClick={() => onDrill("forecastMonth", item.label, `${t("dashboard:charts.forecast.title")} · ${item.label}`)}
           >
-            <title>{`點擊查看 ${item.label} 預計成交商機`}</title>
+            <title>{t("dashboard:charts.forecast.hoverTitle", { month: item.label })}</title>
           </rect>
         ))}
       </svg>
@@ -174,18 +192,18 @@ function MonthlyForecastChart({ data, onDrill }: { data: DashboardReports["month
 /**
  * 產業分布長條圖。
  */
-function IndustryBreakdown({ data, onDrill }: { data: DashboardReports["industryBreakdown"]; onDrill: DrillFn }) {
+function IndustryBreakdown({ data, onDrill, t, locale }: { data: DashboardReports["industryBreakdown"]; onDrill: DrillFn; t: TFunction; locale: string }) {
   const top = [...data].sort((a, b) => b.amount - a.amount).slice(0, 8);
   const max = Math.max(...top.map((item) => item.amount), 1);
   return (
     <article className="panel report-card" data-promo-chart="industry">
-      <div className="panel-title"><h3>產業營收分布</h3><span>點擊查看客戶</span></div>
+      <div className="panel-title"><h3>{t("dashboard:charts.industry.title")}</h3><span>{t("dashboard:charts.industry.subtitle")}</span></div>
       <div className="bar-list">
         {top.map((item) => (
-          <button type="button" className="bar-row clickable" key={item.label} onClick={() => onDrill("industry", item.label, `產業 · ${item.label}`)}>
+          <button type="button" className="bar-row clickable" key={item.label} onClick={() => onDrill("industry", item.label, t("dashboard:charts.industry.drillTitle", { label: item.label }))}>
             <span>{item.label}</span>
             <div><i style={{ width: `${Math.max(8, (item.amount / max) * 100)}%` }} /></div>
-            <b>{formatCompactMoney(item.amount)}</b>
+            <b>{formatCompactMoney(item.amount, locale)}</b>
           </button>
         ))}
       </div>
@@ -196,19 +214,22 @@ function IndustryBreakdown({ data, onDrill }: { data: DashboardReports["industry
 /**
  * 客戶風險結構甜甜圈替代圖。
  */
-function RiskBreakdown({ data, onDrill }: { data: DashboardReports["riskBreakdown"]; onDrill: DrillFn }) {
+function RiskBreakdown({ data, onDrill, t }: { data: DashboardReports["riskBreakdown"]; onDrill: DrillFn; t: TFunction }) {
   const total = data.reduce((sum, item) => sum + item.value, 0) || 1;
   return (
     <article className="panel report-card" data-promo-chart="risk">
-      <div className="panel-title"><h3>客戶風險結構</h3><span>點擊查看客戶</span></div>
+      <div className="panel-title"><h3>{t("dashboard:charts.risk.title")}</h3><span>{t("dashboard:charts.risk.subtitle")}</span></div>
       <div className="risk-report">
-        {data.map((item) => (
-          <button type="button" className={`risk-chip clickable ${item.label.toLowerCase()}`} key={item.label} onClick={() => onDrill("risk", item.label, `風險 · ${riskLabel(item.label)}`)}>
-            <strong>{riskLabel(item.label)}</strong>
-            <b>{item.value}</b>
-            <small>{Math.round((item.value / total) * 100)}%</small>
-          </button>
-        ))}
+        {data.map((item) => {
+          const label = t(riskLabel(item.label));
+          return (
+            <button type="button" className={`risk-chip clickable ${item.label.toLowerCase()}`} key={item.label} onClick={() => onDrill("risk", item.label, t("dashboard:charts.risk.drillTitle", { label }))}>
+              <strong>{label}</strong>
+              <b>{item.value}</b>
+              <small>{Math.round((item.value / total) * 100)}%</small>
+            </button>
+          );
+        })}
       </div>
     </article>
   );
@@ -217,15 +238,15 @@ function RiskBreakdown({ data, onDrill }: { data: DashboardReports["riskBreakdow
 /**
  * 續約預測圖表。
  */
-function RenewalForecast({ data, onDrill }: { data: DashboardReports["renewalForecast"]; onDrill: DrillFn }) {
+function RenewalForecast({ data, onDrill, t }: { data: DashboardReports["renewalForecast"]; onDrill: DrillFn; t: TFunction }) {
   const top = data.slice(0, 8);
   const max = Math.max(...top.map((item) => item.count), 1);
   return (
     <article className="panel report-card" data-promo-chart="renewal">
-      <div className="panel-title"><h3>續約到期預測</h3><span>點擊月份查看</span></div>
+      <div className="panel-title"><h3>{t("dashboard:charts.renewal.title")}</h3><span>{t("dashboard:charts.renewal.subtitle")}</span></div>
       <div className="renewal-bars">
         {top.map((item) => (
-          <button type="button" className="renewal-bar clickable" key={item.label} title={`點擊查看 ${item.label} 續約客戶`} onClick={() => onDrill("renewalMonth", item.label, `續約到期 · ${item.label}`)}>
+          <button type="button" className="renewal-bar clickable" key={item.label} title={t("dashboard:charts.renewal.hoverTitle", { month: item.label })} onClick={() => onDrill("renewalMonth", item.label, t("dashboard:charts.renewal.drillTitle", { label: item.label }))}>
             <span style={{ height: `${Math.max(18, (item.count / max) * 110)}px` }} />
             <small>{item.label.slice(5)}</small>
           </button>
@@ -238,16 +259,16 @@ function RenewalForecast({ data, onDrill }: { data: DashboardReports["renewalFor
 /**
  * 業務排行榜報表。
  */
-function OwnerLeaderboard({ data, onDrill }: { data: DashboardReports["ownerLeaderboard"]; onDrill: DrillFn }) {
+function OwnerLeaderboard({ data, onDrill, t, locale }: { data: DashboardReports["ownerLeaderboard"]; onDrill: DrillFn; t: TFunction; locale: string }) {
   return (
     <article className="panel report-card" data-promo-chart="leaderboard">
-      <div className="panel-title"><h3>業務排行榜</h3><span>點擊查看客戶</span></div>
+      <div className="panel-title"><h3>{t("dashboard:charts.leaderboard.title")}</h3><span>{t("dashboard:charts.leaderboard.subtitle")}</span></div>
       <div className="leaderboard">
         {data.map((owner, index) => (
-          <button type="button" className="leader-row clickable" key={owner.ownerName} onClick={() => onDrill("owner", owner.ownerName, `業務 · ${owner.ownerName}`)}>
+          <button type="button" className="leader-row clickable" key={owner.ownerName} onClick={() => onDrill("owner", owner.ownerName, t("dashboard:charts.leaderboard.drillTitle", { label: owner.ownerName }))}>
             <b>{index + 1}</b>
-            <span>{owner.ownerName}<small>{owner.customerCount} 客戶 / 高風險 {owner.highRiskCount}</small></span>
-            <strong>{formatCompactMoney(owner.opportunityAmount)}</strong>
+            <span>{owner.ownerName}<small>{t("dashboard:charts.leaderboard.customersSuffix", { count: owner.customerCount })} / {t("dashboard:charts.leaderboard.highRiskSuffix", { count: owner.highRiskCount })}</small></span>
+            <strong>{formatCompactMoney(owner.opportunityAmount, locale)}</strong>
           </button>
         ))}
       </div>
@@ -258,15 +279,15 @@ function OwnerLeaderboard({ data, onDrill }: { data: DashboardReports["ownerLead
 /**
  * 近期活動報表。
  */
-function ActivityReportList({ data, onSelectCustomer }: { data: DashboardReports["recentActivities"]; onSelectCustomer: (id: number) => void }) {
+function ActivityReportList({ data, onSelectCustomer, t, locale }: { data: DashboardReports["recentActivities"]; onSelectCustomer: (id: number) => void; t: TFunction; locale: string }) {
   return (
     <article className="panel report-card wide" data-promo-chart="activity">
-      <div className="panel-title"><h3>近期關鍵互動</h3><span>點擊跳到客戶</span></div>
+      <div className="panel-title"><h3>{t("dashboard:charts.activity.title")}</h3><span>{t("dashboard:charts.activity.subtitle")}</span></div>
       <div className="activity-report">
         {data.map((activity) => (
           <button type="button" className="activity-item clickable" key={`${activity.customerId}-${activity.occurredAt}`} onClick={() => onSelectCustomer(activity.customerId)}>
             <strong>{activity.customerName}</strong>
-            <span>{activity.type} / {formatDateTime(activity.occurredAt)}</span>
+            <span>{activity.type} / {formatDateTime(activity.occurredAt, locale, t("common:noData"))}</span>
             <p>{activity.content}</p>
           </button>
         ))}

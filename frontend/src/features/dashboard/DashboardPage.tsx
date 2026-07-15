@@ -214,7 +214,7 @@ export function DashboardPage() {
   // 完整區塊目錄（一律含 usage）：提供穩定的 id 與跨度供版面幾何/預設使用
   const fullCatalog: DashboardBlock[] = [
     ...kpiBlocks(dashboard, riskCounts, t, i18n.language),
-    ...reportBlocks(reports, openDrilldown, jumpToCustomer),
+    ...reportBlocks(reports, openDrilldown, jumpToCustomer, t, i18n.language),
     ...sentimentBlocks(sentiment, jumpToCustomer, t, i18n.language),
     rfmBlock(rfm, jumpToCustomer, t, i18n.language),
     usageBlock(usage, t, i18n.language)
