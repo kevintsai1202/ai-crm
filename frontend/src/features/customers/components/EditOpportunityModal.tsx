@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { OpportunityResponse } from "../../../types";
 
 /**
@@ -19,6 +20,7 @@ export function EditOpportunityModal({
   onSubmit: (data: { name: string; amount: number; expectedCloseDate: string | null; type: string; leadSource: string; probability: number | null }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   /** 解析表單並回傳資料；金額轉數字，預計成交日空字串轉 null。 */
   function handle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,31 +42,31 @@ export function EditOpportunityModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>編輯商機 — {opportunity.name}</h3>
-        <label>商機名稱 <input name="name" type="text" required defaultValue={opportunity.name} /></label>
-        <label>金額(元) <input name="amount" type="number" min="0" step="1000" required defaultValue={opportunity.amount} /></label>
-        <label>預計成交日 <input name="expectedCloseDate" type="date" defaultValue={opportunity.expectedCloseDate ?? ""} /></label>
-        <label>類型
+        <h3>{t("customers:editOpportunityModal.title", { name: opportunity.name })}</h3>
+        <label>{t("customers:form.opportunityName")} <input name="name" type="text" required defaultValue={opportunity.name} /></label>
+        <label>{t("customers:form.amount")} <input name="amount" type="number" min="0" step="1000" required defaultValue={opportunity.amount} /></label>
+        <label>{t("customers:form.expectedCloseDate")} <input name="expectedCloseDate" type="date" defaultValue={opportunity.expectedCloseDate ?? ""} /></label>
+        <label>{t("customers:form.type")}
           <select name="type" required defaultValue={opportunity.type}>
-            <option value="NEW_BUSINESS">新單</option>
-            <option value="RENEWAL">續約</option>
+            <option value="NEW_BUSINESS">{t("customers:enumsOpportunityType.NEW_BUSINESS")}</option>
+            <option value="RENEWAL">{t("customers:enumsOpportunityType.RENEWAL")}</option>
             {/* 若現有類型不在標準選項中，補一個保留原值的選項，避免下拉預設值失效 */}
             {opportunity.type !== "NEW_BUSINESS" && opportunity.type !== "RENEWAL" ? (
               <option value={opportunity.type}>{opportunity.type}</option>
             ) : null}
           </select>
         </label>
-        <label>來源
+        <label>{t("customers:form.leadSource")}
           <select name="leadSource" required defaultValue={opportunity.leadSource}>
-            <option value="OUTBOUND">業務開發</option>
-            <option value="INBOUND">主動上門</option>
-            <option value="REFERRAL">推薦轉介</option>
+            <option value="OUTBOUND">{t("common:enums.leadSource.OUTBOUND")}</option>
+            <option value="INBOUND">{t("common:enums.leadSource.INBOUND")}</option>
+            <option value="REFERRAL">{t("common:enums.leadSource.REFERRAL")}</option>
           </select>
         </label>
-        <label>成交機率(%) <input name="probability" type="number" min="0" max="100" defaultValue={opportunity.probability ?? ""} placeholder="留空則依階段預設" /></label>
+        <label>{t("customers:form.probability")} <input name="probability" type="number" min="0" max="100" defaultValue={opportunity.probability ?? ""} placeholder={t("customers:form.probabilityPlaceholder")} /></label>
         <div className="modal-actions">
-          <button type="submit">儲存</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("common:actions.save")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
