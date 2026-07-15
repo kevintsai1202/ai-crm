@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { InteractionResponse } from "../../../types";
 
 /**
@@ -19,6 +20,8 @@ export function EditInteractionModal({
   onSubmit: (data: { type: string; occurredAt: string; content: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
+
   /** 將後端時間字串轉為 datetime-local 可用的 yyyy-MM-ddTHH:mm（取前 16 字元）。 */
   function toLocalInput(value: string): string {
     return value ? value.slice(0, 16) : "";
@@ -39,20 +42,20 @@ export function EditInteractionModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>編輯互動</h3>
-        <label>類型
+        <h3>{t("customers:editInteractionModal.title")}</h3>
+        <label>{t("customers:form.type")}
           <select name="type" required defaultValue={interaction.type}>
-            <option value="PHONE">電話</option>
-            <option value="MEETING">會議</option>
-            <option value="EMAIL">Email</option>
-            <option value="SUPPORT_TICKET">客服工單</option>
+            <option value="PHONE">{t("customers:enumsInteractionType.PHONE")}</option>
+            <option value="MEETING">{t("customers:enumsInteractionType.MEETING")}</option>
+            <option value="EMAIL">{t("customers:enumsInteractionType.EMAIL")}</option>
+            <option value="SUPPORT_TICKET">{t("customers:enumsInteractionType.SUPPORT_TICKET")}</option>
           </select>
         </label>
-        <label>時間 <input name="occurredAt" type="datetime-local" required defaultValue={toLocalInput(interaction.occurredAt)} /></label>
-        <label>內容 <textarea name="content" rows={3} required defaultValue={interaction.content} /></label>
+        <label>{t("customers:form.occurredAt")} <input name="occurredAt" type="datetime-local" required defaultValue={toLocalInput(interaction.occurredAt)} /></label>
+        <label>{t("customers:form.content")} <textarea name="content" rows={3} required defaultValue={interaction.content} /></label>
         <div className="modal-actions">
-          <button type="submit">儲存</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("common:actions.save")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
