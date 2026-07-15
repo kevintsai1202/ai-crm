@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { CustomerDetail } from "../../../types";
 import { formatDateTime, intentLabel } from "../../../lib/format";
 
@@ -31,6 +32,7 @@ export function Timeline({
   onEdit: (interaction: CustomerDetail["interactions"][number]) => void;
   onDelete: (interaction: CustomerDetail["interactions"][number]) => void;
 }) {
+  const { t, i18n } = useTranslation(["customers", "common"]);
   // 目前選取查看的互動 id（null 表示未選）
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -49,10 +51,11 @@ export function Timeline({
     const ticks: { left: number; label: string }[] = [];
     const cursor = new Date(start.getFullYear(), start.getMonth() + 1, 1);
     while (cursor.getTime() <= end.getTime()) {
-      ticks.push({ left: ((cursor.getTime() - start.getTime()) / span) * 100, label: `${cursor.getMonth() + 1}月` });
+      ticks.push({ left: ((cursor.getTime() - start.getTime()) / span) * 100, label: t("customers:timeline.monthTick", { month: cursor.getMonth() + 1 }) });
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return { dots, ticks, hiddenCount: interactions.length - dots.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interactions]);
 
   // 目前選取的互動(供下方詳情卡)
@@ -61,19 +64,19 @@ export function Timeline({
   return (
     <section className="panel">
       <div className="panel-title">
-        <h3>互動時間線</h3>
-        <span>近 {MONTHS_WINDOW} 個月{hiddenCount > 0 ? ` · 另有 ${hiddenCount} 筆較早` : ""}</span>
+        <h3>{t("customers:timeline.title")}</h3>
+        <span>{t("customers:timeline.recentMonths", { months: MONTHS_WINDOW })}{hiddenCount > 0 ? t("customers:timeline.hiddenSuffix", { count: hiddenCount }) : ""}</span>
       </div>
 
       {dots.length === 0 ? (
-        <p className="trace-empty">近 {MONTHS_WINDOW} 個月內無互動紀錄。</p>
+        <p className="trace-empty">{t("customers:timeline.empty", { months: MONTHS_WINDOW })}</p>
       ) : (
         <>
           {/* 橫向時間軸:水平線 + 月份刻度 + 互動色點 */}
           <div className="tl-axis">
             <div className="tl-line" />
-            {ticks.map((t, i) => (
-              <span className="tl-tick" key={i} style={{ left: `${t.left}%` }}>{t.label}</span>
+            {ticks.map((tick, i) => (
+              <span className="tl-tick" key={i} style={{ left: `${tick.left}%` }}>{tick.label}</span>
             ))}
             {dots.map((d) => (
               <button
@@ -81,9 +84,9 @@ export function Timeline({
                 key={d.item.id}
                 className={`tl-dot ${sentimentClass(d.item.sentiment)} ${selectedId === d.item.id ? "sel" : ""}`}
                 style={{ left: `${d.left}%` }}
-                title={`${formatDateTime(d.item.occurredAt)}｜${d.item.type}`}
+                title={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))}｜${d.item.type}`}
                 onClick={() => setSelectedId(selectedId === d.item.id ? null : d.item.id)}
-                aria-label={`${formatDateTime(d.item.occurredAt)} ${d.item.type}`}
+                aria-label={`${formatDateTime(d.item.occurredAt, i18n.language, t("common:noData"))} ${d.item.type}`}
               />
             ))}
           </div>
@@ -94,17 +97,17 @@ export function Timeline({
               <span className="timeline-meta">
                 {selected.sentiment ? <i className={`sr-dot ${sentimentClass(selected.sentiment)}`} title={selected.sentiment} /> : null}
                 {selected.type}
-                {intentLabel(selected.intent) ? <span className="sr-tag">{intentLabel(selected.intent)}</span> : null}
+                {intentLabel(selected.intent) ? <span className="sr-tag">{t(intentLabel(selected.intent))}</span> : null}
               </span>
-              <strong>{formatDateTime(selected.occurredAt)}</strong>
+              <strong>{formatDateTime(selected.occurredAt, i18n.language, t("common:noData"))}</strong>
               <p>{selected.content}</p>
               <div className="row-actions">
-                <button type="button" className="row-btn" onClick={() => onEdit(selected)}>編輯</button>
-                <button type="button" className="row-btn row-btn-danger" onClick={() => onDelete(selected)}>刪除</button>
+                <button type="button" className="row-btn" onClick={() => onEdit(selected)}>{t("common:actions.edit")}</button>
+                <button type="button" className="row-btn row-btn-danger" onClick={() => onDelete(selected)}>{t("common:actions.delete")}</button>
               </div>
             </article>
           ) : (
-            <p className="tl-hint">點時間軸上的色點查看該次互動內容（顏色代表情緒）。</p>
+            <p className="tl-hint">{t("customers:timeline.hint")}</p>
           )}
         </>
       )}
