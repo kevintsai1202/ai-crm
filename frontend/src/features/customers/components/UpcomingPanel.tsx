@@ -1,12 +1,7 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type { CustomerDetail } from "../../../types";
 import { formatDate, formatMoney, stageLabel } from "../../../lib/format";
-
-/** 待跟進事件的種類與對應顯示 class。 */
-type UpcomingKind = { label: string; cls: string };
-const KIND_INTERACTION: UpcomingKind = { label: "即將互動", cls: "interaction" };
-const KIND_RENEWAL: UpcomingKind = { label: "續約到期", cls: "renewal" };
-const KIND_OPPORTUNITY: UpcomingKind = { label: "商機成交", cls: "opportunity" };
 
 /** 未來幾天視為「即將」。 */
 const AHEAD_DAYS = 7;
@@ -19,6 +14,13 @@ const AHEAD_DAYS = 7;
  * @param detail 客戶詳情
  */
 export function UpcomingPanel({ detail }: { detail: CustomerDetail }) {
+  const { t, i18n } = useTranslation(["customers", "common"]);
+
+  // 事件種類 → CSS class 與 i18n key 對照（元件內部常數，依賴 t，故放函式體內而非模組層級）
+  const KIND_INTERACTION = { labelKey: "customers:upcoming.kindInteraction", cls: "interaction" } as const;
+  const KIND_RENEWAL = { labelKey: "customers:upcoming.kindRenewal", cls: "renewal" } as const;
+  const KIND_OPPORTUNITY = { labelKey: "customers:upcoming.kindOpportunity", cls: "opportunity" } as const;
+
   const events = useMemo(() => {
     const now = new Date();
     const end = new Date();
@@ -26,37 +28,38 @@ export function UpcomingPanel({ detail }: { detail: CustomerDetail }) {
     // 判斷日期字串是否落在 [now, now+7d]
     const within = (dateStr: string | null | undefined) => {
       if (!dateStr) return false;
-      const t = new Date(dateStr).getTime();
-      return t >= now.getTime() && t <= end.getTime();
+      const t2 = new Date(dateStr).getTime();
+      return t2 >= now.getTime() && t2 <= end.getTime();
     };
-    const list: { kind: UpcomingKind; date: string; label: string }[] = [];
+    const list: { kind: { labelKey: string; cls: string }; date: string; label: string }[] = [];
     // ① 未來日期的互動
     detail.interactions.filter((i) => within(i.occurredAt)).forEach((i) =>
-      list.push({ kind: KIND_INTERACTION, date: i.occurredAt, label: `${i.type}：${i.content}` })
+      list.push({ kind: KIND_INTERACTION, date: i.occurredAt, label: t("customers:upcoming.interactionLabel", { type: i.type, content: i.content }) })
     );
     // ② 續約日落在本週
     if (within(detail.customer.renewalDueDate)) {
-      list.push({ kind: KIND_RENEWAL, date: detail.customer.renewalDueDate as string, label: "合約續約到期日" });
+      list.push({ kind: KIND_RENEWAL, date: detail.customer.renewalDueDate as string, label: t("customers:upcoming.renewalLabel") });
     }
     // ③ 商機預計成交日落在本週
     detail.opportunities.filter((o) => within(o.expectedCloseDate)).forEach((o) =>
-      list.push({ kind: KIND_OPPORTUNITY, date: o.expectedCloseDate as string, label: `${o.name}（${stageLabel(o.stage)}・${formatMoney(o.amount)}）` })
+      list.push({ kind: KIND_OPPORTUNITY, date: o.expectedCloseDate as string, label: t("customers:upcoming.opportunityLabel", { name: o.name, stage: t(stageLabel(o.stage)), amount: formatMoney(o.amount, i18n.language) }) })
     );
     // 依日期由近到遠排序
     return list.sort((a, b) => a.date.localeCompare(b.date));
-  }, [detail]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail, i18n.language]);
 
   return (
     <section className="panel upcoming-panel">
-      <div className="panel-title"><h3>本週待跟進</h3><span>未來 {AHEAD_DAYS} 天</span></div>
+      <div className="panel-title"><h3>{t("customers:upcoming.title")}</h3><span>{t("customers:upcoming.aheadDays", { days: AHEAD_DAYS })}</span></div>
       {events.length === 0 ? (
-        <p className="trace-empty">未來 {AHEAD_DAYS} 天沒有排定的互動、續約或商機到期。</p>
+        <p className="trace-empty">{t("customers:upcoming.empty", { days: AHEAD_DAYS })}</p>
       ) : (
         <div className="upcoming-list">
           {events.map((e, i) => (
             <div className="upcoming-item" key={i}>
-              <span className={`upcoming-kind k-${e.kind.cls}`}>{e.kind.label}</span>
-              <strong>{formatDate(e.date)}</strong>
+              <span className={`upcoming-kind k-${e.kind.cls}`}>{t(e.kind.labelKey)}</span>
+              <strong>{formatDate(e.date, i18n.language, t("common:noData"))}</strong>
               <p>{e.label}</p>
             </div>
           ))}
