@@ -1,16 +1,10 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useTranslation } from "react-i18next";
 import type { AgentTraceResponse, AiCallHistoryItem } from "../../../types";
 import { formatDateTime } from "../../../lib/format";
 import { AiBadge } from "../../../components/common/AiBadge";
-
-/** AI 呼叫類型的中文標籤。 */
-const CALL_TYPE_LABELS: Record<string, string> = {
-  CHAT: "對話",
-  ASSESSMENT: "整體評估",
-  PORTFOLIO: "Portfolio 評估"
-};
 
 /**
  * AI 歷程 Modal：列出該客戶歷次 AI 呼叫(新到舊)與 Agent 決策歷程(GOAP 步驟)。
@@ -30,6 +24,7 @@ export function AiHistoryModal({ customerName, calls, trace, loading, onClose }:
   loading: boolean;
   onClose: () => void;
 }) {
+  const { t, i18n } = useTranslation(["customers", "common"]);
   // 目前展開中的呼叫 id(清單預設收合答案,點選展開,避免一次塞入大量長文)
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -38,31 +33,32 @@ export function AiHistoryModal({ customerName, calls, trace, loading, onClose }:
       <div className="modal-content report-modal" onClick={(e) => e.stopPropagation()}>
         <div className="report-header">
           <div>
-            <h3>AI 歷程 — {customerName} <AiBadge onDark /></h3>
-            <small>歷次 AI 呼叫與 Agent 決策步驟</small>
+            <h3>{t("customers:aiHistory.title", { name: customerName })} <AiBadge onDark /></h3>
+            <small>{t("customers:aiHistory.subtitle")}</small>
           </div>
-          <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+          <button type="button" className="chat-close" onClick={onClose} aria-label={t("common:actions.close")}>✕</button>
         </div>
 
         <div className="report-body">
           {/* 區段一:歷次 AI 呼叫紀錄 */}
-          <h4 className="ai-history-section">AI 呼叫歷史（{calls.length}）</h4>
+          <h4 className="ai-history-section">{t("customers:aiHistory.callsHeading", { count: calls.length })}</h4>
           {loading ? (
-            <p className="chat-typing">載入中<span>…</span></p>
+            <p className="chat-typing">{t("customers:aiHistory.loading")}<span>…</span></p>
           ) : calls.length === 0 ? (
-            <p className="trace-empty">此客戶尚無 AI 呼叫紀錄。點「整體評估」或「詢問 AI 助理」後即會記錄。</p>
+            <p className="trace-empty">{t("customers:aiHistory.empty")}</p>
           ) : (
             <div className="ai-history-list">
               {calls.map((call) => {
                 const open = expandedId === call.id;
+                const callTypeLabel = t(`customers:aiHistory.callTypes.${call.callType}`, { defaultValue: call.callType });
                 return (
                   <article className={`ai-history-item ${open ? "open" : ""}`} key={call.id}>
                     <button type="button" className="ai-history-head" onClick={() => setExpandedId(open ? null : call.id)}>
-                      <span className="ai-history-type">{CALL_TYPE_LABELS[call.callType] ?? call.callType}</span>
-                      <span className="ai-history-time">{formatDateTime(call.createdAt)}</span>
+                      <span className="ai-history-type">{callTypeLabel}</span>
+                      <span className="ai-history-time">{formatDateTime(call.createdAt, i18n.language, t("common:noData"))}</span>
                       {/* 模型 / fallback 標記:真實呼叫顯示模型名,否則標示為樣板回覆 */}
                       <span className={`ai-history-mode ${call.aiEnabled ? "real" : "fallback"}`}>
-                        {call.aiEnabled ? (call.model ?? "LLM") : "樣板 fallback"}
+                        {call.aiEnabled ? (call.model ?? "LLM") : t("customers:aiHistory.fallbackMode")}
                       </span>
                       <span className="ai-history-toggle">{open ? "▲" : "▼"}</span>
                     </button>
@@ -78,8 +74,8 @@ export function AiHistoryModal({ customerName, calls, trace, loading, onClose }:
           )}
 
           {/* 區段二:Agent 決策歷程(GOAP 步驟) */}
-          <h4 className="ai-history-section">Agent 決策歷程</h4>
-          <p className="trace-intro">AI 助理分析此客戶的決策步驟,顯示如何一步步檢索資料、評估風險並產生建議。</p>
+          <h4 className="ai-history-section">{t("customers:aiHistory.traceHeading")}</h4>
+          <p className="trace-intro">{t("customers:aiHistory.traceIntro")}</p>
           {trace ? (
             <>
               <p className="recommendation">{trace.finalRecommendation}</p>
@@ -93,11 +89,11 @@ export function AiHistoryModal({ customerName, calls, trace, loading, onClose }:
                 ))}
               </div>
             </>
-          ) : <p className="trace-empty">尚無 Agent 決策歷程。</p>}
+          ) : <p className="trace-empty">{t("customers:aiHistory.traceEmpty")}</p>}
         </div>
 
         <div className="report-footer">
-          <button type="button" onClick={onClose}>關閉</button>
+          <button type="button" onClick={onClose}>{t("common:actions.close")}</button>
         </div>
       </div>
     </div>
