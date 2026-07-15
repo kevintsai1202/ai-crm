@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { CustomerSummary, OwnerOption } from "../../../types";
 
 /**
@@ -31,6 +32,7 @@ export function EditCustomerModal({
   }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   // 找出目前負責業務帳號 id（以顯示名稱比對 owners 清單），供下拉預設值使用
   const currentOwner = owners.find((o) => o.displayName === customer.ownerName);
 
@@ -65,27 +67,27 @@ export function EditCustomerModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>編輯客戶 — {customer.name}</h3>
-        <label>名稱 <input name="name" required defaultValue={customer.name} /></label>
-        <label>Email <input name="email" type="email" required defaultValue={customer.email} /></label>
-        <label>電話 <input name="phone" placeholder="0912345678" required defaultValue={customer.phone} /></label>
-        <label>統編 <input name="taxId" placeholder="12345678" required defaultValue={customer.taxId} /></label>
-        <label>產業 <input name="industry" required defaultValue={customer.industry} /></label>
+        <h3>{t("customers:editCustomerModal.title", { name: customer.name })}</h3>
+        <label>{t("customers:form.name")} <input name="name" required defaultValue={customer.name} /></label>
+        <label>{t("customers:form.email")} <input name="email" type="email" required defaultValue={customer.email} /></label>
+        <label>{t("customers:form.phone")} <input name="phone" placeholder={t("customers:form.phonePlaceholder")} required defaultValue={customer.phone} /></label>
+        <label>{t("customers:form.taxId")} <input name="taxId" placeholder={t("customers:form.taxIdPlaceholder")} required defaultValue={customer.taxId} /></label>
+        <label>{t("customers:form.industry")} <input name="industry" required defaultValue={customer.industry} /></label>
         <label>
-          負責業務
+          {t("customers:form.owner")}
           <select name="ownerId" required defaultValue={currentOwner ? String(currentOwner.id) : ""}>
-            {owners.length === 0 ? <option value="" disabled>無可指派業務</option> : null}
+            {owners.length === 0 ? <option value="" disabled>{t("customers:form.noAssignableOwner")}</option> : null}
             {owners.map((o) => (
               <option key={o.id} value={o.id}>{o.displayName}</option>
             ))}
           </select>
         </label>
-        <label>合約起始日 <input name="contractStartDate" type="date" defaultValue="" /></label>
-        <label>合約到期日 <input name="contractEndDate" type="date" defaultValue="" /></label>
-        <label>續約日 <input name="renewalDueDate" type="date" defaultValue={toDateInput(customer.renewalDueDate)} /></label>
+        <label>{t("customers:form.contractStart")} <input name="contractStartDate" type="date" defaultValue="" /></label>
+        <label>{t("customers:form.contractEnd")} <input name="contractEndDate" type="date" defaultValue="" /></label>
+        <label>{t("customers:form.renewalDue")} <input name="renewalDueDate" type="date" defaultValue={toDateInput(customer.renewalDueDate)} /></label>
         <div className="modal-actions">
-          <button type="submit">儲存</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{t("common:actions.save")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
