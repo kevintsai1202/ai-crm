@@ -52,6 +52,12 @@
 - Snapshots are retained as history for a trend; the intelligence tab shows the score, component breakdown, evidence, trend, and next-best-action, and can create a task or open the follow-up composer.
 - Decision-chain completeness degrades gracefully (contact-count proxy) until V27 stakeholder data exists.
 
+### V27 stakeholder decision map
+
+- `stakeholder_roles` and `stakeholder_relations` carry role/influence/stance/relation with a `source` (AI/MANUAL) and a `status` (SUGGESTED/CONFIRMED/REJECTED).
+- AI suggestions and confirmed facts are always distinguishable: the map response keeps them in separate fields, confirmed items render solid, and pending suggestions render dashed with a pending badge.
+- Suggest is deterministic and idempotent; confirm promotes a suggestion to a fact; reject keeps an audit row that is never shown as a fact or in the pending list; cross-customer relations are rejected.
+
 1. 建立 Windows + PowerShell 7+ 可驗證的前後端分離 monorepo。
 2. 後端提供 CRM REST API、JWT 認證、角色授權、全域錯誤處理與 AI 教學流程。
 3. 前端提供登入、Dashboard、客戶列表、客戶詳情、互動時間線、商機看板、AI 助理與 Agent Trace。

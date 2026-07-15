@@ -10,6 +10,7 @@ import { BusinessCardWizardPage } from "./features/business-card/BusinessCardWiz
 import { MeetingCopilotPage } from "./features/meeting-copilot/MeetingCopilotPage";
 import { FollowUpComposer } from "./features/follow-up/FollowUpComposer";
 import { OpportunityIntelligenceTab } from "./features/opportunity-intelligence/OpportunityIntelligenceTab";
+import { StakeholderMapTab } from "./features/stakeholder-map/StakeholderMapTab";
 import { AdminUsersPage } from "./features/admin/AdminUsersPage";
 import AdminSettingsPage from "./features/admin/AdminSettingsPage";
 import { TeamAnalyticsPage } from "./features/team/TeamAnalyticsPage";
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/customers/:customerId/meeting-copilot" element={<MeetingCopilotPage />} />
           <Route path="/customers/:customerId/follow-up" element={<FollowUpComposer />} />
           <Route path="/opportunities/:opportunityId/intelligence" element={<OpportunityIntelligenceTab />} />
+          <Route path="/customers/:customerId/stakeholder-map" element={<StakeholderMapTab />} />
           <Route element={<ManagerRoute />}>
             <Route path="/team" element={<TeamAnalyticsPage />} />
           </Route>

@@ -7,6 +7,12 @@ import com.aicrm.crm.domain.LeadSource;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.OpportunityType;
 import com.aicrm.crm.domain.Role;
+import com.aicrm.crm.domain.StakeholderInfluence;
+import com.aicrm.crm.domain.StakeholderRelationType;
+import com.aicrm.crm.domain.StakeholderRoleType;
+import com.aicrm.crm.domain.StakeholderSource;
+import com.aicrm.crm.domain.StakeholderStance;
+import com.aicrm.crm.domain.StakeholderSuggestionStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -763,4 +769,75 @@ public final class Dtos {
     public record OpportunityHealthResponse(Long opportunityId, int totalScore, List<HealthComponentDto> components,
                                             String nextBestAction, String ruleVersion, String model, Instant calculatedAt,
                                             List<HealthTrendPoint> trend) {}
+
+    // ===== V27 Stakeholder 決策鏈 =====
+
+    /**
+     * Stakeholder 決策角色（可為已確認事實或待確認建議，以 status 區分）。
+     *
+     * @param id 角色資料主鍵
+     * @param contactId 綁定的聯絡人 id
+     * @param contactName 聯絡人姓名
+     * @param contactTitle 聯絡人職稱
+     * @param roleType 決策角色類型
+     * @param influence 影響力
+     * @param stance 立場
+     * @param confidence 信心分數（0–100）
+     * @param source 資料來源（AI / MANUAL）
+     * @param status 確認狀態（SUGGESTED / CONFIRMED / REJECTED）
+     */
+    public record StakeholderRoleDto(Long id, Long contactId, String contactName, String contactTitle,
+                                     StakeholderRoleType roleType, StakeholderInfluence influence,
+                                     StakeholderStance stance, int confidence, StakeholderSource source,
+                                     StakeholderSuggestionStatus status) {}
+
+    /**
+     * Stakeholder 關係（兩位同客戶 Contact；可為已確認事實或待確認建議，以 status 區分）。
+     *
+     * @param id 關係資料主鍵
+     * @param fromContactId 起點聯絡人 id
+     * @param fromContactName 起點聯絡人姓名
+     * @param toContactId 終點聯絡人 id
+     * @param toContactName 終點聯絡人姓名
+     * @param relationType 關係類型
+     * @param source 資料來源（AI / MANUAL）
+     * @param status 確認狀態
+     */
+    public record StakeholderRelationDto(Long id, Long fromContactId, String fromContactName, Long toContactId,
+                                         String toContactName, StakeholderRelationType relationType,
+                                         StakeholderSource source, StakeholderSuggestionStatus status) {}
+
+    /**
+     * 待確認建議包裝（可為角色或關係，以 kind 與 suggestionId 前綴區分；confirm / reject 以 suggestionId 對應）。
+     *
+     * @param suggestionId 建議識別碼（role-{id} 或 relation-{id}）
+     * @param kind 建議種類（ROLE / RELATION）
+     * @param status 建議目前狀態
+     * @param role kind=ROLE 時的角色內容（否則 null）
+     * @param relation kind=RELATION 時的關係內容（否則 null）
+     */
+    public record StakeholderSuggestionDto(String suggestionId, String kind, StakeholderSuggestionStatus status,
+                                           StakeholderRoleDto role, StakeholderRelationDto relation) {}
+
+    /**
+     * 客戶決策鏈圖回應：已確認事實與待確認建議分開欄位，明確可區分。
+     *
+     * @param customerId 客戶 id
+     * @param confirmedRoles 已確認角色（事實）
+     * @param confirmedRelations 已確認關係（事實）
+     * @param suggestions 待確認建議（SUGGESTED；不含 REJECTED）
+     */
+    public record StakeholderMapResponse(Long customerId, List<StakeholderRoleDto> confirmedRoles,
+                                         List<StakeholderRelationDto> confirmedRelations,
+                                         List<StakeholderSuggestionDto> suggestions) {}
+
+    /**
+     * 手動新增 Stakeholder 關係請求。
+     *
+     * @param fromContactId 起點聯絡人 id
+     * @param toContactId 終點聯絡人 id
+     * @param relationType 關係類型
+     */
+    public record CreateStakeholderRelationRequest(@NotNull Long fromContactId, @NotNull Long toContactId,
+                                                   @NotNull StakeholderRelationType relationType) {}
 }

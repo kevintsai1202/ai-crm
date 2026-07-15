@@ -165,3 +165,12 @@ Credentials are read only from backend configuration and never returned to the c
 - `POST /api/opportunities/{id}/health/recalculate`: recompute and store a new snapshot (history retained for the trend). Owner-scoped.
 
 The score is produced by a pure, deterministic calculator (`sum(components) == total`); the LLM only phrases the next-best-action and falls back to a deterministic message. This feature never modifies opportunity stage or probability. Scoring dimensions: stage dwell, expected close date, interaction heat, sentiment/intent signals, task status, and decision-chain completeness (degrades gracefully until V27 stakeholder data exists).
+
+## V27 stakeholder decision map
+
+- `GET /api/customers/{id}/stakeholder-map`: return the map with confirmed facts and pending AI suggestions in separate fields — `confirmedRoles`, `confirmedRelations`, and `suggestions` (SUGGESTED only). Rejected items appear in neither. Owner-scoped.
+- `POST /api/customers/{id}/stakeholder-map/suggest`: deterministically derive role/relation suggestions from the customer's contacts (idempotent — re-suggesting does not duplicate). Owner-scoped.
+- `POST /api/customers/{id}/stakeholder-map/relations`: manually create a MANUAL/CONFIRMED relation between two contacts of the same customer; a cross-customer pair is rejected (`400`).
+- `POST /api/stakeholder-suggestions/{id}/confirm` and `.../reject`: the suggestion id is a token (`role-{id}` / `relation-{id}`). Confirm promotes a suggestion to a confirmed fact; reject keeps an audit row (REJECTED) that is never shown as a fact or in the pending list.
+
+AI suggestions and human-confirmed facts are always distinguishable via `status` and `source`; the UI renders confirmed items solid and pending suggestions dashed with a pending badge.

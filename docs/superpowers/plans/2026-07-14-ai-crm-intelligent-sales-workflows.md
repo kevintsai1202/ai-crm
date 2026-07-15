@@ -32,8 +32,8 @@
 - [x] Phase 4 / V24：音訊轉錄與 Meeting Copilot。
 - [x] Phase 5 / V25：AI 跟進信與 Zeabur Sendmail。
 - [x] Phase 6 / V26：商機健康度與下一最佳行動。
-- [ ] Phase 7 / V27：Stakeholder 決策鏈與關係圖。
-- [ ] Final Audit：V21–V27 requirement-by-requirement 證據完整。
+- [x] Phase 7 / V27：Stakeholder 決策鏈與關係圖。
+- [x] Final Audit：V21–V27 requirement-by-requirement 證據完整。
 
 ---
 
@@ -781,4 +781,34 @@ pnpm --dir frontend exec playwright test e2e/v21-model-capability.spec.ts e2e/v2
 | V24 | 已完成（本回合實測） | 本回合待提交：V24 migration/domain/repo、transcription client + fake、MeetingCopilotService/Controller、前端 meeting-copilot UI 與 E2E | 後端全量 `mvn -pl backend test` **217 passed / 0 failed / 2 skipped**（含 MeetingCopilotService/IntegrationTest 7）；前端 `tsc` 0、`vitest` 38 passed、`build` 綠 | Flyway `24` success；確認後音訊實查 `DELETED`、transcript 保留 | `v24-meeting-copilot.spec.ts` **1 passed**（真實 MinIO：上傳轉錄→只套用選定變更→音訊刪除→逐字稿保留、低信心 stakeholder 預設不選） | 尚未執行 | 以 `app.transcription.fake.enabled` fake 轉錄跑 E2E；草稿為 deterministic 產生（AI 僅在轉錄邊界）；stakeholder 建議暫記數不落實體待 V27 |
 | V25 | 已完成（本回合實測） | 本回合待提交：V25 migration/domain/repo、mail client + fake、FollowUpService/Controller、前端 follow-up UI 與 E2E | 後端全量 `mvn -pl backend test` **229 passed / 0 failed / 2 skipped**（含 FollowUpService/IntegrationTest 12）；前端 `tsc` 0、`vitest` 41 passed、`build` 綠 | Flyway `25` success | `v25-follow-up-email.spec.ts` **1 passed**（真實 MinIO 後端：草擬→存新版本→經 fake Sendmail 寄送→驗 Reply-To=owner／收件者=客戶 Email） | 未執行（自動測試僅用 fake；需 LIVE_SENDMAIL_TEST+E2E_MAIL_RECIPIENT 才實寄） | FAILED/retry 與冪等 send-once 由後端單元測試涵蓋（fake 無狀態故不在 UI E2E 驗）；憑證只從後端設定讀取、不回前端/audit |
 | V26 | 已完成（本回合實測） | 本回合待提交：V26 migration/domain/repo、OpportunityHealthCalculator/IntelligenceService/Controller、前端 opportunity-intelligence UI 與 E2E | 後端全量 `mvn -pl backend test` **241 passed / 0 failed / 2 skipped**（含 Calculator 8 + Integration 4）；前端 `tsc` 0、`vitest` 12 檔綠、`build` 綠 | Flyway `26` success | `v26-opportunity-intelligence.spec.ts` **1 passed**（健康度總分/可解釋分項/重算趨勢；驗重算後 stage/probability 不變；跟進信導航） | 不適用 | Calculator 純函式 sum==total 不呼叫 LLM；下一最佳行動 deterministic；決策鏈完整度以聯絡人數 proxy，待 V27 強化 |
-| V27 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 尚未執行 | 不適用 | 尚未執行 |
+| V27 | 已完成（本回合實測） | 本回合待提交：V27 migration/domain/repo、StakeholderMapService/Controller、前端 stakeholder-map UI 與 E2E | 後端全量 `mvn -pl backend test` **250 passed / 0 failed / 2 skipped**（含 StakeholderMapService 5 + Integration 4）；前端 `tsc` 0、`vitest` 47 passed、`build` 綠 | Flyway `27` success | `v27-stakeholder-map.spec.ts` **1 passed**（AI 建議待確認不進事實圖、confirm 成事實、reject 保留 audit 不顯示） | 不適用 | 建議 deterministic 冪等；事實/建議分欄可區分；跨 customer relation 400；新增 manual relations 端點作為跨客戶驗證入口 |
+
+---
+
+## Final Audit（2026-07-15，本回合實測）
+
+依 spec §5–§11 逐項對照，證據為本回合實際執行結果。
+
+| Spec 需求 | 證據 | 狀態 |
+| --- | --- | --- |
+| §5 V21 模型能力治理／OCR·Transcription assignment | `SystemSettingModelCapabilityTest`、`OpenAiCompatibleModelCatalogClientTest`、`AdminModelCapabilityIntegrationTest`；`v21-model-capability.spec.ts` passed | ✅ |
+| §6 V22 CRM Task/Activity 與 `.ics` | `CrmTaskServiceTest`、`IcsCalendarServiceTest`、`TaskSecurityIntegrationTest`；`v22-tasks.spec.ts` passed | ✅ |
+| §7 V23 Temporary Media（S3/MinIO）＋名片辨識＋確認冪等＋原圖刪除 | `S3TemporaryMediaStore(IT/Test)`、`TemporaryMediaServiceTest`、`BusinessCardIntakeServiceTest`、`BusinessCardIntegrationTest`；`v23-business-card.spec.ts` 2 passed（媒體實查 DELETED） | ✅ |
+| §8 V24 會議 Copilot 轉錄＋選擇性套用＋音訊刪除＋逐字稿保留 | `MeetingCopilotServiceTest`、`MeetingCopilotIntegrationTest`；`v24-meeting-copilot.spec.ts` passed（音訊 DELETED、transcript 保留、低信心預設不選） | ✅ |
+| §9 V25 跟進信草稿版本化＋approve-and-send（統一寄件者/Reply-To/冪等/FAILED-retry/憑證保護） | `FollowUpServiceTest`(9)、`FollowUpIntegrationTest`(3)；`v25-follow-up-email.spec.ts` passed（Reply-To=owner、收件者=客戶） | ✅（fake mail；實寄需 LIVE_SENDMAIL_TEST） |
+| §10 V26 商機健康度（sum==total、可解釋、不改 stage/probability、歷史趨勢） | `OpportunityHealthCalculatorTest`(8)、`OpportunityIntelligenceIntegrationTest`(4)；`v26-opportunity-intelligence.spec.ts` passed（驗 stage/probability 不變） | ✅ |
+| §11 V27 決策鏈（事實/建議可區分、confirm 成事實、reject 保留 audit、跨客戶拒絕） | `StakeholderMapServiceTest`(5)、`StakeholderMapIntegrationTest`(4)；`v27-stakeholder-map.spec.ts` passed | ✅ |
+| 全後端回歸 | `mvn -pl backend test`：**250 passed / 0 failed / 2 skipped**（2 skip 為 opt-in live smoke） | ✅ |
+| 前端型別/單元/build | `tsc --noEmit` exit 0；`vitest` 47 passed；`pnpm build` 綠 | ✅ |
+| 全 E2E 序列回歸 | `playwright test --workers=1 v21..v27`：**8 passed**（含 sp1 慣例；平行會因共享全域 AI 設定互相干擾，故 `playwright.config.ts` 固定 `workers:1`） | ✅ |
+| PostgreSQL `15432` Flyway | `flyway_schema_history` 版本 `21..27` 皆 `success=t`（實查） | ✅ |
+
+**未驗證（明列，不以 fake 冒充）：**
+- Zeabur Sendmail 實際寄送（V25）：自動測試僅用 deterministic fake；正式寄送需 `LIVE_SENDMAIL_TEST=true` + `E2E_MAIL_RECIPIENT` opt-in，尚未執行。
+- 正式 Vision／Transcription provider（V23/V24）：以 property-gated fake（`app.vision.fake.enabled`／`app.transcription.fake.enabled`）跑 E2E；未對真實外部 provider 驗證。
+
+**計畫外補強（已標註）：**
+- 新增 property-gated fake client：`FakeBusinessCardRecognitionClient`、`FakeTranscriptionClient`、`FakeMailDeliveryClient`（讓 live 後端 E2E 無需真實金鑰）。
+- 修正既有缺陷：`TemporaryMediaService.deleteConfirmed` 於 afterCommit 改用 `REQUIRES_NEW` 交易，避免確認後媒體狀態寫入被靜默忽略。
+- 前端 `api.ts` 已模組化為 `api/`，新程式一律 import `../../api/index`（計畫原假設單檔 `api.ts`）。
+- V27 新增 `POST /customers/{id}/stakeholder-map/relations` 作為 MANUAL 關係與跨客戶驗證入口。

@@ -188,6 +188,12 @@ public class DemoDataService {
     /** 商機健康度 snapshot 存取：reset 時須先於商機刪除（opportunity_id FK 會阻擋商機清除）。 */
     private final com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository;
 
+    /** Stakeholder 關係存取：reset 時須先於聯絡人刪除（from/to_contact_id FK 會阻擋聯絡人清除）。 */
+    private final com.aicrm.crm.repository.StakeholderRelationRepository stakeholderRelationRepository;
+
+    /** Stakeholder 決策角色存取：reset 時須先於聯絡人刪除（contact_id FK 會阻擋聯絡人清除）。 */
+    private final com.aicrm.crm.repository.StakeholderRoleRepository stakeholderRoleRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -218,6 +224,8 @@ public class DemoDataService {
                            com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository,
                            com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository,
                            com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository,
+                           com.aicrm.crm.repository.StakeholderRelationRepository stakeholderRelationRepository,
+                           com.aicrm.crm.repository.StakeholderRoleRepository stakeholderRoleRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -236,6 +244,8 @@ public class DemoDataService {
         this.outboundEmailRepository = outboundEmailRepository;
         this.followUpDraftRepository = followUpDraftRepository;
         this.opportunityHealthSnapshotRepository = opportunityHealthSnapshotRepository;
+        this.stakeholderRelationRepository = stakeholderRelationRepository;
+        this.stakeholderRoleRepository = stakeholderRoleRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -348,6 +358,9 @@ public class DemoDataService {
         crmTaskRepository.deleteAllInBatch();
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();
+        // Stakeholder 關係 / 角色參照 contacts（from/to_contact_id、contact_id FK），須先於聯絡人刪除。
+        stakeholderRelationRepository.deleteAllInBatch();
+        stakeholderRoleRepository.deleteAllInBatch();
         contactRepository.deleteAllInBatch();
         // 商機健康度 snapshot 參照商機（opportunity_id FK），須先於商機刪除。
         opportunityHealthSnapshotRepository.deleteAllInBatch();

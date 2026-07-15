@@ -638,6 +638,54 @@ export interface OpportunityHealthResponse {
   trend: HealthTrendPoint[];
 }
 
+/** Stakeholder 建議/確認狀態；enum 以字串序列化。 */
+export type StakeholderSuggestionStatus = "SUGGESTED" | "CONFIRMED" | "REJECTED";
+/** 資料來源：AI 建議或人工。 */
+export type StakeholderSource = "AI" | "MANUAL";
+
+/** Stakeholder 決策角色（綁定 Contact）。 */
+export interface StakeholderRoleDto {
+  id: number;
+  contactId: number;
+  contactName: string;
+  contactTitle: string | null;
+  roleType: string;
+  influence: string;
+  stance: string;
+  confidence: number;
+  source: StakeholderSource;
+  status: StakeholderSuggestionStatus;
+}
+
+/** Stakeholder 關係（兩位同客戶 Contact）。 */
+export interface StakeholderRelationDto {
+  id: number;
+  fromContactId: number;
+  fromContactName: string;
+  toContactId: number;
+  toContactName: string;
+  relationType: string;
+  source: StakeholderSource;
+  status: StakeholderSuggestionStatus;
+}
+
+/** 待確認建議（角色或關係擇一）。 */
+export interface StakeholderSuggestionDto {
+  suggestionId: string;
+  kind: "ROLE" | "RELATION";
+  status: StakeholderSuggestionStatus;
+  role: StakeholderRoleDto | null;
+  relation: StakeholderRelationDto | null;
+}
+
+/** 決策鏈圖回應：已確認事實與待確認建議分開。 */
+export interface StakeholderMapResponse {
+  customerId: number;
+  confirmedRoles: StakeholderRoleDto[];
+  confirmedRelations: StakeholderRelationDto[];
+  suggestions: StakeholderSuggestionDto[];
+}
+
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
 export interface AiProviderItem {
   id: number;

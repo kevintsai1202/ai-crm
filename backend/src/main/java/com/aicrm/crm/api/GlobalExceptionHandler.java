@@ -130,6 +130,19 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_GATEWAY, "Bad Gateway", "跟進信寄送服務暫時無法使用", request);
     }
 
+    /** Stakeholder 決策鏈輸入驗證失敗（如跨 customer 的關係）回 400。 */
+    @ExceptionHandler(com.aicrm.crm.service.StakeholderValidationException.class)
+    ResponseEntity<ProblemDetail> handleStakeholderValidation(com.aicrm.crm.service.StakeholderValidationException ex,
+            HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage(), request);
+    }
+
+    /** Stakeholder 建議狀態衝突（重複確認 / 拒絕）回 409。 */
+    @ExceptionHandler(com.aicrm.crm.service.StakeholderConflictException.class)
+    ResponseEntity<ProblemDetail> handleStakeholderConflict(HttpServletRequest request) {
+        return problem(HttpStatus.CONFLICT, "Conflict", "Stakeholder 建議已被確認或拒絕，無法重複處理", request);
+    }
+
     /**
      * 建立 ProblemDetail 回應。
      *

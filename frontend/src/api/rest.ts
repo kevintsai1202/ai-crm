@@ -35,6 +35,8 @@ import type {
   FollowUpDraftResponse,
   OutboundEmailResponse,
   OpportunityHealthResponse,
+  StakeholderMapResponse,
+  StakeholderSuggestionDto,
 } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
 
@@ -151,6 +153,30 @@ export async function fetchOpportunityHealth(opportunityId: number) {
 /** 重算商機健康度並保留歷史 snapshot。 */
 export async function recalculateOpportunityHealth(opportunityId: number) {
   const { data } = await apiClient.post<OpportunityHealthResponse>(`/opportunities/${opportunityId}/health/recalculate`, {});
+  return data;
+}
+
+/** 取得客戶決策鏈圖（已確認事實 + 待確認 AI 建議分開）。 */
+export async function fetchStakeholderMap(customerId: number) {
+  const { data } = await apiClient.get<StakeholderMapResponse>(`/customers/${customerId}/stakeholder-map`);
+  return data;
+}
+
+/** 由現有聯絡人 deterministic 產生 AI 決策鏈建議。 */
+export async function suggestStakeholders(customerId: number) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto[]>(`/customers/${customerId}/stakeholder-map/suggest`, {});
+  return data;
+}
+
+/** 確認一則建議，轉為已確認事實。 */
+export async function confirmStakeholderSuggestion(suggestionId: string) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto>(`/stakeholder-suggestions/${suggestionId}/confirm`, {});
+  return data;
+}
+
+/** 拒絕一則建議，保留 audit 但不顯示為事實。 */
+export async function rejectStakeholderSuggestion(suggestionId: string) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto>(`/stakeholder-suggestions/${suggestionId}/reject`, {});
   return data;
 }
 
