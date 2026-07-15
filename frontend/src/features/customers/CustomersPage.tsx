@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   addInteraction, createContact, createCustomer, createOpportunity, deleteContact, deleteCustomer,
   deleteInteraction, deleteOpportunity, fetchAgentTrace, fetchCustomerAiCalls, fetchCustomerAssessmentStream,
@@ -36,6 +37,7 @@ import { TaskPanel } from "../tasks/TaskPanel";
  * 函式級註解：選取客戶以 URL :id 為單一真實來源；切換 :id 時載入詳情與 Agent Trace。
  */
 export function CustomersPage() {
+  const { t, i18n } = useTranslation(["customers", "common"]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -225,7 +227,7 @@ export function CustomersPage() {
   /** 刪除客戶：確認後刪除，成功導回列表並重載。 */
   async function handleDeleteCustomer() {
     if (!selected) return;
-    if (!window.confirm("確定刪除此客戶?此動作無法復原。")) return;
+    if (!window.confirm(t("customers:confirm.deleteCustomer"))) return;
     await deleteCustomer(selected.customer.id);
     navigate("/customers");
     await loadCustomers();
@@ -245,7 +247,7 @@ export function CustomersPage() {
 
   /** 刪除聯絡人：確認後刪除，成功後重載詳情。 */
   async function handleDeleteContact(contact: ContactResponse) {
-    if (!window.confirm(`確定刪除聯絡人「${contact.name}」?此動作無法復原。`)) return;
+    if (!window.confirm(t("customers:confirm.deleteContact", { name: contact.name }))) return;
     await deleteContact(contact.id);
     await reloadSelectedDetail();
   }
@@ -260,7 +262,7 @@ export function CustomersPage() {
 
   /** 刪除商機：確認後刪除，成功後重載詳情。 */
   async function handleDeleteOpportunity(opportunity: OpportunityResponse) {
-    if (!window.confirm(`確定刪除商機「${opportunity.name}」?此動作無法復原。`)) return;
+    if (!window.confirm(t("customers:confirm.deleteOpportunity", { name: opportunity.name }))) return;
     await deleteOpportunity(opportunity.id);
     await reloadSelectedDetail();
   }
@@ -275,7 +277,7 @@ export function CustomersPage() {
 
   /** 刪除互動:確認後刪除,成功後重載詳情。 */
   async function handleDeleteInteraction(interaction: InteractionResponse) {
-    if (!window.confirm("確定刪除此互動紀錄?此動作無法復原。")) return;
+    if (!window.confirm(t("customers:confirm.deleteInteraction"))) return;
     await deleteInteraction(interaction.id);
     await reloadSelectedDetail();
   }
@@ -301,7 +303,7 @@ export function CustomersPage() {
   function openCustomerAssessment() {
     if (!selected) return;
     const name = selected.customer.name;
-    const title = `整體評估 — ${name}`;
+    const title = t("customers:assessment.title", { name });
     setReport({ open: true, title, loading: true, streaming: true, markdown: "" });
     let acc = "";
     fetchCustomerAssessmentStream(
@@ -311,7 +313,7 @@ export function CustomersPage() {
           acc += chunk.delta;
           setReport((r) => (r ? { ...r, loading: false, streaming: true, markdown: acc } : r));
         } else if (chunk.type === "risk" && chunk.risk) {
-          setReport((r) => (r ? { ...r, meta: `流失風險 ${chunk.risk.churnRisk} · 續約延遲 ${chunk.risk.renewalDelayRisk}` } : r));
+          setReport((r) => (r ? { ...r, meta: t("customers:assessment.riskMeta", { churn: chunk.risk.churnRisk, renewal: chunk.risk.renewalDelayRisk }) } : r));
         } else if (chunk.type === "callId") {
           setReport((r) => (r ? { ...r, callId: chunk.callId } : r));
         }
@@ -319,7 +321,7 @@ export function CustomersPage() {
       () => setReport((r) => (r ? { ...r, loading: false, streaming: false } : r)),
       (e) => {
         console.error("客戶整體評估失敗:", e);
-        setReport((r) => (r ? { ...r, loading: false, streaming: false, markdown: acc || "⚠️ 產生評估失敗，請稍後再試。" } : r));
+        setReport((r) => (r ? { ...r, loading: false, streaming: false, markdown: acc || t("customers:assessment.error") } : r));
       }
     );
   }
@@ -348,61 +350,61 @@ export function CustomersPage() {
       {source?.from === "dashboard" ? (
         <Breadcrumb
           crumbs={[
-            { label: "儀表板", onClick: () => navigate("/dashboard", { state: { scrollTo: source.blockId } }) },
+            { label: t("customers:breadcrumb.dashboard"), onClick: () => navigate("/dashboard", { state: { scrollTo: source.blockId } }) },
             { label: source.section, onClick: () => navigate("/dashboard", { state: { scrollTo: source.blockId } }) },
-            { label: selected?.customer.name ?? "客戶" }
+            { label: selected?.customer.name ?? t("customers:breadcrumb.customerFallback") }
           ]}
         />
       ) : null}
       <section className="topbar">
         <div>
           <p>Hahow AI Full-stack Teaching Build</p>
-          <h2>客戶工作台</h2>
+          <h2>{t("customers:topbar.title")}</h2>
         </div>
         <form className="search-box" onSubmit={handleSearch}>
-          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="名稱 / Email / 電話 / 統編" />
+          <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t("customers:topbar.searchPlaceholder")} />
           <select value={industry} onChange={(e) => setIndustry(e.target.value)}>
-            <option value="">全部產業</option>
+            <option value="">{t("customers:filters.allIndustries")}</option>
             {filterOptions.industries.map((it) => (
               <option key={it} value={it}>{it}</option>
             ))}
           </select>
           <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-            <option value="">全部業務</option>
+            <option value="">{t("customers:filters.allOwners")}</option>
             {filterOptions.owners.map((o) => (
               <option key={o.id} value={o.displayName}>{o.displayName}</option>
             ))}
           </select>
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">全部狀態</option>
-            <option value="ACTIVE">使用中</option>
-            <option value="INACTIVE">停用</option>
-            <option value="LEVERAGED">重點客戶</option>
+            <option value="">{t("customers:filters.allStatuses")}</option>
+            <option value="ACTIVE">{t("customers:enums.status.ACTIVE")}</option>
+            <option value="INACTIVE">{t("customers:enums.status.INACTIVE")}</option>
+            <option value="LEVERAGED">{t("customers:enums.status.LEVERAGED")}</option>
           </select>
           <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
-            <option value="">全部風險</option>
-            <option value="HIGH">高風險</option>
-            <option value="MEDIUM">中風險</option>
-            <option value="LOW">低風險</option>
+            <option value="">{t("customers:filters.allRisk")}</option>
+            <option value="HIGH">{t("common:enums.risk.HIGH")}</option>
+            <option value="MEDIUM">{t("common:enums.risk.MEDIUM")}</option>
+            <option value="LOW">{t("common:enums.risk.LOW")}</option>
           </select>
           {/* 續約到期日區間 */}
-          <input type="date" value={renewalFrom} onChange={(e) => setRenewalFrom(e.target.value)} title="續約到期日(起)" />
-          <input type="date" value={renewalTo} onChange={(e) => setRenewalTo(e.target.value)} title="續約到期日(迄)" />
-          <button type="submit">搜尋</button>
-          <button type="button" className="btn-secondary" onClick={handleResetFilters}>清除</button>
+          <input type="date" value={renewalFrom} onChange={(e) => setRenewalFrom(e.target.value)} title={t("customers:filters.renewalFrom")} />
+          <input type="date" value={renewalTo} onChange={(e) => setRenewalTo(e.target.value)} title={t("customers:filters.renewalTo")} />
+          <button type="submit">{t("customers:filters.search")}</button>
+          <button type="button" className="btn-secondary" onClick={handleResetFilters}>{t("customers:filters.clear")}</button>
         </form>
       </section>
 
       <div className="action-bar">
-        <button type="button" className="btn-assess" onClick={() => setAiModalOpen(true)}>✨ AI 工作建議</button>
-        <button type="button" onClick={() => setShowAddCustomer(true)}>+ 新增客戶</button>
-        <button type="button" onClick={() => navigate("/business-cards/new")}>📇 名片建檔</button>
-        {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>+ 新增互動</button> : null}
-        {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
-        {selected ? <button type="button" onClick={() => setShowTaskForm(true)}>☎ 安排電話</button> : null}
-        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/meeting-copilot`)}>🎙 會議 Copilot</button> : null}
-        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/follow-up`)}>✉️ AI 跟進信</button> : null}
-        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/stakeholder-map`)}>🕸 決策鏈</button> : null}
+        <button type="button" className="btn-assess" onClick={() => setAiModalOpen(true)}>{t("customers:actionBar.aiSuggestions")}</button>
+        <button type="button" onClick={() => setShowAddCustomer(true)}>{t("customers:actionBar.addCustomer")}</button>
+        <button type="button" onClick={() => navigate("/business-cards/new")}>{t("customers:actionBar.businessCard")}</button>
+        {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>{t("customers:actionBar.addInteraction")}</button> : null}
+        {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>{t("customers:actionBar.addOpportunity")}</button> : null}
+        {selected ? <button type="button" onClick={() => setShowTaskForm(true)}>{t("customers:actionBar.scheduleCall")}</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/meeting-copilot`)}>{t("customers:actionBar.meetingCopilot")}</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/follow-up`)}>{t("customers:actionBar.followUpEmail")}</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/stakeholder-map`)}>{t("customers:actionBar.stakeholderMap")}</button> : null}
       </div>
 
       {selected ? <TaskPanel customerId={selected.customer.id} refreshKey={taskRefreshKey} /> : null}
