@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { CustomerSummary } from "../../../types";
 import { riskLabel } from "../../../lib/format";
 
@@ -5,11 +6,12 @@ import { riskLabel } from "../../../lib/format";
  * 客戶列表，支援選取客戶與空結果提示。
  */
 export function CustomerList({ customers, selectedId, onSelect, loading }: { customers: CustomerSummary[]; selectedId?: number; onSelect: (id: number) => void; loading?: boolean }) {
+  const { t } = useTranslation(["customers", "common"]);
   return (
     <section className="panel customer-list">
       <div className="panel-title">
-        <h3>客戶列表</h3>
-        <span>{customers.length} 筆</span>
+        <h3>{t("customers:list.title")}</h3>
+        <span>{t("customers:list.countSuffix", { count: customers.length })}</span>
       </div>
       {loading ? (
         <div className="skeleton-list">
@@ -17,8 +19,8 @@ export function CustomerList({ customers, selectedId, onSelect, loading }: { cus
         </div>
       ) : customers.length === 0 ? (
         <div className="empty-state-box">
-          <p>查無符合條件的客戶</p>
-          <small>請調整搜尋條件或清除篩選</small>
+          <p>{t("customers:list.emptyTitle")}</p>
+          <small>{t("customers:list.emptyHint")}</small>
         </div>
       ) : (
         customers.map((customer) => (
@@ -28,7 +30,7 @@ export function CustomerList({ customers, selectedId, onSelect, loading }: { cus
               <strong>{customer.name}</strong>
               <small>{customer.industry} / {customer.ownerName}</small>
             </div>
-            <em>{riskLabel(customer.riskLevel)}</em>
+            <em>{t(riskLabel(customer.riskLevel))}</em>
           </button>
         ))
       )}
