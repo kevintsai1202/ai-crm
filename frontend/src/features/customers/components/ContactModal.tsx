@@ -1,4 +1,5 @@
 import { FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { ContactResponse } from "../../../types";
 
 /**
@@ -19,6 +20,7 @@ export function ContactModal({
   onSubmit: (data: { name: string; title: string; email: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(["customers", "common"]);
   // 是否為編輯模式（用於標題與按鈕文字）
   const isEdit = Boolean(contact);
 
@@ -36,13 +38,13 @@ export function ContactModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>{isEdit ? "編輯聯絡人" : "新增聯絡人"}</h3>
-        <label>姓名 <input name="name" required defaultValue={contact?.name ?? ""} /></label>
-        <label>職稱 <input name="title" defaultValue={contact?.title ?? ""} /></label>
-        <label>Email <input name="email" type="email" required defaultValue={contact?.email ?? ""} /></label>
+        <h3>{isEdit ? t("customers:contactModal.editTitle") : t("customers:contactModal.addTitle")}</h3>
+        <label>{t("customers:contacts.name")} <input name="name" required defaultValue={contact?.name ?? ""} /></label>
+        <label>{t("customers:contacts.title_")} <input name="title" defaultValue={contact?.title ?? ""} /></label>
+        <label>{t("customers:contacts.email")} <input name="email" type="email" required defaultValue={contact?.email ?? ""} /></label>
         <div className="modal-actions">
-          <button type="submit">{isEdit ? "儲存" : "新增"}</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit">{isEdit ? t("common:actions.save") : t("common:actions.add")}</button>
+          <button type="button" onClick={onClose}>{t("common:actions.cancel")}</button>
         </div>
       </form>
     </div>
