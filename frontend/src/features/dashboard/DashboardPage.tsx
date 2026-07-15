@@ -215,7 +215,7 @@ export function DashboardPage() {
   const fullCatalog: DashboardBlock[] = [
     ...kpiBlocks(dashboard, riskCounts, t, i18n.language),
     ...reportBlocks(reports, openDrilldown, jumpToCustomer),
-    ...sentimentBlocks(sentiment, jumpToCustomer),
+    ...sentimentBlocks(sentiment, jumpToCustomer, t, i18n.language),
     rfmBlock(rfm, jumpToCustomer, t, i18n.language),
     usageBlock(usage)
   ];
