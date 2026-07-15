@@ -25,7 +25,195 @@ import type {
   SentimentRadarResponse,
   UsageSummaryResponse
 } from "../types";
+import type { CreateCrmTaskRequest, CrmTask } from "../types";
+import type {
+  BusinessCardConfirmResponse,
+  BusinessCardIntakeResponse,
+  ConfirmBusinessCardRequest,
+  MeetingCopilotSessionResponse,
+  MeetingCopilotConfirmResponse,
+  FollowUpDraftResponse,
+  OutboundEmailResponse,
+  OpportunityHealthResponse,
+  StakeholderMapResponse,
+  StakeholderSuggestionDto,
+} from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
+
+/** 取得登入者可見的正式 CRM 任務。 */
+export async function fetchTasks() {
+  const { data } = await apiClient.get<CrmTask[]>("/tasks");
+  return data;
+}
+
+/** 上傳名片圖片並建立辨識工作，回傳初始 intake（狀態多為 PROCESSING）。 */
+export async function createBusinessCardIntake(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await apiClient.post<BusinessCardIntakeResponse>(
+    "/business-card-intakes",
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return data;
+}
+
+/** 輪詢名片辨識結果，直到後端狀態變為 REVIEW_PENDING / FAILED / CONFIRMED。 */
+export async function fetchBusinessCardIntake(id: number) {
+  const { data } = await apiClient.get<BusinessCardIntakeResponse>(`/business-card-intakes/${id}`);
+  return data;
+}
+
+/**
+ * 人工確認名片並原子寫入四類 CRM 資料。
+ * 必須帶 Idempotency-Key，後端以該 key 防止重複建檔；重送同 key 回傳原結果。
+ */
+export async function confirmBusinessCardIntake(
+  id: number,
+  request: ConfirmBusinessCardRequest,
+  idempotencyKey: string,
+) {
+  const { data } = await apiClient.post<BusinessCardConfirmResponse>(
+    `/business-card-intakes/${id}/confirm`,
+    request,
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return data;
+}
+
+/** 上傳會議音訊並建立轉錄/草稿 session（需已設定 Transcription 模型）。 */
+export async function createMeetingSession(file: File, customerId: number, opportunityId: number | null) {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("customerId", String(customerId));
+  if (opportunityId != null) form.append("opportunityId", String(opportunityId));
+  const { data } = await apiClient.post<MeetingCopilotSessionResponse>(
+    "/meeting-copilot/sessions",
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return data;
+}
+
+/** 輪詢會議 session 的轉錄、摘要與結構化草稿。 */
+export async function fetchMeetingSession(id: number) {
+  const { data } = await apiClient.get<MeetingCopilotSessionResponse>(`/meeting-copilot/sessions/${id}`);
+  return data;
+}
+
+/**
+ * 選擇性確認會議變更並原子套用。必須帶 Idempotency-Key；重送同 key 回原結果。
+ */
+export async function confirmMeetingSession(id: number, selectedChangeIds: string[], idempotencyKey: string) {
+  const { data } = await apiClient.post<MeetingCopilotConfirmResponse>(
+    `/meeting-copilot/sessions/${id}/confirm`,
+    { selectedChangeIds },
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return data;
+}
+
+/** 產生客戶（可選商機）的 AI 跟進信草稿。 */
+export async function createFollowUpDraft(customerId: number, opportunityId: number | null) {
+  const { data } = await apiClient.post<FollowUpDraftResponse>(
+    `/customers/${customerId}/follow-ups/drafts`,
+    { opportunityId },
+  );
+  return data;
+}
+
+/** 人工修改草稿並產生新版本。 */
+export async function updateFollowUpDraft(id: number, subject: string, body: string) {
+  const { data } = await apiClient.put<FollowUpDraftResponse>(`/follow-ups/drafts/${id}`, { subject, body });
+  return data;
+}
+
+/** 核准並透過 Zeabur Sendmail 寄送；必須帶 Idempotency-Key，重送同 key 回原結果。 */
+export async function approveAndSendFollowUp(id: number, idempotencyKey: string) {
+  const { data } = await apiClient.post<OutboundEmailResponse>(
+    `/follow-ups/drafts/${id}/approve-and-send`,
+    {},
+    { headers: { "Idempotency-Key": idempotencyKey } },
+  );
+  return data;
+}
+
+/** 重試先前寄送失敗（FAILED）的郵件。 */
+export async function retryOutboundEmail(id: number) {
+  const { data } = await apiClient.post<OutboundEmailResponse>(`/outbound-emails/${id}/retry`, {});
+  return data;
+}
+
+/** 取得商機健康度（含分項、依據、趨勢與下一最佳行動）。 */
+export async function fetchOpportunityHealth(opportunityId: number) {
+  const { data } = await apiClient.get<OpportunityHealthResponse>(`/opportunities/${opportunityId}/health`);
+  return data;
+}
+
+/** 重算商機健康度並保留歷史 snapshot。 */
+export async function recalculateOpportunityHealth(opportunityId: number) {
+  const { data } = await apiClient.post<OpportunityHealthResponse>(`/opportunities/${opportunityId}/health/recalculate`, {});
+  return data;
+}
+
+/** 取得客戶決策鏈圖（已確認事實 + 待確認 AI 建議分開）。 */
+export async function fetchStakeholderMap(customerId: number) {
+  const { data } = await apiClient.get<StakeholderMapResponse>(`/customers/${customerId}/stakeholder-map`);
+  return data;
+}
+
+/** 由現有聯絡人 deterministic 產生 AI 決策鏈建議。 */
+export async function suggestStakeholders(customerId: number) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto[]>(`/customers/${customerId}/stakeholder-map/suggest`, {});
+  return data;
+}
+
+/** 確認一則建議，轉為已確認事實。 */
+export async function confirmStakeholderSuggestion(suggestionId: string) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto>(`/stakeholder-suggestions/${suggestionId}/confirm`, {});
+  return data;
+}
+
+/** 拒絕一則建議，保留 audit 但不顯示為事實。 */
+export async function rejectStakeholderSuggestion(suggestionId: string) {
+  const { data } = await apiClient.post<StakeholderSuggestionDto>(`/stakeholder-suggestions/${suggestionId}/reject`, {});
+  return data;
+}
+
+/** 建立正式 CRM 任務。 */
+export async function createTask(request: CreateCrmTaskRequest) {
+  const { data } = await apiClient.post<CrmTask>("/tasks", request);
+  return data;
+}
+
+/** 依 API 回傳的最新 version 延期任務。 */
+export async function postponeTask(task: CrmTask, scheduledStart: string, scheduledEnd: string) {
+  const { data } = await apiClient.post<CrmTask>(`/tasks/${task.id}/postpone`, {
+    scheduledStart,
+    scheduledEnd,
+    version: task.version,
+  });
+  return data;
+}
+
+/** 依 API 回傳的最新 version 完成任務。 */
+export async function completeTask(task: CrmTask) {
+  const { data } = await apiClient.post<CrmTask>(`/tasks/${task.id}/complete`, { version: task.version });
+  return data;
+}
+
+/** 下載後端即時產生的 iCalendar 檔案，保留瀏覽器 download event。 */
+export async function downloadTaskIcs(task: CrmTask) {
+  const { data } = await apiClient.get<Blob>(`/tasks/${task.id}/calendar.ics`, { responseType: "blob" });
+  const objectUrl = URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `crm-task-${task.id}.ics`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
 
 /**
  * 呼叫健康檢查 API。
@@ -862,6 +1050,43 @@ export async function updateAiProvider(
 /** 刪除 AI 供應商（限 ADMIN）。 */
 export async function deleteAiProvider(id: number) {
   await apiClient.delete(`/admin/settings/ai/providers/${id}`);
+}
+
+/** 從 Provider 目錄重新取得模型與可靠能力 metadata。 */
+export async function refreshAiProviderModels(id: number) {
+  const { data } = await apiClient.post<import("../types").ModelOptionItem[]>(
+    `/admin/settings/ai/providers/${id}/models/refresh`,
+  );
+  return data;
+}
+
+/** 由 Admin 人工覆寫 UNKNOWN／MANUAL 模型能力。 */
+export async function saveModelCapabilities(
+  model: string,
+  providerId: number,
+  capabilities: import("../types").ModelCapability[],
+) {
+  const { data } = await apiClient.put<import("../types").ModelOptionItem>(
+    `/admin/settings/ai/models/${encodeURIComponent(model)}/capabilities`,
+    { providerId, capabilities },
+  );
+  return data;
+}
+
+/** 儲存 Chat、OCR 與語音轉錄用途模型，後端會再次驗證能力。 */
+export async function saveAiModelAssignments(assignments: {
+  chatModel: string;
+  chatProviderId: number | null;
+  ocrModel: string | null;
+  ocrProviderId: number | null;
+  transcriptionModel: string | null;
+  transcriptionProviderId: number | null;
+}) {
+  const { data } = await apiClient.put<import("../types").AiSettingsResponse>(
+    "/admin/settings/ai/assignments",
+    assignments,
+  );
+  return data;
 }
 
 /**

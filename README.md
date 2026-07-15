@@ -1,219 +1,217 @@
 # AI CRM Intelligent Sales Assistant
 
-[English](#english) | [繁體中文](#繁體中文)
+AI CRM is a teaching and demonstration full-stack CRM for governed AI-assisted sales workflows. It combines a production-shaped Spring Boot backend, a React workspace, PostgreSQL migrations, deterministic AI fallbacks, and end-to-end verification that runs against real HTTP and database boundaries.
 
-## English
+## Technology stack
 
-AI CRM is a full-stack teaching and demonstration project built from the Hahow course units and AI collaboration prompts. It uses a monorepo structure:
+- Backend: Spring Boot 4.1, Java 21, Spring Security, JPA/Hibernate, Flyway, Spring AI 2.0, and pgvector.
+- Frontend: React 19, TypeScript, Vite, React Router, Vitest, and Playwright.
+- Database: PostgreSQL 16 with pgvector, exposed on host port `15432` for local development.
+- Tooling: Maven, pnpm, Docker Compose, and PowerShell 7+.
 
-- `backend/`: Spring Boot **4.1**, Java 21, JPA, Flyway, Spring Security, Spring AI **2.0**, and pgvector.
-- `frontend/`: Vite, React 19, and TypeScript.
-- `docs/`: Specifications, API documentation, the roadmap (`docs/roadmap-progress.md`), and SP plans.
-- `scripts/`: Verification scripts compatible with Windows and PowerShell 7+.
+The repository is a monorepo:
 
-When `OPENAI_API_KEY` is configured, the AI features call a real LLM through OpenAI or an OpenAI-compatible gateway. The gateway `BASE_URL` must include `/v1`. If the key is missing or the request fails, the application falls back to a deterministic workflow. RAG uses Voyage embeddings with pgvector and falls back to deterministic embeddings when `VOYAGE_API_KEY` is unavailable.
+- `backend/`: REST APIs, security, AI orchestration, persistence, and Flyway migrations.
+- `frontend/`: CRM dashboard, customer workspace, administration, and AI-assisted workflows.
+- `docs/`: specifications, API contracts, roadmap status, and implementation plans.
+- `scripts/`: repeatable environment, API, frontend, screenshot, and phase-gate verification.
 
-### Quick start
+## Features
+
+- JWT authentication with SALES, MANAGER, and ADMIN authorization boundaries.
+- Customer, contact, interaction, opportunity, dashboard, forecast, RFM, and sentiment workflows.
+- Governed AI chat, assessment, usage audit, feedback, PII masking, RAG, and deterministic fallback behavior.
+- Explicit Vision and audio-transcription model capabilities with governed OCR/transcription assignments.
+- Formal CRM tasks for phone calls, email, meetings, and general follow-up.
+- Customer and workspace task entry, due-time ordering, overdue indicators, postponement, completion, and optimistic-lock recovery.
+- Stable UTF-8 RFC 5545 `.ics` export with CRLF, an Asia/Taipei time zone, and deterministic task UID.
+- AI business-card intake: upload a card image, review AI-recognized fields, resolve duplicate customers, and confirm to atomically create a customer, contact, opportunity, and phone-call task; the source image is deleted after confirmation.
+- Rule-based workspace recommendations remain suggestions; persistent task status always comes from `/api/tasks`.
+
+## Quick start
+
+Requirements: Java 21, Maven, Node.js with pnpm, Docker Desktop, and PowerShell 7+.
 
 ```powershell
 pwsh .\check-env.ps1
 docker compose up -d postgres
 
 $env:JAVA_HOME = "D:\java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
+$env:Path = "$env:JAVA_HOME\bin;D:\nodejs;$env:Path"
+$env:APP_SECURITY_JWT_SECRET = "replace-with-a-random-secret-at-least-32-characters"
 
-# Use the local profile when local debugging is required.
-# Production deployments should use the prod profile, which disables demo cleanup and /api/dev.
 mvn -pl backend spring-boot:run
-# Alternative: mvn -pl backend spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=local"
 ```
 
-Required environment variable: `APP_SECURITY_JWT_SECRET` (at least 32 characters). Optional variables: `OPENAI_API_KEY`, `BASE_URL`, and `VOYAGE_API_KEY`. Store them in the project-root `.env` file and do not commit that file. An empty `BASE_URL` is normalized to the default OpenAI endpoint.
-
-Docker exposes PostgreSQL on host port `15432` to avoid conflicts with other local PostgreSQL services on port `5432`. The backend API is available at `http://127.0.0.1:18080/api`, avoiding conflicts with Spring Boot applications on port `8080`.
-
-Start the frontend after Node.js is available on `PATH`:
+In another PowerShell terminal:
 
 ```powershell
-Set-Location frontend
-$env:Path = "D:\nodejs;$env:Path"
+Set-Location .\frontend
 pnpm install
 pnpm run dev
 ```
 
-Port `5175` is recommended for a consistent local frontend URL:
+The backend listens on `http://127.0.0.1:18080`; the default Vite development server listens on `http://127.0.0.1:5173`. To use the documentation/screenshot port:
 
 ```powershell
 pnpm run dev -- --port 5175 --host 127.0.0.1
 ```
 
-### Demo accounts
+## Configuration
 
-| Account | Password | Role |
+Create a project-root `.env` file for local secrets and never commit it.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `APP_SECURITY_JWT_SECRET` | Yes | Random JWT signing secret of at least 32 characters. |
+| `OPENAI_API_KEY` | No | Enables a real OpenAI-compatible LLM; absence uses deterministic teaching fallbacks. |
+| `BASE_URL` | No | OpenAI-compatible gateway URL, including `/v1`; blank values normalize to the OpenAI default. |
+| `VOYAGE_API_KEY` | No | Enables Voyage embeddings; absence uses deterministic embeddings. |
+
+The default datasource is `jdbc:postgresql://127.0.0.1:15432/aicrm`. Flyway applies migrations on startup and Hibernate validates the resulting schema. Use the `local` profile for additional development logging and the `prod` profile to disable demo cleanup/development endpoints.
+
+```powershell
+mvn -pl backend spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=local"
+```
+
+## Default accounts
+
+| Username | Password | Role |
 | --- | --- | --- |
 | `sales@aurora.local` | `password123` | SALES |
 | `manager@aurora.local` | `password123` | MANAGER |
 | `admin@aurora.local` | `password123` | ADMIN |
 
-### Core endpoints
+These accounts are for local teaching data only. Replace all default credentials before any shared deployment.
+
+## Key endpoints
 
 - `GET /api/health`
 - `POST /api/auth/login`
-- `GET /api/customers`
-- `POST /api/customers`
+- `GET/POST /api/customers`
 - `GET /api/customers/{id}`
 - `PUT /api/customers/{id}/status`
 - `POST /api/customers/{id}/interactions`
 - `GET /api/dashboard/summary`
 - `GET /api/dashboard/reports`
 - `POST /api/ai/chat`
-- `GET /api/agent/customers/{id}/trace` — a teaching-oriented decision-flow trace simulation, not a multi-step tool-calling agent.
+- `GET /api/agent/customers/{id}/trace` — teaching decision-flow trace, not a multi-step tool-calling agent.
+- `GET/POST /api/tasks`
+- `GET/PUT /api/tasks/{id}`
+- `POST /api/tasks/{id}/postpone`
+- `POST /api/tasks/{id}/complete`
+- `GET /api/tasks/{id}/calendar.ics`
+- `DELETE /api/tasks/{id}?version={version}` — explicit owner-scoped cleanup with optimistic-lock protection.
 
-See [`docs/api.md`](docs/api.md) for the API contract and [`docs/spec.md`](docs/spec.md) for the project specification.
+See [`docs/api.md`](docs/api.md) for request/response contracts and authorization behavior.
 
-### Dashboard and promotional assets
+## Testing and verification
 
-The dashboard includes a sales funnel, monthly revenue forecast, revenue by industry, customer risk breakdown, renewal forecast, owner leaderboard, and recent activities. Flyway migration `V4__add_promo_report_seed_data.sql` provides demo data across industries, owners, months, and opportunity stages.
-
-Generate course screenshots, interaction screenshots, an operation video, and vertical Hahow promotional artwork with:
-
-```powershell
-$env:Path = "D:\nodejs;$env:Path"
-$env:FRONTEND_URL = "http://127.0.0.1:5175/"
-node .\scripts\capture-promo-screenshots.mjs
-```
-
-Generated assets are written to:
-
-- Full-page and primary screenshots: `frontend/.promo-screenshots/`
-- Individual chart screenshots: `frontend/.promo-screenshots/charts/`
-- Chart hover, drill-down, and AI interaction screenshots: `frontend/.promo-screenshots/interactions/`
-- Operation video: `frontend/.promo-screenshots/video/ai-crm-operation-flow.webm`
-- Vertical Hahow promotional artwork: `frontend/.hahow-promo-vertical/`
-
-### Verification
+Run backend regression tests with Java 21:
 
 ```powershell
 $env:JAVA_HOME = "D:\java\jdk-21"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-mvn -pl backend test -DskipTests
+$env:JDK_JAVA_OPTIONS = "-Djdk.net.URLClassPath.disableClassPathURLCheck=true"
+mvn -pl backend test
+```
 
+Run frontend unit tests, type checking, and a production build:
+
+```powershell
+pnpm --dir frontend test
+pnpm --dir frontend exec tsc --noEmit
+pnpm --dir frontend run build
+```
+
+With the backend listening on port `18080`, run the V22 real-browser workflow or its complete phase gate:
+
+```powershell
+pnpm --dir frontend exec playwright test frontend/e2e/v22-tasks.spec.ts
+pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.spec.ts
+```
+
+The V22 test creates uniquely prefixed data, creates and postpones a phone task through the UI, reloads to verify persistence, reads the browser-downloaded `.ics` bytes, completes the task, verifies formal API state, and safely removes only its own task/customer aggregate.
+
+For V23 the backend also needs MinIO (`docker compose up -d minio`) and a deterministic Vision fake. Start the backend with `--app.vision.fake.enabled=true` and the MinIO credentials in `MEDIA_S3_ACCESS_KEY`/`MEDIA_S3_SECRET_KEY`, then:
+
+```powershell
+pnpm --dir frontend exec playwright test frontend/e2e/v23-business-card.spec.ts
+pwsh .\scripts\verify-phase-gate.ps1 -Phase V23 -E2ESpec frontend/e2e/v23-business-card.spec.ts
+```
+
+The V23 test provisions a governed Vision OCR assignment through the real Admin API, uploads a fixture card, reviews and confirms a brand-new customer (asserting the source image reaches `DELETED`), and in a second case merges into a pre-created duplicate customer without creating a new one.
+
+Additional verification and promotional assets:
+
+```powershell
 pwsh .\scripts\test-crm-api.ps1
-
-$env:Path = "D:\nodejs;$env:Path"
-Set-Location frontend
-pnpm run build
-Set-Location ..
-$env:FRONTEND_URL = "http://127.0.0.1:5175/"
 node .\scripts\verify-frontend.mjs
+$env:FRONTEND_URL = "http://127.0.0.1:5175/"
 node .\scripts\capture-promo-screenshots.mjs
 ```
+
+The dashboard includes a sales funnel, monthly revenue forecast, revenue by industry, customer risk breakdown, renewal forecast, and owner leaderboard, seeded by the `V4__add_promo_report_seed_data.sql` migration. Generated screenshots and recordings are stored under `frontend/.promo-screenshots/` (with `charts/` and `interactions/` subfolders and an operation video at `frontend/.promo-screenshots/video/ai-crm-operation-flow.webm`); vertical proposal assets are stored under `frontend/.hahow-promo-vertical/`.
+
+## Documentation
+
+- [`docs/spec.md`](docs/spec.md): current functional and technical specification.
+- [`docs/api.md`](docs/api.md): API contract.
+- [`docs/roadmap-progress.md`](docs/roadmap-progress.md): delivery status and evidence.
+- [`docs/superpowers/specs/`](docs/superpowers/specs/): approved design specifications.
+- [`docs/superpowers/plans/`](docs/superpowers/plans/): implementation plans and phase checklists.
+
+## Contribution guidelines
+
+1. Read the relevant specification and local `CLAUDE.md` before editing.
+2. Keep each change scoped to one task and preserve unrelated working-tree changes.
+3. Add Traditional Chinese function-level comments for new functions and comments for important objects.
+4. Use TDD: capture a failure caused by the missing behavior, implement the minimum fix, and rerun focused plus regression verification.
+5. Update the API/specification/roadmap documentation when behavior changes.
+6. Do not mark a phase complete until migration, backend, frontend, real E2E, and PostgreSQL `15432` evidence are green.
+
+## Troubleshooting
+
+- Backend refuses to start: confirm Java 21, `APP_SECURITY_JWT_SECRET` length, Docker PostgreSQL health, and that port `18080` is free.
+- Database connection fails: confirm `docker compose up -d postgres` and host port `15432`.
+- Windows worktree Maven tests report a manifest classpath root error: set `JDK_JAVA_OPTIONS=-Djdk.net.URLClassPath.disableClassPathURLCheck=true` before running Maven.
+- Frontend cannot reach APIs: confirm backend health at `/api/health` and the Vite `/api` proxy target `127.0.0.1:18080`.
+- AI calls use fallback unexpectedly: verify `OPENAI_API_KEY`, the gateway `BASE_URL` including `/v1`, and provider/model settings in the ADMIN UI.
+- Task mutation returns `409`: another update won the optimistic lock; reload the task list and retry using the latest version.
 
 ---
 
-## 繁體中文
+## 中文摘要
 
-AI CRM 是依據 Hahow 教學站單元與 AI 協作提示詞建立的全端教學／示範專案，採用 monorepo 架構：
+AI CRM 是一套教學／示範用的全端智慧業務助理，後端採 Spring Boot 4.1、Java 21、PostgreSQL、Flyway 與 pgvector，前端採 React 19、TypeScript、Vite、Vitest 與 Playwright。系統包含客戶、聯絡人、互動、商機、儀表板、RFM、情緒意圖、RAG、PII 遮罩、AI 治理與模型能力設定。
 
-- `backend/`：Spring Boot **4.1**、Java 21、JPA、Flyway、Spring Security、Spring AI **2.0** 與 pgvector。
-- `frontend/`：Vite、React 19 與 TypeScript。
-- `docs/`：規格、API 文件、路線圖（`docs/roadmap-progress.md`）與 SP 計畫。
-- `scripts/`：相容 Windows 與 PowerShell 7+ 的驗證腳本。
+V22 新增正式 CRM 任務：可從客戶工作台或「我的工作檯」安排電話追蹤、延期、完成與下載 `.ics`。正式狀態只以 `/api/tasks` 為準；既有 AI／規則式工作建議仍是建議，不會冒充已持久化任務。任務更新使用 `version` 樂觀鎖，發生 `409` 時前端會提示並重新載入。
 
-設定 `OPENAI_API_KEY` 後，AI 功能會呼叫 OpenAI 或 OpenAI 相容閘道的真實 LLM；閘道的 `BASE_URL` 必須包含 `/v1`。未設定金鑰或呼叫失敗時，系統會回退至 deterministic 流程。RAG 使用 Voyage embedding 與 pgvector；未設定 `VOYAGE_API_KEY` 時則使用 deterministic embedding。
+Dashboard 包含銷售漏斗、月度營收 Forecast、產業營收分布、客戶風險結構、續約到期預測與業務排行榜，資料由 `V4__add_promo_report_seed_data.sql` migration 提供。
 
-### 快速啟動
+### 中文快速啟動
 
 ```powershell
 pwsh .\check-env.ps1
 docker compose up -d postgres
-
 $env:JAVA_HOME = "D:\java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-
-# 本機除錯時可使用 local profile。
-# 正式部署應使用 prod profile，以關閉 demo 清除與 /api/dev。
+$env:Path = "$env:JAVA_HOME\bin;D:\nodejs;$env:Path"
+$env:APP_SECURITY_JWT_SECRET = "請替換為至少32字元的隨機字串"
 mvn -pl backend spring-boot:run
-# 替代指令：mvn -pl backend spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=local"
 ```
 
-必要環境變數為 `APP_SECURITY_JWT_SECRET`（至少 32 字元）；選用變數為 `OPENAI_API_KEY`、`BASE_URL` 與 `VOYAGE_API_KEY`。請將它們存放於專案根目錄的 `.env`，且不要提交該檔案。空白的 `BASE_URL` 會正規化為 OpenAI 預設端點。
-
-Docker 將 PostgreSQL 對外映射至主機 port `15432`，避免與其他使用 `5432` 的本機 PostgreSQL 衝突。後端 API 位於 `http://127.0.0.1:18080/api`，避免與使用 `8080` 的其他 Spring Boot 專案衝突。
-
-Node.js 加入 `PATH` 後啟動前端：
+另開終端機執行：
 
 ```powershell
-Set-Location frontend
-$env:Path = "D:\nodejs;$env:Path"
+Set-Location .\frontend
 pnpm install
 pnpm run dev
 ```
 
-建議固定使用前端 port `5175`：
+本機 PostgreSQL 固定使用 `15432`，後端使用 `18080`，Vite 預設使用 `5173`。完整 V22 驗收使用：
 
 ```powershell
-pnpm run dev -- --port 5175 --host 127.0.0.1
+pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.spec.ts
 ```
 
-### 示範帳號
-
-| 帳號 | 密碼 | 角色 |
-| --- | --- | --- |
-| `sales@aurora.local` | `password123` | SALES |
-| `manager@aurora.local` | `password123` | MANAGER |
-| `admin@aurora.local` | `password123` | ADMIN |
-
-### 核心端點
-
-- `GET /api/health`
-- `POST /api/auth/login`
-- `GET /api/customers`
-- `POST /api/customers`
-- `GET /api/customers/{id}`
-- `PUT /api/customers/{id}/status`
-- `POST /api/customers/{id}/interactions`
-- `GET /api/dashboard/summary`
-- `GET /api/dashboard/reports`
-- `POST /api/ai/chat`
-- `GET /api/agent/customers/{id}/trace`：教學用決策流程 Trace 模擬，不是多步驟 tool-calling Agent。
-
-API 契約請參閱 [`docs/api.md`](docs/api.md)，專案規格請參閱 [`docs/spec.md`](docs/spec.md)。
-
-### Dashboard 與宣傳素材
-
-Dashboard 包含銷售漏斗、月度營收 Forecast、產業營收分布、客戶風險結構、續約到期預測、業務排行榜與近期活動。Flyway migration `V4__add_promo_report_seed_data.sql` 提供涵蓋多產業、多業務、多月份與各商機階段的展示資料。
-
-使用下列指令產出課程截圖、互動過程截圖、操作影片與 Hahow 直式文宣圖：
-
-```powershell
-$env:Path = "D:\nodejs;$env:Path"
-$env:FRONTEND_URL = "http://127.0.0.1:5175/"
-node .\scripts\capture-promo-screenshots.mjs
-```
-
-產出位置：
-
-- 桌面整頁與主要操作截圖：`frontend/.promo-screenshots/`
-- 圖表拆分截圖：`frontend/.promo-screenshots/charts/`
-- 圖表 hover、下鑽與 AI 互動過程截圖：`frontend/.promo-screenshots/interactions/`
-- 操作影片：`frontend/.promo-screenshots/video/ai-crm-operation-flow.webm`
-- Hahow 提案直式文宣圖稿：`frontend/.hahow-promo-vertical/`
-
-### 驗證
-
-```powershell
-$env:JAVA_HOME = "D:\java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-mvn -pl backend test -DskipTests
-
-pwsh .\scripts\test-crm-api.ps1
-
-$env:Path = "D:\nodejs;$env:Path"
-Set-Location frontend
-pnpm run build
-Set-Location ..
-$env:FRONTEND_URL = "http://127.0.0.1:5175/"
-node .\scripts\verify-frontend.mjs
-node .\scripts\capture-promo-screenshots.mjs
-```
+詳細規格、API 與進度請見 `docs/spec.md`、`docs/api.md`、`docs/roadmap-progress.md`。

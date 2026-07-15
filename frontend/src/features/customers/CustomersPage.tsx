@@ -28,6 +28,8 @@ import { AiHistoryModal } from "./components/AiHistoryModal";
 import { ChatLauncher } from "../ai-assistant/components/ChatLauncher";
 import { ChatWindow } from "../ai-assistant/components/ChatWindow";
 import { WorkspaceAiModal } from "../my-workspace/WorkspaceAiModal";
+import { TaskFormModal } from "../tasks/TaskFormModal";
+import { TaskPanel } from "../tasks/TaskPanel";
 
 /**
  * 操作頁（做事）：搜尋/篩選 + 客戶列表 + 詳情 + 商機看板 + 互動 + AI 助理。
@@ -74,6 +76,8 @@ export function CustomersPage() {
   const [report, setReport] = useState<{ open: boolean; title: string; loading: boolean; streaming?: boolean; markdown: string; meta?: string; callId?: number | null } | null>(null);
   // AI 歷程 Modal：open 控制開關、loading 載入中、calls 為該客戶歷次 AI 呼叫
   const [aiHistory, setAiHistory] = useState<{ open: boolean; loading: boolean; calls: AiCallHistoryItem[] } | null>(null);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
 
   const { messages, chatSending, chatOpen, setChatOpen, sendChat, resetChat, loadHistory, historyLoading } = useAiChat();
 
@@ -392,9 +396,16 @@ export function CustomersPage() {
       <div className="action-bar">
         <button type="button" className="btn-assess" onClick={() => setAiModalOpen(true)}>✨ AI 工作建議</button>
         <button type="button" onClick={() => setShowAddCustomer(true)}>+ 新增客戶</button>
+        <button type="button" onClick={() => navigate("/business-cards/new")}>📇 名片建檔</button>
         {selected ? <button type="button" onClick={() => setShowAddInteraction(true)}>+ 新增互動</button> : null}
         {selected ? <button type="button" onClick={() => setShowAddOpportunity(true)}>+ 新增商機</button> : null}
+        {selected ? <button type="button" onClick={() => setShowTaskForm(true)}>☎ 安排電話</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/meeting-copilot`)}>🎙 會議 Copilot</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/follow-up`)}>✉️ AI 跟進信</button> : null}
+        {selected ? <button type="button" onClick={() => navigate(`/customers/${selected.customer.id}/stakeholder-map`)}>🕸 決策鏈</button> : null}
       </div>
+
+      {selected ? <TaskPanel customerId={selected.customer.id} refreshKey={taskRefreshKey} /> : null}
 
       <div className="workspace-grid">
         <div className="customer-col">
@@ -442,6 +453,7 @@ export function CustomersPage() {
       {contactModal.open && selected ? <ContactModal contact={contactModal.editing} onSubmit={handleSubmitContact} onClose={() => setContactModal({ open: false, editing: null })} /> : null}
       {editingOpportunity ? <EditOpportunityModal opportunity={editingOpportunity} onSubmit={handleUpdateOpportunity} onClose={() => setEditingOpportunity(null)} /> : null}
       {editingInteraction ? <EditInteractionModal interaction={editingInteraction} onSubmit={handleUpdateInteraction} onClose={() => setEditingInteraction(null)} /> : null}
+      {showTaskForm && selected && user ? <TaskFormModal customerId={selected.customer.id} customerName={selected.customer.name} assigneeId={user.id} onCreated={() => { setShowTaskForm(false); setTaskRefreshKey((key) => key + 1); }} onClose={() => setShowTaskForm(false)} /> : null}
     </>
   );
 }

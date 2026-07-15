@@ -9,6 +9,11 @@ logging:
 spring:
   application:
     name: ai-crm-backend
+  servlet:
+    multipart:
+      # 音訊業務上限為 100 MB；額外 5 MB 保留 multipart framing overhead。
+      max-file-size: 105MB
+      max-request-size: 106MB
   # 匯入專案根目錄的 .env 作為設定來源（OPENAI_API_KEY、MODEL 等）。
   # optional 表示檔案不存在也不報錯；[.properties] 提示以 KEY=VALUE 格式解析。
   # 同時嘗試 backend 工作目錄與其上層（repo 根），相容不同啟動位置。
@@ -59,6 +64,25 @@ spring:
           max-completion-tokens: ${OPENAI_MAX_COMPLETION_TOKENS:2000}
 
 app:
+  media:
+    # 暫存媒體內容只放 S3-compatible storage；DB 僅保存 metadata。
+    s3:
+      endpoint: ${MEDIA_S3_ENDPOINT:http://127.0.0.1:19000}
+      access-key: ${MEDIA_S3_ACCESS_KEY}
+      secret-key: ${MEDIA_S3_SECRET_KEY}
+      bucket: ${MEDIA_S3_BUCKET:ai-crm-temporary-media}
+      region: ${MEDIA_S3_REGION:us-east-1}
+    retention: ${MEDIA_RETENTION:PT24H}
+    image:
+      # 解碼前像素炸彈防護；預設 25MP，依實際名片影像需求調整。
+      max-pixels: ${MEDIA_IMAGE_MAX_PIXELS:25000000}
+    # 音訊 parser 專屬暫存目錄；只允許服務產生的 UUID 檔名。
+    temp-dir: ${MEDIA_TEMP_DIR:${java.io.tmpdir}/ai-crm-media}
+    # 啟動時清除符合服務命名且超過此時間的 crash 遺留檔；最小允許 1 分鐘。
+    temp-stale-age: ${MEDIA_TEMP_STALE_AGE:PT24H}
+    cleanup:
+      enabled: ${MEDIA_CLEANUP_ENABLED:true}
+      fixed-delay: ${MEDIA_CLEANUP_FIXED_DELAY:PT1H}
   security:
     # JWT 簽章密鑰：務必以環境變數 APP_SECURITY_JWT_SECRET 提供高強度隨機值（≥32 bytes）。
     # 預設留空，啟動時由 JwtService 做 fail-fast 檢查，杜絕使用公開預設值（避免認證繞過）。
@@ -86,6 +110,16 @@ app:
   # 務必以環境變數 DEMO_RESET_ENABLED=false 關閉，避免誤刪真實業務資料。
   demo:
     reset-enabled: ${DEMO_RESET_ENABLED:true}
+  # AI 跟進信與 Zeabur Sendmail 寄送設定（V25）。
+  # from：統一已驗證公司寄件者。fake.enabled=true 時啟用 deterministic FakeMailDeliveryClient（E2E/本機）。
+  # zeabur.endpoint/token：正式 Sendmail 端點與憑證；token 只從環境設定讀取，絕不回傳前端或寫入 audit。
+  mail:
+    from: ${APP_MAIL_FROM:no-reply@ai-crm.local}
+    fake:
+      enabled: ${APP_MAIL_FAKE_ENABLED:false}
+    zeabur:
+      endpoint: ${APP_MAIL_ZEABUR_ENDPOINT:}
+      token: ${APP_MAIL_ZEABUR_TOKEN:}
   # 模型測試的 max_completion_tokens 上限。推理型模型（gpt-5-mini 等）會先花大量 token 在內部
   # reasoning，上限太低（如 2000）會在輸出可見內容前就截斷成空回應；預設 8000，可以
   # MODEL_TEST_MAX_COMPLETION_TOKENS 調整。

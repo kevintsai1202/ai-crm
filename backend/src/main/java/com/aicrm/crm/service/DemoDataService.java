@@ -170,6 +170,30 @@ public class DemoDataService {
     /** 對話記憶存取：清除重建時刪除綁定既有客戶的對話（FK 參照 customers，not null）。 */
     private final ChatMessageRepository chatMessageRepository;
 
+    /** CRM 任務存取：示範資料清除重建時須先明確刪除，正式外鍵不做 cascade。 */
+    private final com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository;
+
+    /** 名片 intake 存取：reset 時須先刪除，避免其結果 FK 阻擋正式資料清除。 */
+    private final com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository;
+
+    /** 會議 Copilot session 存取：reset 時須先刪除，其 customer_id/opportunity_id FK 會阻擋正式資料清除。 */
+    private final com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository;
+
+    /** 外寄郵件存取：reset 時須先於草稿刪除（FK 參照 follow_up_drafts）。 */
+    private final com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository;
+
+    /** 跟進信草稿存取：reset 時須先於客戶刪除（customer_id FK 會阻擋正式資料清除）。 */
+    private final com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository;
+
+    /** 商機健康度 snapshot 存取：reset 時須先於商機刪除（opportunity_id FK 會阻擋商機清除）。 */
+    private final com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository;
+
+    /** Stakeholder 關係存取：reset 時須先於聯絡人刪除（from/to_contact_id FK 會阻擋聯絡人清除）。 */
+    private final com.aicrm.crm.repository.StakeholderRelationRepository stakeholderRelationRepository;
+
+    /** Stakeholder 決策角色存取：reset 時須先於聯絡人刪除（contact_id FK 會阻擋聯絡人清除）。 */
+    private final com.aicrm.crm.repository.StakeholderRoleRepository stakeholderRoleRepository;
+
     /** 情緒意圖分類服務：生成後做 deterministic 批次分析。 */
     private final SentimentIntentService sentimentIntentService;
 
@@ -194,6 +218,14 @@ public class DemoDataService {
                            InteractionInsightRepository interactionInsightRepository,
                            ContactRepository contactRepository,
                            ChatMessageRepository chatMessageRepository,
+                           com.aicrm.crm.repository.CrmTaskRepository crmTaskRepository,
+                           com.aicrm.crm.repository.BusinessCardIntakeRepository businessCardIntakeRepository,
+                           com.aicrm.crm.repository.MeetingCopilotSessionRepository meetingCopilotSessionRepository,
+                           com.aicrm.crm.repository.OutboundEmailRepository outboundEmailRepository,
+                           com.aicrm.crm.repository.FollowUpDraftRepository followUpDraftRepository,
+                           com.aicrm.crm.repository.OpportunityHealthSnapshotRepository opportunityHealthSnapshotRepository,
+                           com.aicrm.crm.repository.StakeholderRelationRepository stakeholderRelationRepository,
+                           com.aicrm.crm.repository.StakeholderRoleRepository stakeholderRoleRepository,
                            SentimentIntentService sentimentIntentService,
                            AppUserRepository userRepository,
                            PasswordEncoder passwordEncoder,
@@ -206,6 +238,14 @@ public class DemoDataService {
         this.interactionInsightRepository = interactionInsightRepository;
         this.contactRepository = contactRepository;
         this.chatMessageRepository = chatMessageRepository;
+        this.crmTaskRepository = crmTaskRepository;
+        this.businessCardIntakeRepository = businessCardIntakeRepository;
+        this.meetingCopilotSessionRepository = meetingCopilotSessionRepository;
+        this.outboundEmailRepository = outboundEmailRepository;
+        this.followUpDraftRepository = followUpDraftRepository;
+        this.opportunityHealthSnapshotRepository = opportunityHealthSnapshotRepository;
+        this.stakeholderRelationRepository = stakeholderRelationRepository;
+        this.stakeholderRoleRepository = stakeholderRoleRepository;
         this.sentimentIntentService = sentimentIntentService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -305,17 +345,29 @@ public class DemoDataService {
     }
 
     /**
-     * 依 FK 順序清除「業務資料」：互動分析 → 互動 → 商機 → 客戶。
+     * 依 FK 順序清除「業務資料」：名片 intake → 任務 → 互動分析 → 互動 → 商機 → 客戶。
      * 帳號、系統設定、AI 歷程、對話記憶不在清除範圍。
      */
     private void clearBusinessData() {
+        // 正式 FK 刻意禁止 cascade；只有已明確啟用的示範 reset 流程可主動清除歷史任務。
+        // 外寄郵件 → 跟進信草稿：先刪郵件（FK 參照草稿），再刪草稿（FK 參照客戶）。
+        outboundEmailRepository.deleteAllInBatch();
+        followUpDraftRepository.deleteAllInBatch();
+        businessCardIntakeRepository.deleteAllInBatch();
+        meetingCopilotSessionRepository.deleteAllInBatch();
+        crmTaskRepository.deleteAllInBatch();
         interactionInsightRepository.deleteAllInBatch();
         interactionRepository.deleteAllInBatch();
+        // Stakeholder 關係 / 角色參照 contacts（from/to_contact_id、contact_id FK），須先於聯絡人刪除。
+        stakeholderRelationRepository.deleteAllInBatch();
+        stakeholderRoleRepository.deleteAllInBatch();
         contactRepository.deleteAllInBatch();
+        // 商機健康度 snapshot 參照商機（opportunity_id FK），須先於商機刪除。
+        opportunityHealthSnapshotRepository.deleteAllInBatch();
         opportunityRepository.deleteAllInBatch();
         chatMessageRepository.deleteAllInBatch();
         customerRepository.deleteAllInBatch();
-        log.info("示範資料清除完成（互動分析 / 互動 / 聯絡人 / 商機 / 對話記憶 / 客戶）；帳號、設定與 AI 稽核歷程保留。");
+        log.info("示範資料清除完成（任務 / 互動分析 / 互動 / 聯絡人 / 商機 / 對話記憶 / 客戶）；帳號、設定與 AI 稽核歷程保留。");
     }
 
     /**

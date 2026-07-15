@@ -15,6 +15,8 @@ import { AiBadge } from "../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../components/common/AiThinkingIndicator";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { AddOpportunityModal } from "../customers/components/AddOpportunityModal";
+import { TaskFormModal } from "../tasks/TaskFormModal";
+import { TaskPanel } from "../tasks/TaskPanel";
 
 /** 待辦類型對應的中文標籤與色票 class。 */
 const TODO_META: Record<string, { label: string; cls: string }> = {
@@ -50,6 +52,8 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
   const [callsLoading, setCallsLoading] = useState(false);
+  const [taskCustomer, setTaskCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
 
   // 開啟 / 切換範圍：讀上次總結 + 即時待辦
   useEffect(() => {
@@ -179,11 +183,13 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
                           <span className="todo-customer">{t.customerName}</span>
                           <span className="todo-reason">{t.reason}</span>
                         </button>
+                        <button type="button" className="btn-secondary todo-call-task" onClick={() => setTaskCustomer({ id: t.customerId, name: t.customerName })}>☎ 安排電話</button>
                       </li>
                     );
                   })}
                 </ul>
               )}
+              <TaskPanel compact refreshKey={taskRefreshKey} />
             </div>
 
             {/* 右：AI 總結 + 建議商機 */}
@@ -269,6 +275,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
       {historyOpen ? (
         <AiCallHistoryModal title="我的工作檯 AI 歷程" calls={calls} loading={callsLoading} onClose={() => setHistoryOpen(false)} />
       ) : null}
+      {taskCustomer && user ? <TaskFormModal customerId={taskCustomer.id} customerName={taskCustomer.name} assigneeId={user.id} onCreated={() => { setTaskCustomer(null); setTaskRefreshKey((key) => key + 1); }} onClose={() => setTaskCustomer(null)} /> : null}
     </>
   );
 }

@@ -2,9 +2,11 @@ package com.aicrm.crm.service;
 
 import com.aicrm.crm.api.Dtos;
 import com.aicrm.crm.domain.AiProvider;
+import com.aicrm.crm.domain.ModelCapability;
 import com.aicrm.crm.domain.SystemSetting;
 import com.aicrm.crm.repository.AiProviderRepository;
 import com.aicrm.crm.repository.SystemSettingRepository;
+import com.aicrm.crm.service.ai.ModelCatalogClient;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -39,11 +41,21 @@ public class SystemSettingService {
     public static final String KEY_AI_CHAT_MAX_COMPLETION_TOKENS = "ai.chat.max_completion_tokens";
     /** reasoning_effort 設定鍵（空 = 未設定；推理模型用 minimal/low/medium/high）。 */
     public static final String KEY_AI_CHAT_REASONING_EFFORT = "ai.chat.reasoning_effort";
+    /** OCR 模型設定鍵。 */
+    public static final String KEY_AI_OCR_MODEL = "ai.ocr.model";
+    /** OCR provider ID 設定鍵。 */
+    public static final String KEY_AI_OCR_PROVIDER_ID = "ai.ocr.provider_id";
+    /** 語音轉錄模型設定鍵。 */
+    public static final String KEY_AI_TRANSCRIPTION_MODEL = "ai.transcription.model";
+    /** 語音轉錄 provider ID 設定鍵。 */
+    public static final String KEY_AI_TRANSCRIPTION_PROVIDER_ID = "ai.transcription.provider_id";
 
     /** 設定資料存取。 */
     private final SystemSettingRepository repository;
     /** AI 供應商資料存取。 */
     private final AiProviderRepository providerRepository;
+    /** Provider 模型目錄探索 client。 */
+    private final ModelCatalogClient modelCatalogClient;
     /** Jackson 3 ObjectMapper（Spring Boot 4.1 受管 bean）。 */
     private final ObjectMapper objectMapper;
     /** 環境變數預設模型（spring.ai.openai.chat.model），供留空時在 UI 顯示回退目標。 */
@@ -51,10 +63,12 @@ public class SystemSettingService {
 
     public SystemSettingService(SystemSettingRepository repository,
                                 AiProviderRepository providerRepository,
+                                ModelCatalogClient modelCatalogClient,
                                 ObjectMapper objectMapper,
                                 @Value("${spring.ai.openai.chat.model:}") String envDefaultModel) {
         this.repository = repository;
         this.providerRepository = providerRepository;
+        this.modelCatalogClient = modelCatalogClient;
         this.objectMapper = objectMapper;
         this.envDefaultModel = envDefaultModel;
     }
@@ -246,7 +260,197 @@ public class SystemSettingService {
         var providers = getProviders();
         var source = current.isBlank() ? "ENV" : "DB";
         return new Dtos.AiSettingsResponse(current, currentProviderId, options, providers, envDefaultModel, source,
-                getTemperature().orElse(null), getMaxCompletionTokens().orElse(null), getReasoningEffort().orElse(null));
+                getTemperature().orElse(null), getMaxCompletionTokens().orElse(null), getReasoningEffort().orElse(null),
+                getTextSetting(KEY_AI_OCR_MODEL), getLongSetting(KEY_AI_OCR_PROVIDER_ID),
+                getTextSetting(KEY_AI_TRANSCRIPTION_MODEL), getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID));
+    }
+
+    /** 取得文字設定；缺少或空白時回空字串。 */
+    private String getTextSetting(String key) {
+        return repository.findBySettingKey(key)
+                .map(SystemSetting::getSettingValue)
+                .filter(StringUtils::hasText)
+                .orElse("");
+    }
+
+    /** 取得 Long 設定；缺少或空白時回 null。 */
+    private Long getLongSetting(String key) {
+        var value = getTextSetting(key);
+        return value.isBlank() ? null : Long.valueOf(value);
+    }
+
+    /** 解析並再次驗證 OCR assignment 必須是同一 Provider/model pair 且具有 VISION。 */
+    @Transactional(readOnly = true)
+    public com.aicrm.crm.service.vision.AiModelAssignment resolveOcrAssignment() {
+        String model = getTextSetting(KEY_AI_OCR_MODEL);
+        Long providerId = getLongSetting(KEY_AI_OCR_PROVIDER_ID);
+        if (!StringUtils.hasText(model) || providerId == null) return null;
+        var option = getModelOptions().stream()
+                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
+                .filter(item -> item.capabilities().contains(ModelCapability.VISION)).findFirst().orElse(null);
+        if (option == null) return null;
+        var provider = providerRepository.findById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
+                provider.getBaseUrl(), provider.getApiKey());
+    }
+
+    /** 解析並再次驗證轉錄 assignment 必須是同一 Provider/model pair 且具有 AUDIO_TRANSCRIPTION。 */
+    @Transactional(readOnly = true)
+    public com.aicrm.crm.service.vision.AiModelAssignment resolveTranscriptionAssignment() {
+        String model = getTextSetting(KEY_AI_TRANSCRIPTION_MODEL);
+        Long providerId = getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID);
+        if (!StringUtils.hasText(model) || providerId == null) return null;
+        var option = getModelOptions().stream()
+                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
+                .filter(item -> item.capabilities().contains(ModelCapability.AUDIO_TRANSCRIPTION)).findFirst().orElse(null);
+        if (option == null) return null;
+        var provider = providerRepository.findById(providerId).orElse(null);
+        if (provider == null || !provider.isApiKeySet()) return null;
+        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
+                provider.getBaseUrl(), provider.getApiKey());
+    }
+
+    /**
+     * 更新 Chat、OCR 與轉錄用途 assignment，並在後端強制驗證能力。
+     *
+     * @param assignments 三種用途的模型設定
+     * @param username 操作者帳號
+     */
+    @Transactional
+    public void updateAssignments(Dtos.AiModelAssignments assignments, String username) {
+        if (assignments == null) {
+            throw new IllegalArgumentException("AI model assignment request 不得為 null");
+        }
+        var options = getModelOptions();
+        validateProvider(assignments.chatProviderId(), "Chat");
+        validateProvider(assignments.ocrProviderId(), "OCR");
+        validateProvider(assignments.transcriptionProviderId(), "Transcription");
+        validateCapability(assignments.ocrModel(), assignments.ocrProviderId(),
+                ModelCapability.VISION, "OCR", options);
+        validateCapability(assignments.transcriptionModel(), assignments.transcriptionProviderId(),
+                ModelCapability.AUDIO_TRANSCRIPTION, "Transcription", options);
+        validateKnownModel(assignments.chatModel(), assignments.chatProviderId(), "Chat", options);
+
+        upsert(KEY_AI_CHAT_MODEL, normalizeModel(assignments.chatModel()), username);
+        upsert(KEY_AI_CHAT_PROVIDER_ID, normalizeProviderId(assignments.chatProviderId()), username);
+        upsert(KEY_AI_OCR_MODEL, normalizeModel(assignments.ocrModel()), username);
+        upsert(KEY_AI_OCR_PROVIDER_ID, normalizeProviderId(assignments.ocrProviderId()), username);
+        upsert(KEY_AI_TRANSCRIPTION_MODEL, normalizeModel(assignments.transcriptionModel()), username);
+        upsert(KEY_AI_TRANSCRIPTION_PROVIDER_ID, normalizeProviderId(assignments.transcriptionProviderId()), username);
+    }
+
+    /**
+     * 人工覆寫指定模型能力；能力來源固定標記為 MANUAL。
+     *
+     * @param model 模型名稱
+     * @param providerId Provider ID
+     * @param capabilities Admin 確認的能力集合
+     * @param username 操作者帳號
+     * @return 更新後模型選項
+     */
+    @Transactional
+    public Dtos.ModelOptionItem updateModelCapabilities(String model, Long providerId,
+                                                        java.util.Set<ModelCapability> capabilities,
+                                                        String username) {
+        if (!StringUtils.hasText(model) || providerId == null) {
+            throw new IllegalArgumentException("模型名稱與 providerId 為必填");
+        }
+        validateProvider(providerId, "模型能力");
+        var safeCapabilities = capabilities == null ? java.util.Set.<ModelCapability>of() : java.util.Set.copyOf(capabilities);
+        var updated = new Dtos.ModelOptionItem(model.strip(), providerId, safeCapabilities,
+                com.aicrm.crm.domain.CapabilitySource.MANUAL);
+        var options = getModelOptions();
+        var found = options.stream().anyMatch(option -> option.model().equals(model.strip())
+                && java.util.Objects.equals(option.providerId(), providerId));
+        if (!found) {
+            throw new IllegalArgumentException("模型不在候選清單內：" + model);
+        }
+        var replacements = options.stream()
+                .map(option -> option.model().equals(model.strip())
+                        && java.util.Objects.equals(option.providerId(), providerId) ? updated : option)
+                .toList();
+        upsert(KEY_AI_CHAT_MODEL_OPTIONS, serializeModelOptions(replacements), username);
+        return updated;
+    }
+
+    /**
+     * 從指定 Provider refresh 模型目錄，只替換該 Provider 的既有候選。
+     *
+     * @param providerId Provider ID
+     * @param username 操作者帳號
+     * @return refresh 後完整模型候選清單
+     */
+    @Transactional
+    public List<Dtos.ModelOptionItem> refreshProviderModels(Long providerId, String username) {
+        var provider = providerRepository.findById(providerId)
+                .orElseThrow(() -> new IllegalArgumentException("Provider 不存在：" + providerId));
+        var discovered = modelCatalogClient.discover(provider).stream()
+                .map(option -> new Dtos.ModelOptionItem(option.model(), providerId,
+                        option.capabilities(), option.capabilitySource()))
+                .toList();
+        var merged = new java.util.ArrayList<Dtos.ModelOptionItem>();
+        getModelOptions().stream()
+                .filter(option -> !java.util.Objects.equals(option.providerId(), providerId))
+                .forEach(merged::add);
+        merged.addAll(discovered);
+        var immutableMerged = List.copyOf(merged);
+        upsert(KEY_AI_CHAT_MODEL_OPTIONS, serializeModelOptions(immutableMerged), username);
+        return immutableMerged;
+    }
+
+    /** 驗證非空用途模型存在，且具有指定能力。 */
+    private void validateCapability(String model, Long providerId, ModelCapability required,
+                                    String purpose, List<Dtos.ModelOptionItem> options) {
+        if (!StringUtils.hasText(model)) {
+            if (providerId != null) {
+                throw new IllegalArgumentException(purpose + " 模型留空時 providerId 也必須留空");
+            }
+            return;
+        }
+        var option = findModelOption(model, providerId, purpose, options);
+        if (!option.capabilities().contains(required)) {
+            throw new IllegalArgumentException(purpose + " 模型必須支援 " + required + "：" + model);
+        }
+    }
+
+    /** 驗證非空 Chat 模型存在於候選清單。 */
+    private void validateKnownModel(String model, Long providerId, String purpose,
+                                    List<Dtos.ModelOptionItem> options) {
+        if (!StringUtils.hasText(model)) {
+            if (providerId != null) {
+                throw new IllegalArgumentException(purpose + " 模型留空時 providerId 也必須留空");
+            }
+            return;
+        }
+        findModelOption(model, providerId, purpose, options);
+    }
+
+    /** 以模型名稱與 providerId 成對尋找候選模型。 */
+    private Dtos.ModelOptionItem findModelOption(String model, Long providerId, String purpose,
+                                                 List<Dtos.ModelOptionItem> options) {
+        return options.stream()
+                .filter(option -> option.model().equals(model.strip()))
+                .filter(option -> java.util.Objects.equals(option.providerId(), providerId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(purpose + " 模型不在候選清單內：" + model));
+    }
+
+    /** 正規化可選模型名稱。 */
+    private String normalizeModel(String model) {
+        return model == null ? "" : model.strip();
+    }
+
+    /** 正規化 provider ID 為設定值。 */
+    private String normalizeProviderId(Long providerId) {
+        return providerId == null ? "" : providerId.toString();
+    }
+
+    /** 驗證非空 Provider ID 仍存在，避免 stale assignment 或人工能力設定。 */
+    private void validateProvider(Long providerId, String purpose) {
+        if (providerId != null && !providerRepository.existsById(providerId)) {
+            throw new IllegalArgumentException(purpose + " Provider 不存在：" + providerId);
+        }
     }
 
     /**
@@ -263,9 +467,12 @@ public class SystemSettingService {
                                  Double temperature, Integer maxCompletionTokens, String reasoningEffort,
                                  String username) {
         var safeModel = model == null ? "" : model.strip();
-        var safeOptions = modelOptions == null ? List.<Dtos.ModelOptionItem>of() : modelOptions;
-        var modelNames = safeOptions.stream().map(Dtos.ModelOptionItem::model).toList();
-        if (!safeModel.isBlank() && !modelNames.contains(safeModel)) {
+        var safeOptions = normalizeExternalModelOptions(modelOptions);
+        validateProvider(providerId, "Chat");
+        var selectedOptionExists = safeOptions.stream()
+                .anyMatch(option -> option.model().equals(safeModel)
+                        && java.util.Objects.equals(option.providerId(), providerId));
+        if (!safeModel.isBlank() && !selectedOptionExists) {
             throw new IllegalArgumentException("選用模型不在候選清單內：" + safeModel);
         }
         // 參數驗證：溫度 0~2、max_completion_tokens > 0、reasoning_effort 限定值
@@ -285,6 +492,27 @@ public class SystemSettingService {
         upsert(KEY_AI_CHAT_TEMPERATURE, temperature != null ? temperature.toString() : "", username);
         upsert(KEY_AI_CHAT_MAX_COMPLETION_TOKENS, maxCompletionTokens != null ? maxCompletionTokens.toString() : "", username);
         upsert(KEY_AI_CHAT_REASONING_EFFORT, safeReasoning, username);
+    }
+
+    /**
+     * 正規化舊設定 API 傳入的模型清單：同 pair 保留伺服器可信能力，新 pair 一律 UNKNOWN。
+     * 此邊界禁止前端藉由一般設定 payload 偽造 AUTO 或 MANUAL 能力。
+     */
+    private List<Dtos.ModelOptionItem> normalizeExternalModelOptions(List<Dtos.ModelOptionItem> requestedOptions) {
+        var existingOptions = getModelOptions();
+        var requested = requestedOptions == null ? List.<Dtos.ModelOptionItem>of() : requestedOptions;
+        return requested.stream().map(option -> {
+            if (option == null || !StringUtils.hasText(option.model())) {
+                throw new IllegalArgumentException("模型候選不得為 null 或空名稱");
+            }
+            validateProvider(option.providerId(), "模型候選");
+            return existingOptions.stream()
+                    .filter(existing -> existing.model().equals(option.model().strip()))
+                    .filter(existing -> java.util.Objects.equals(existing.providerId(), option.providerId()))
+                    .findFirst()
+                    .orElseGet(() -> new Dtos.ModelOptionItem(option.model().strip(), option.providerId(),
+                            java.util.Set.of(), com.aicrm.crm.domain.CapabilitySource.UNKNOWN));
+        }).toList();
     }
 
     /** 解析 ModelOptionItem 清單 JSON；任何錯誤回空清單並記 log。 */

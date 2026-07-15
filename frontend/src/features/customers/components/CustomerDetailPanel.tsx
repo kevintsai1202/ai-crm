@@ -124,7 +124,7 @@ export function CustomerDetailPanel({
       />
       {/* 時間線改橫向 banner、商機看板含 5 欄,皆改整列全寬呈現(原本半寬欄會擠) */}
       <Timeline interactions={detail.interactions} onEdit={onEditInteraction} onDelete={onDeleteInteraction} />
-      <OpportunityBoard opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
+      <OpportunityBoard customerId={detail.customer.id} opportunities={detail.opportunities} onStageChange={onStageChange} onEdit={onEditOpportunity} onDelete={onDeleteOpportunity} />
     </section>
   );
 }

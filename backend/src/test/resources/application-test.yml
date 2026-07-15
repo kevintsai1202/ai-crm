@@ -12,6 +12,9 @@ spring:
     openai:
       api-key: ""
 app:
+  media:
+    # 一般 Spring context 測試不依賴外部 MinIO；媒體 IT 直接啟動真實 container/adapter。
+    enabled: false
   security:
     # 測試用 JWT 密鑰（≥32 字元）：避免 JwtService fail-fast 導致整合測試 context 載入失敗。
     # 正式環境一律由環境變數 APP_SECURITY_JWT_SECRET 提供，切勿沿用此測試值。

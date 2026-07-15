@@ -2,7 +2,7 @@
 
 > 本文件是所有子專案（SP）進度的**唯一真實來源**。每個 session 開始前先讀本檔，結束後更新狀態。
 > 依據：`docs/consulting-review.md`、`docs/crm-ai-consultant-analysis.md`
-> 最後更新：2026-06-19（SP1 完成上線，下一個 SP2）
+> 最後更新：2026-07-15（V21–V27 智慧銷售工作流全部完成）
 
 ## 狀態圖例
 `⬜ 未開始` ｜ `🟡 設計中(spec)` ｜ `🔵 計畫中(plan)` ｜ `🟠 實作中` ｜ `✅ 完成`
@@ -11,6 +11,18 @@
 
 > **路線圖 SP1–SP6 全部完成 ✅；追加 SP7 ✅、SP8 ✅、SP9-A 示範資料/漏斗 ✅、SP9-B 工作檯個人 AI ✅**　｜　最後完成：SP9-B  
 > **下一階段程式：** SP10–SP15 優化修正（見 `docs/superpowers/plans/2026-07-10-post-sp9-optimization-program.md`）；**不含**金鑰輪替。建議序：SP10 → SP11 →（SP12 ∥ SP13）→ SP14 → SP15。
+
+### Intelligent sales workflows (V21–V27)
+
+| Phase | Status | Delivery |
+|---|---|---|
+| V21 | ✅ Complete | Explicit Vision/audio capabilities, AUTO/MANUAL/UNKNOWN provenance, governed OCR/transcription assignments, Admin UI and real API E2E |
+| V22 | ✅ Complete | Formal CRM task work queue, customer/workspace phone follow-up entry, postpone/complete, stable UTF-8 `.ics`, owner/version-safe explicit cleanup and real download E2E |
+| V23 | ✅ Complete | Temporary media on S3/MinIO, AI business-card OCR intake, three-step wizard (upload→review/dedupe→confirm), atomic customer/contact/opportunity/phone-task creation with Idempotency-Key, post-commit image deletion (`DELETED`), deterministic fake Vision for E2E; two real MinIO-backed E2E cases pass |
+| V24 | ✅ Complete | AI meeting copilot: audio upload to temporary media, governed transcription, deterministic structured draft (interaction/task/opportunity-patch/stakeholder), side-by-side transcript + selectable CRM changes, low-confidence stakeholder default-unselected, Idempotency-Key selective confirm applying only chosen changes, post-commit audio deletion with transcript retained; fake transcription for E2E; backend 217 tests + real MinIO E2E pass |
+| V25 | ✅ Complete | AI follow-up email: grounded draft, human edits create new versions (append-only chain), approve-and-send via Zeabur Sendmail with unified company sender + owner Reply-To (blocked when owner lacks email), Idempotency-Key single-send, FAILED-only retry, credentials never returned/logged; fake mail client for E2E; backend 229 tests + real MinIO E2E pass |
+| V26 | ✅ Complete | Explainable opportunity health: pure deterministic calculator (sum==total, stage dwell/close date/interaction heat/sentiment/task/decision-chain), history snapshots + trend, deterministic next-best-action, never mutates stage/probability, owner-scoped; intelligence tab with recalculate and task/follow-up entry; backend 241 tests + real E2E pass |
+| V27 | ✅ Complete | Stakeholder decision map: confirmed roles/relations vs pending AI suggestions kept in separate fields, deterministic idempotent suggest, confirm promotes to fact, reject keeps audit but hides from facts/pending, cross-customer relations rejected, owner-scoped; graph UI renders confirmed solid and pending dashed with confirm/reject; backend 250 tests + real E2E pass |
 
 | # | 子專案 | 狀態 | spec | plan | 備註 |
 |---|--------|------|------|------|------|

@@ -7,6 +7,12 @@ import com.aicrm.crm.domain.LeadSource;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.OpportunityType;
 import com.aicrm.crm.domain.Role;
+import com.aicrm.crm.domain.StakeholderInfluence;
+import com.aicrm.crm.domain.StakeholderRelationType;
+import com.aicrm.crm.domain.StakeholderRoleType;
+import com.aicrm.crm.domain.StakeholderSource;
+import com.aicrm.crm.domain.StakeholderStance;
+import com.aicrm.crm.domain.StakeholderSuggestionStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -466,8 +472,141 @@ public final class Dtos {
     /** 優先關懷單筆：客戶與中文關懷理由。 */
     public record PriorityCareItem(Long customerId, String name, String reason) {}
 
-    /** 模型設定項目（含供應商關聯）。 */
-    public record ModelOptionItem(String model, Long providerId) {}
+    /** 建立 CRM 任務請求。 */
+    public record CreateTaskRequest(
+            @NotNull Long customerId,
+            Long opportunityId,
+            Long contactId,
+            @NotNull com.aicrm.crm.domain.CrmTaskType type,
+            @NotNull com.aicrm.crm.domain.CrmTaskPriority priority,
+            @NotBlank String title,
+            String description,
+            @NotNull Long assigneeId,
+            @NotNull LocalDateTime scheduledStart,
+            @NotNull LocalDateTime scheduledEnd,
+            @NotNull com.aicrm.crm.domain.CrmTaskSource source) {}
+
+    /** 編輯 CRM 任務請求；version 用於拒絕過期畫面送出的更新。 */
+    public record UpdateTaskRequest(
+            @NotNull com.aicrm.crm.domain.CrmTaskType type,
+            @NotNull com.aicrm.crm.domain.CrmTaskPriority priority,
+            @NotBlank String title,
+            String description,
+            @NotNull Long assigneeId,
+            @NotNull LocalDateTime scheduledStart,
+            @NotNull LocalDateTime scheduledEnd,
+            @NotNull Long version) {}
+
+    /** CRM 任務延期請求。 */
+    public record PostponeTaskRequest(@NotNull LocalDateTime scheduledStart,
+                                      @NotNull LocalDateTime scheduledEnd,
+                                      @NotNull Long version) {}
+
+    /** 完成 CRM 任務請求，version 用來拒絕順序式舊畫面更新。 */
+    public record CompleteTaskRequest(@NotNull Long version) {}
+
+    /** CRM 任務 API 回應。 */
+    public record TaskResponse(
+            Long id, Long customerId, Long opportunityId, Long contactId,
+            com.aicrm.crm.domain.CrmTaskType type,
+            com.aicrm.crm.domain.CrmTaskStatus status,
+            com.aicrm.crm.domain.CrmTaskPriority priority,
+            String title, String description, Long assigneeId, String assigneeName,
+            LocalDateTime scheduledStart, LocalDateTime scheduledEnd, LocalDateTime completedAt,
+            int postponeCount, com.aicrm.crm.domain.CrmTaskSource source, long version,
+            Instant revisionTimestamp) {}
+
+    /** 模型設定項目（含供應商關聯、已確認能力及能力來源）。 */
+    public record ModelOptionItem(
+            String model,
+            Long providerId,
+            java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities,
+            com.aicrm.crm.domain.CapabilitySource capabilitySource) {
+        /** 正規化舊資料或缺漏欄位，禁止從模型名稱推測能力。 */
+        public ModelOptionItem {
+            capabilities = capabilities == null ? java.util.Set.of() : java.util.Set.copyOf(capabilities);
+            capabilitySource = capabilitySource == null
+                    ? com.aicrm.crm.domain.CapabilitySource.UNKNOWN
+                    : capabilitySource;
+        }
+    }
+
+    /** Chat、OCR 與轉錄三種用途的模型 assignment。 */
+    public record AiModelAssignments(
+            String chatModel,
+            Long chatProviderId,
+            String ocrModel,
+            Long ocrProviderId,
+            String transcriptionModel,
+            Long transcriptionProviderId) {}
+
+    /** Vision 模型辨識後的標準化名片欄位。 */
+    public record RecognizedBusinessCard(String personName, String title, String email, String phone,
+                                         String companyName, String website, Map<String, Double> confidence,
+                                         List<String> warnings) {}
+
+    /** 可能重複的客戶候選，不自動選擇合併。 */
+    public record BusinessCardDuplicateCandidate(Long customerId, String customerName,
+                                                  List<String> matchedBy) {}
+
+    /** 名片 intake 查詢與建立回應。 */
+    public record BusinessCardIntakeResponse(Long id, String status, Long mediaId,
+                                              RecognizedBusinessCard recognized,
+                                              List<BusinessCardDuplicateCandidate> duplicateCandidates,
+                                              String errorSummary) {}
+
+    /** 人工確認名片建檔請求；CREATE 與 MERGE 必須明確選擇。 */
+    public record ConfirmBusinessCardRequest(
+            @NotBlank String customerAction, Long customerId,
+            @NotBlank String customerName, @NotBlank @Email String customerEmail,
+            @NotBlank String customerPhone, @NotBlank String taxId, @NotBlank String industry,
+            @NotBlank String contactName, @NotBlank String contactTitle, @NotBlank @Email String contactEmail,
+            @NotBlank String opportunityName, @NotNull @PositiveOrZero BigDecimal opportunityAmount,
+            LocalDate expectedCloseDate, @NotNull LocalDateTime callAt) {}
+
+    /** 名片確認後所有正式 CRM 關聯 ID。 */
+    public record BusinessCardConfirmResponse(Long intakeId, Long customerId, Long contactId,
+                                               Long opportunityId, Long taskId) {}
+
+    // ===== V24 AI 會議 Copilot =====
+
+    /**
+     * 會議 Copilot 草稿的單一變更項；每項有穩定 changeId，confirm 只套用被選定者。
+     *
+     * @param changeId 穩定變更識別碼
+     * @param type INTERACTION / TASK / OPPORTUNITY_PATCH / STAKEHOLDER_SUGGESTION
+     * @param description 人可讀描述
+     * @param lowConfidence 是否為低信心推測
+     * @param selectedByDefault 前端預設是否勾選（低信心預設不勾）
+     * @param detail 套用所需的型別特定欄位
+     */
+    public record MeetingChange(String changeId, String type, String description,
+                                boolean lowConfidence, boolean selectedByDefault, Map<String, String> detail) {
+        /** 正規化 detail 為不可變 map，避免 null 與外部改動。 */
+        public MeetingChange {
+            detail = detail == null ? Map.of() : Map.copyOf(detail);
+        }
+    }
+
+    /** 會議 Copilot 結構化草稿：AI 摘要與可勾選變更清單。 */
+    public record MeetingDraft(String summary, List<MeetingChange> changes) {}
+
+    /** 會議 Copilot session 建立與查詢回應。 */
+    public record MeetingCopilotSessionResponse(Long id, String status, Long mediaId, Long customerId,
+                                                Long opportunityId, String transcript, String summary,
+                                                List<MeetingChange> changes, String errorSummary) {}
+
+    /** 會議 Copilot 確認請求：選定要套用的 changeId 清單。 */
+    public record ConfirmMeetingRequest(@NotNull List<String> selectedChangeIds) {}
+
+    /** 會議 Copilot 確認結果：實際套用的變更與建立的正式 CRM 資料 ID。 */
+    public record MeetingCopilotConfirmResponse(Long sessionId, List<String> appliedChangeIds, Long interactionId,
+                                                List<Long> taskIds, Long opportunityId, int stakeholderSuggestionCount) {}
+
+    /** Admin 人工覆寫指定 Provider 模型能力的請求。 */
+    public record ModelCapabilitiesRequest(
+            @jakarta.validation.constraints.NotNull Long providerId,
+            @jakarta.validation.constraints.NotNull java.util.Set<com.aicrm.crm.domain.ModelCapability> capabilities) {}
 
     /** AI 供應商檢視（apiKey 永不回傳前端，以 apiKeySet 布林代替）。 */
     public record AiProviderItem(Long id, String name, String baseUrl, boolean apiKeySet) {}
@@ -490,7 +629,11 @@ public final class Dtos {
         // 可編輯模型參數（null/空 = 未設定，沿用預設）
         Double temperature,
         Integer maxCompletionTokens,
-        String reasoningEffort
+        String reasoningEffort,
+        String ocrModel,
+        Long ocrProviderId,
+        String transcriptionModel,
+        Long transcriptionProviderId
     ) {}
 
     /** AI 設定更新請求。 */
@@ -540,4 +683,161 @@ public final class Dtos {
     public record WorkspaceRecommendationResponse(String summary, String model, String generatedAt,
                                                   List<WorkspaceTodoItem> todos,
                                                   List<SuggestedOpportunityDraft> drafts) {}
+
+    // ===== V25 AI 跟進信與 Zeabur Sendmail =====
+
+    /** 產生跟進信草稿請求；opportunityId 選填（帶入時 grounding 納入該商機）。 */
+    public record CreateFollowUpDraftRequest(Long opportunityId) {}
+
+    /** 人工修改草稿請求（產生新版本）。 */
+    public record UpdateFollowUpDraftRequest(@NotBlank String subject, @NotBlank String body) {}
+
+    /**
+     * 跟進信草稿回應。
+     *
+     * @param id 草稿 id
+     * @param customerId 所屬客戶 id
+     * @param opportunityId 關聯商機 id（可空）
+     * @param versionNumber 版本號（1 起算，人工修改遞增）
+     * @param parentId 上一版本 id（第一版為 null）
+     * @param model 產生模型（deterministic 時為 null）
+     * @param grounding AI 引用依據（客戶／商機／近期互動）
+     * @param subject 主旨
+     * @param body 內文
+     * @param edited 是否為人工修改版本
+     * @param approvedBy 核准者（未核准為 null）
+     * @param approvedAt 核准時間（未核准為 null）
+     */
+    public record FollowUpDraftResponse(Long id, Long customerId, Long opportunityId, int versionNumber, Long parentId,
+                                        String model, String grounding, String subject, String body, boolean edited,
+                                        String approvedBy, Instant approvedAt) {}
+
+    /**
+     * 外寄郵件回應。
+     *
+     * @param id 外寄郵件 id
+     * @param draftId 來源草稿 id
+     * @param from 寄件者（統一公司信箱）
+     * @param replyTo Reply-To（負責業務 Email）
+     * @param recipient 收件者
+     * @param subject 主旨快照
+     * @param body 內文快照
+     * @param status QUEUED / SENT / FAILED
+     * @param messageId Zeabur message id（未寄出為 null）
+     * @param retryCount 重試次數
+     * @param errorSummary 去敏錯誤摘要（絕不含憑證）
+     * @param sentAt 寄出時間（未寄出為 null）
+     */
+    public record OutboundEmailResponse(Long id, Long draftId, String from, String replyTo, String recipient,
+                                        String subject, String body, String status, String messageId, int retryCount,
+                                        String errorSummary, Instant sentAt) {}
+
+    // ===== V26：商機健康度與下一最佳行動 =====
+
+    /**
+     * 健康度單一評分分項（可解釋）。
+     *
+     * @param key 分項代碼（穩定識別，如 STAGE_DWELL）
+     * @param label 分項中文標籤
+     * @param score 實得分數（0–maxScore）
+     * @param maxScore 分項上限
+     * @param reason 中文加/扣分理由
+     * @param evidence 佐證來源引用（引用哪筆互動/任務/階段停留天數等）
+     */
+    public record HealthComponentDto(String key, String label, int score, int maxScore, String reason, String evidence) {}
+
+    /**
+     * 健康度趨勢點（供歷史 snapshot 折線呈現）。
+     *
+     * @param totalScore 該次 snapshot 總分
+     * @param calculatedAt 計算時間
+     */
+    public record HealthTrendPoint(int totalScore, Instant calculatedAt) {}
+
+    /**
+     * 商機健康度回應（GET / recalculate 共用）。
+     *
+     * @param opportunityId 商機 id
+     * @param totalScore 最新總分（0–100，恆等於各分項總和）
+     * @param components 各分項明細（含可解釋 reason 與 evidence）
+     * @param nextBestAction 下一最佳行動文案
+     * @param ruleVersion 規則版本
+     * @param model 產生下一最佳行動的 AI 模型（deterministic 時為 null）
+     * @param calculatedAt 最新 snapshot 計算時間
+     * @param trend 歷史趨勢（時間升冪，含本次）
+     */
+    public record OpportunityHealthResponse(Long opportunityId, int totalScore, List<HealthComponentDto> components,
+                                            String nextBestAction, String ruleVersion, String model, Instant calculatedAt,
+                                            List<HealthTrendPoint> trend) {}
+
+    // ===== V27 Stakeholder 決策鏈 =====
+
+    /**
+     * Stakeholder 決策角色（可為已確認事實或待確認建議，以 status 區分）。
+     *
+     * @param id 角色資料主鍵
+     * @param contactId 綁定的聯絡人 id
+     * @param contactName 聯絡人姓名
+     * @param contactTitle 聯絡人職稱
+     * @param roleType 決策角色類型
+     * @param influence 影響力
+     * @param stance 立場
+     * @param confidence 信心分數（0–100）
+     * @param source 資料來源（AI / MANUAL）
+     * @param status 確認狀態（SUGGESTED / CONFIRMED / REJECTED）
+     */
+    public record StakeholderRoleDto(Long id, Long contactId, String contactName, String contactTitle,
+                                     StakeholderRoleType roleType, StakeholderInfluence influence,
+                                     StakeholderStance stance, int confidence, StakeholderSource source,
+                                     StakeholderSuggestionStatus status) {}
+
+    /**
+     * Stakeholder 關係（兩位同客戶 Contact；可為已確認事實或待確認建議，以 status 區分）。
+     *
+     * @param id 關係資料主鍵
+     * @param fromContactId 起點聯絡人 id
+     * @param fromContactName 起點聯絡人姓名
+     * @param toContactId 終點聯絡人 id
+     * @param toContactName 終點聯絡人姓名
+     * @param relationType 關係類型
+     * @param source 資料來源（AI / MANUAL）
+     * @param status 確認狀態
+     */
+    public record StakeholderRelationDto(Long id, Long fromContactId, String fromContactName, Long toContactId,
+                                         String toContactName, StakeholderRelationType relationType,
+                                         StakeholderSource source, StakeholderSuggestionStatus status) {}
+
+    /**
+     * 待確認建議包裝（可為角色或關係，以 kind 與 suggestionId 前綴區分；confirm / reject 以 suggestionId 對應）。
+     *
+     * @param suggestionId 建議識別碼（role-{id} 或 relation-{id}）
+     * @param kind 建議種類（ROLE / RELATION）
+     * @param status 建議目前狀態
+     * @param role kind=ROLE 時的角色內容（否則 null）
+     * @param relation kind=RELATION 時的關係內容（否則 null）
+     */
+    public record StakeholderSuggestionDto(String suggestionId, String kind, StakeholderSuggestionStatus status,
+                                           StakeholderRoleDto role, StakeholderRelationDto relation) {}
+
+    /**
+     * 客戶決策鏈圖回應：已確認事實與待確認建議分開欄位，明確可區分。
+     *
+     * @param customerId 客戶 id
+     * @param confirmedRoles 已確認角色（事實）
+     * @param confirmedRelations 已確認關係（事實）
+     * @param suggestions 待確認建議（SUGGESTED；不含 REJECTED）
+     */
+    public record StakeholderMapResponse(Long customerId, List<StakeholderRoleDto> confirmedRoles,
+                                         List<StakeholderRelationDto> confirmedRelations,
+                                         List<StakeholderSuggestionDto> suggestions) {}
+
+    /**
+     * 手動新增 Stakeholder 關係請求。
+     *
+     * @param fromContactId 起點聯絡人 id
+     * @param toContactId 終點聯絡人 id
+     * @param relationType 關係類型
+     */
+    public record CreateStakeholderRelationRequest(@NotNull Long fromContactId, @NotNull Long toContactId,
+                                                   @NotNull StakeholderRelationType relationType) {}
 }

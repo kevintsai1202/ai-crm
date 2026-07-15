@@ -8,6 +8,24 @@
   line-height: 1.5;
 }
 
+/* V22 正式 CRM 任務：與規則式 AI 建議分區，避免狀態語意混淆。 */
+.task-panel { margin: 0 24px 18px; padding: 16px; border: 1px solid #dce3ec; border-radius: 12px; background: #fff; }
+.task-panel-compact { margin: 18px 0 0; padding: 12px; }
+.task-panel-head, .task-actions, .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.task-panel-head h4 { margin: 0; }
+.task-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+.task-list li { border: 1px solid #dce3ec; border-left: 4px solid #4f75ff; border-radius: 8px; padding: 10px; display: flex; justify-content: space-between; gap: 12px; }
+.task-list li.task-overdue { border-left-color: #d64545; background: #fff7f7; }
+.task-list li span, .task-list li time { display: block; margin-top: 3px; color: #64748b; font-size: .8rem; }
+.task-actions { justify-content: flex-end; flex-wrap: wrap; }
+.task-actions button { font-size: .78rem; padding: 6px 8px; }
+.task-form-modal { max-width: 520px; display: grid; gap: 12px; }
+.task-form-modal label { display: grid; gap: 5px; font-weight: 600; }
+.task-form-modal input, .task-form-modal select, .task-form-modal textarea { width: 100%; box-sizing: border-box; }
+.task-form-modal textarea { min-height: 84px; resize: vertical; }
+.todo-call-task { margin: 4px 0 10px; }
+@media (max-width: 760px) { .task-list li { flex-direction: column; } .task-actions { justify-content: flex-start; } }
+
 * {
   box-sizing: border-box;
 }

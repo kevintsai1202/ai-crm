@@ -432,10 +432,258 @@ export interface ManagerInsightResponse {
 }
 
 
-/** 模型設定項目（含供應商關聯）。 */
+/** 後端可治理的模型輸入能力。 */
+export type ModelCapability = "VISION" | "AUDIO_TRANSCRIPTION";
+
+/** 模型能力的可信來源；UNKNOWN 不得由模型名稱推測。 */
+export type CapabilitySource = "AUTO" | "MANUAL" | "UNKNOWN";
+
+/** 模型設定項目（含供應商關聯與已確認能力）。 */
 export interface ModelOptionItem {
   model: string;
   providerId: number | null;
+  capabilities: ModelCapability[];
+  capabilitySource: CapabilitySource;
+}
+
+/** CRM 正式任務，狀態唯一來自 `/api/tasks`。 */
+export interface CrmTask {
+  id: number;
+  customerId: number;
+  opportunityId: number | null;
+  contactId: number | null;
+  type: "PHONE_CALL" | "EMAIL" | "MEETING" | "GENERAL";
+  status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  title: string;
+  description: string | null;
+  assigneeId: number;
+  assigneeName: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  completedAt: string | null;
+  postponeCount: number;
+  source: "MANUAL" | "BUSINESS_CARD" | "MEETING_AI" | "FOLLOW_UP_AI";
+  version: number;
+  revisionTimestamp: string;
+}
+
+/** 建立正式 CRM 任務的輸入。 */
+export interface CreateCrmTaskRequest {
+  customerId: number;
+  opportunityId: number | null;
+  contactId: number | null;
+  type: CrmTask["type"];
+  priority: CrmTask["priority"];
+  title: string;
+  description: string | null;
+  assigneeId: number;
+  scheduledStart: string;
+  scheduledEnd: string;
+  source: CrmTask["source"];
+}
+
+/** 名片辨識與人工確認生命週期，對應後端 BusinessCardStatus。 */
+export type BusinessCardStatus = "PROCESSING" | "REVIEW_PENDING" | "FAILED" | "CONFIRMED";
+
+/** Vision 模型辨識後的標準化名片欄位；confidence 以 0–1 表示各欄位信心。 */
+export interface RecognizedBusinessCard {
+  personName: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  companyName: string | null;
+  website: string | null;
+  confidence: Record<string, number>;
+  warnings: string[];
+}
+
+/** 可能重複的既有客戶候選，僅供人工選擇合併，不自動套用。 */
+export interface BusinessCardDuplicateCandidate {
+  customerId: number;
+  customerName: string;
+  matchedBy: string[];
+}
+
+/** 名片 intake 建立與輪詢回應。 */
+export interface BusinessCardIntakeResponse {
+  id: number;
+  status: BusinessCardStatus;
+  mediaId: number | null;
+  recognized: RecognizedBusinessCard | null;
+  duplicateCandidates: BusinessCardDuplicateCandidate[];
+  errorSummary: string | null;
+}
+
+/** 人工確認名片建檔請求；customerAction 必須明確為 CREATE 或 MERGE。 */
+export interface ConfirmBusinessCardRequest {
+  customerAction: "CREATE" | "MERGE";
+  customerId: number | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  taxId: string;
+  industry: string;
+  contactName: string;
+  contactTitle: string;
+  contactEmail: string;
+  opportunityName: string;
+  opportunityAmount: number;
+  expectedCloseDate: string | null;
+  callAt: string;
+}
+
+/** 名片確認後所有正式 CRM 關聯 ID。 */
+export interface BusinessCardConfirmResponse {
+  intakeId: number;
+  customerId: number;
+  contactId: number;
+  opportunityId: number;
+  taskId: number;
+}
+
+/** 會議 Copilot session 生命週期，對應後端 MeetingCopilotStatus。 */
+export type MeetingCopilotStatus = "UPLOADED" | "PROCESSING" | "REVIEW_PENDING" | "FAILED" | "CONFIRMED";
+
+/** 會議草稿中的單一 CRM 變更；低信心的 STAKEHOLDER 建議預設不勾選。 */
+export interface MeetingChange {
+  changeId: string;
+  type: "INTERACTION" | "TASK" | "OPPORTUNITY_PATCH" | "STAKEHOLDER_SUGGESTION";
+  description: string;
+  lowConfidence: boolean;
+  selectedByDefault: boolean;
+  detail: Record<string, string>;
+}
+
+/** 會議 Copilot session 建立與輪詢回應。 */
+export interface MeetingCopilotSessionResponse {
+  id: number;
+  status: MeetingCopilotStatus;
+  mediaId: number | null;
+  customerId: number;
+  opportunityId: number | null;
+  transcript: string | null;
+  summary: string | null;
+  changes: MeetingChange[];
+  errorSummary: string | null;
+}
+
+/** 會議 Copilot 選擇性確認結果。 */
+export interface MeetingCopilotConfirmResponse {
+  sessionId: number;
+  appliedChangeIds: string[];
+  interactionId: number | null;
+  taskIds: number[];
+  opportunityId: number | null;
+  stakeholderSuggestionCount: number;
+}
+
+/** AI 跟進信草稿；人工修改會產生新版本（versionNumber 遞增、parentId 指向前版）。 */
+export interface FollowUpDraftResponse {
+  id: number;
+  customerId: number;
+  opportunityId: number | null;
+  versionNumber: number;
+  parentId: number | null;
+  model: string | null;
+  grounding: string;
+  subject: string;
+  body: string;
+  edited: boolean;
+  approvedBy: string | null;
+  approvedAt: string | null;
+}
+
+/** 寄出郵件紀錄；狀態 QUEUED/SENT/FAILED，憑證不回傳。 */
+export interface OutboundEmailResponse {
+  id: number;
+  draftId: number;
+  from: string;
+  replyTo: string;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "QUEUED" | "SENT" | "FAILED";
+  messageId: string | null;
+  retryCount: number;
+  errorSummary: string | null;
+  sentAt: string | null;
+}
+
+/** 商機健康度單一分項（可解釋加/扣分）。 */
+export interface HealthComponentDto {
+  key: string;
+  label: string;
+  score: number;
+  maxScore: number;
+  reason: string;
+  evidence: string;
+}
+
+/** 健康度趨勢點（歷史 snapshot）。 */
+export interface HealthTrendPoint {
+  totalScore: number;
+  calculatedAt: string;
+}
+
+/** 商機健康度回應（GET / recalculate 共用）。 */
+export interface OpportunityHealthResponse {
+  opportunityId: number;
+  totalScore: number;
+  components: HealthComponentDto[];
+  nextBestAction: string;
+  ruleVersion: string;
+  model: string | null;
+  calculatedAt: string;
+  trend: HealthTrendPoint[];
+}
+
+/** Stakeholder 建議/確認狀態；enum 以字串序列化。 */
+export type StakeholderSuggestionStatus = "SUGGESTED" | "CONFIRMED" | "REJECTED";
+/** 資料來源：AI 建議或人工。 */
+export type StakeholderSource = "AI" | "MANUAL";
+
+/** Stakeholder 決策角色（綁定 Contact）。 */
+export interface StakeholderRoleDto {
+  id: number;
+  contactId: number;
+  contactName: string;
+  contactTitle: string | null;
+  roleType: string;
+  influence: string;
+  stance: string;
+  confidence: number;
+  source: StakeholderSource;
+  status: StakeholderSuggestionStatus;
+}
+
+/** Stakeholder 關係（兩位同客戶 Contact）。 */
+export interface StakeholderRelationDto {
+  id: number;
+  fromContactId: number;
+  fromContactName: string;
+  toContactId: number;
+  toContactName: string;
+  relationType: string;
+  source: StakeholderSource;
+  status: StakeholderSuggestionStatus;
+}
+
+/** 待確認建議（角色或關係擇一）。 */
+export interface StakeholderSuggestionDto {
+  suggestionId: string;
+  kind: "ROLE" | "RELATION";
+  status: StakeholderSuggestionStatus;
+  role: StakeholderRoleDto | null;
+  relation: StakeholderRelationDto | null;
+}
+
+/** 決策鏈圖回應：已確認事實與待確認建議分開。 */
+export interface StakeholderMapResponse {
+  customerId: number;
+  confirmedRoles: StakeholderRoleDto[];
+  confirmedRelations: StakeholderRelationDto[];
+  suggestions: StakeholderSuggestionDto[];
 }
 
 /** AI 供應商資訊（前端不顯示 apiKey 原文）。 */
@@ -458,6 +706,10 @@ export interface AiSettingsResponse {
   temperature: number | null;
   maxCompletionTokens: number | null;
   reasoningEffort: string | null;
+  ocrModel: string | null;
+  ocrProviderId: number | null;
+  transcriptionModel: string | null;
+  transcriptionProviderId: number | null;
 }
 
 /** 單一模型競速測試結果（供評分 API 傳送）。 */
