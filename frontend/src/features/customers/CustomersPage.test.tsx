@@ -47,7 +47,7 @@ describe("CustomersPage i18n", () => {
         </Routes>
       </MemoryRouter>
     );
-    expect(screen.getByRole("heading", { name: "Customer Workbench" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Customers" })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("Customer list")).toBeInTheDocument();
     });

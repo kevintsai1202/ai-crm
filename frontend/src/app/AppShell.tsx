@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -57,28 +58,53 @@ export function AppShell() {
   const { t } = useTranslation(["app", "common"]);
   const { user, health, healthError, refreshHealth, logout } = useAuth();
   const hasUpdate = useVersionCheck();
+  // 側邊欄收合偏好只影響桌面版，並保留於瀏覽器供下次進入沿用。
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("ai-crm-sidebar-collapsed") === "true"
+  );
+
+  /** 切換側邊欄展開狀態並保存使用者偏好。 */
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      localStorage.setItem("ai-crm-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {hasUpdate && <UpdateBanner />}
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
+        <div className="sidebar-toolbar">
+          <LanguageSwitcher className="lang-switcher sidebar-language" />
+          <button
+            type="button"
+            className="sidebar-toggle"
+            aria-label={t(sidebarCollapsed ? "app:menu.expand" : "app:menu.collapse")}
+            aria-expanded={!sidebarCollapsed}
+            onClick={toggleSidebar}
+          >
+            <span aria-hidden="true">{sidebarCollapsed ? "☰" : "◀"}</span>
+          </button>
+        </div>
         <div className="brand-block">
           <img src="/crm-hero.svg" alt={t("app:brand.tagline")} />
-          <div>
+          <div className="brand-copy">
             <span>{t("app:brand.name")}</span>
             <h1>{t("app:brand.tagline")}</h1>
           </div>
         </div>
         <nav className="side-nav">
-          <NavLink to="/dashboard" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.dashboard")}</NavLink>
-          <NavLink to="/customers" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.customers")}</NavLink>
+          <NavLink to="/dashboard" title={t("app:nav.dashboard")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📊</span><span className="side-nav-label">{t("app:nav.dashboard")}</span></NavLink>
+          <NavLink to="/customers" title={t("app:nav.customers")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">👥</span><span className="side-nav-label">{t("app:nav.customers")}</span></NavLink>
           {user?.role === "MANAGER" || user?.role === "ADMIN" ? (
-            <NavLink to="/team" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.team")}</NavLink>
+            <NavLink to="/team" title={t("app:nav.team")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📈</span><span className="side-nav-label">{t("app:nav.team")}</span></NavLink>
           ) : null}
           {user?.role === "ADMIN" ? (
             <>
-              <NavLink to="/admin/users" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.adminUsers")}</NavLink>
-              <NavLink to="/admin/settings" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.adminSettings")}</NavLink>
+              <NavLink to="/admin/users" title={t("app:nav.adminUsers")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">⚙️</span><span className="side-nav-label">{t("app:nav.adminUsers")}</span></NavLink>
+              <NavLink to="/admin/settings" title={t("app:nav.adminSettings")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">🔧</span><span className="side-nav-label">{t("app:nav.adminSettings")}</span></NavLink>
             </>
           ) : null}
         </nav>
@@ -90,8 +116,6 @@ export function AppShell() {
             <button type="button" onClick={logout}>{t("app:userCard.logout")}</button>
           </div>
         ) : null}
-        {/* 語言切換置於側邊欄底部，登入後全站可切換介面語言 */}
-        <LanguageSwitcher className="lang-switcher" />
       </aside>
       <main className="main">
         <Outlet />

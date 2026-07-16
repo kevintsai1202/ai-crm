@@ -1,11 +1,11 @@
 {
   "topbar": {
     "title": "Dashboard",
-    "surveyLink": "📋 Fill out the fundraising course survey",
+    "surveyLink": "📋 Course survey",
     "layoutButton": "⊞ Layout (hidden {{count}})",
     "generateDemo": "🧪 Generate demo data",
     "generatingDemo": "Generating…",
-    "portfolioAssess": "📊 Portfolio assessment (company-wide)",
+    "portfolioAssess": "📊 Portfolio review",
     "aiHistory": "🕘 AI history"
   },
   "grid": { "dragHandle": "Drag to move", "closeBlock": "Close block" },
@@ -17,13 +17,13 @@
   "loading": "Loading...",
   "kpi": {
     "customers": { "title": "KPI · Customers", "label": "Customers" },
-    "activeOpps": { "title": "KPI · Active opportunities", "label": "Active opportunities" },
-    "pipeline": { "title": "KPI · Pipeline amount", "label": "Pipeline amount" },
-    "highRisk": { "title": "KPI · High-risk customers", "label": "High-risk customers" }
+    "activeOpps": { "title": "KPI · Opportunities", "label": "Opportunities" },
+    "pipeline": { "title": "KPI · Pipeline", "label": "Pipeline" },
+    "highRisk": { "title": "KPI · High risk", "label": "High risk" }
   },
   "charts": {
     "pipeline": {
-      "title": "Sales funnel · Pipeline", "subtitle": "Opportunity (top) → Won (bottom)",
+      "title": "Sales pipeline", "subtitle": "Top: open · Bottom: won",
       "sourceAll": "All", "sourceInbound": "Inbound", "sourceOutbound": "Outbound", "sourceReferral": "Referral",
       "hoverTitle": "Click to view {{stage}}'s {{count}} opportunities", "avgDaysSuffix": " · avg {{days}} days in stage", "overdueSuffix": " · {{count}} overdue",
       "countSuffix": "{{count}}", "avgDaysInline": " · avg {{days}} days"
@@ -34,8 +34,8 @@
     },
     "industry": { "title": "Revenue by industry", "subtitle": "Click to view customers", "drillTitle": "Industry · {{label}}" },
     "risk": { "title": "Customer risk breakdown", "subtitle": "Click to view customers", "drillTitle": "Risk · {{label}}" },
-    "renewal": { "title": "Renewal forecast", "subtitle": "Click month to view", "hoverTitle": "Click to view customers renewing in {{month}}", "drillTitle": "Renewal due · {{label}}" },
-    "leaderboard": { "title": "Owner leaderboard", "subtitle": "Click to view customers", "drillTitle": "Owner · {{label}}", "customersSuffix": "{{count}} customers", "highRiskSuffix": "high-risk {{count}}" },
+    "renewal": { "title": "Renewals", "subtitle": "Select a month", "hoverTitle": "Click to view customers renewing in {{month}}", "drillTitle": "Renewal due · {{label}}" },
+    "leaderboard": { "title": "Sales leaderboard", "subtitle": "Select an owner", "drillTitle": "Owner · {{label}}", "customersSuffix": "{{count}} clients", "highRiskSuffix": "risk {{count}}" },
     "activity": { "title": "Recent key activity", "subtitle": "Click to jump to customer" }
   },
   "rfm": {

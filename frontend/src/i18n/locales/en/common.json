@@ -33,7 +33,7 @@
     "password": "Password",
     "submit": "Sign in",
     "accounts": "Available accounts: sales@aurora.local / manager@aurora.local / admin@aurora.local, password is password123.",
-    "surveyLink": "📋 Fill out the fundraising course survey",
+    "surveyLink": "📋 Course survey",
     "error": {
       "invalid": "Incorrect username or password.",
       "rateLimited": "Too many requests, please try again later.",

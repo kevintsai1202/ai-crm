@@ -54,8 +54,10 @@ describe("DashboardPage i18n", () => {
     await waitFor(() => {
       expect(screen.getByText("Customers")).toBeInTheDocument();
     });
-    expect(screen.getByText("Active opportunities")).toBeInTheDocument();
-    expect(screen.getByText("Pipeline amount")).toBeInTheDocument();
+    expect(screen.getByText("Opportunities")).toBeInTheDocument();
+    expect(screen.getByText("Pipeline")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "📋 Course survey" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Portfolio review/i })).toBeInTheDocument();
   });
 
   it("切換繁中顯示頁面標題與 KPI 標籤", async () => {

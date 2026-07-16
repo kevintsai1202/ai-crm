@@ -1,12 +1,13 @@
 {
   "brand": { "name": "AI CRM", "tagline": "智慧業務助理" },
   "nav": {
-    "dashboard": "📊 儀表板",
-    "customers": "👥 客戶工作台",
-    "team": "📈 業務分析",
-    "adminUsers": "⚙️ 帳號管理",
-    "adminSettings": "🔧 系統設定"
+    "dashboard": "儀表板",
+    "customers": "客戶工作台",
+    "team": "業務分析",
+    "adminUsers": "帳號管理",
+    "adminSettings": "系統設定"
   },
+  "menu": { "collapse": "收合選單", "expand": "展開選單" },
   "health": {
     "ok": "後端連線正常",
     "fail": "後端無法連線",

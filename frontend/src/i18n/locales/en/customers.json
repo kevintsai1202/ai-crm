@@ -1,5 +1,5 @@
 {
-  "topbar": { "title": "Customer Workbench", "searchPlaceholder": "Name / Email / Phone / Tax ID" },
+  "topbar": { "title": "Customers", "searchPlaceholder": "Name / Email / Phone / Tax ID" },
   "filters": {
     "allIndustries": "All industries", "allOwners": "All owners", "allStatuses": "All statuses",
     "allRisk": "All risk levels", "renewalFrom": "Renewal due from", "renewalTo": "Renewal due to",
