@@ -11,7 +11,9 @@ export default defineConfig({
   // 序列執行：V21–V27 E2E 皆操作同一份後端全域 AI 設定（provider/模型/用途 assignment）
   // 與共享 DB，平行會互相干擾；固定單一 worker 確保階段間彼此隔離。
   workers: 1,
-  use: { baseURL: "http://127.0.0.1:5173" },
+  // locale: "zh-TW" — 未明確指定語言的既有測試（如 sp1-smoke、sp7-layout）沿用中文斷言；
+  // mobile-rwd.spec.ts 以 addInitScript 寫入 localStorage 指定語言，優先權高於瀏覽器語系，不受影響。
+  use: { baseURL: "http://127.0.0.1:5173", locale: "zh-TW" },
   webServer: {
     command: "pnpm run dev",
     url: "http://127.0.0.1:5173",

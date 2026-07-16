@@ -115,6 +115,9 @@ button {
   gap: 18px;
   color: #f8fffd;
   background: #123047;
+  /* 內容（導覽 + 健康狀態卡 + 使用者卡 + 語言切換）超過視窗高度時可捲動，
+     避免底部項目（如語言切換）被卡在畫面外無法互動。 */
+  overflow-y: auto;
 }
 
 .brand-block {
@@ -1161,6 +1164,20 @@ button {
     align-items: stretch;
   }
 
+  /* topbar-actions（整體評估/AI 歷程/版面/募資問卷等按鈕列）容器本身允許換行；
+     個別按鈕的 white-space: normal 覆寫集中放在檔案最後（見「手機版面溢出修正」），
+     避免與各按鈕原本各自的 nowrap 規則因宣告順序被覆蓋回去。 */
+  .topbar-actions {
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  /* 客戶工作台操作列（AI 工作建議/新增客戶/名片建檔...9 個按鈕）：英文標籤較長，
+     手機寬度下允許換行，避免整排強制單行撐破畫面。 */
+  .action-bar {
+    flex-wrap: wrap;
+  }
+
   .metric-grid,
   .report-grid,
   .detail-grid,
@@ -1971,10 +1988,12 @@ button.renewal-bar.clickable:hover {
 .side-nav-link.active { background: rgba(20, 184, 166, 0.22); }
 
 /* RFM 客戶分群區塊 */
-.rfm-table { display: flex; flex-direction: column; gap: 4px; }
+.rfm-table { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* grid 欄寬用 minmax(0, Nfr) 而非單純 Nfr：避免英文分群標籤（如 "Needs attention"）
+   比中文長，導致該欄的 auto 最小寬度撐開整個 grid、撑破窄螢幕版面。 */
 .rfm-head, .rfm-row {
   display: grid;
-  grid-template-columns: 2fr 1.4fr 0.5fr 0.5fr 0.5fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 0.5fr) minmax(0, 0.5fr) minmax(0, 0.5fr) minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -1988,7 +2007,11 @@ button.renewal-bar.clickable:hover {
 .rfm-row strong { font-weight: 600; }
 .rfm-row em { font-style: normal; text-align: center; font-variant-numeric: tabular-nums; }
 .rfm-row b { text-align: right; }
-.rfm-seg { font-size: 12px; padding: 2px 8px; border-radius: 999px; text-align: center; white-space: nowrap; }
+.rfm-seg {
+  font-size: 12px; padding: 2px 8px; border-radius: 999px; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  display: inline-block;
+}
 .rfm-seg.champion { background: rgba(16, 185, 129, 0.22); color: #34d399; }
 .rfm-seg.loyal { background: rgba(20, 184, 166, 0.18); color: #2dd4bf; }
 .rfm-seg.potential { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
@@ -2020,6 +2043,16 @@ button.renewal-bar.clickable:hover {
 .topbar-actions { display: flex; gap: 10px; align-items: center; margin-left: auto; }
 .topbar-actions .btn-assess { white-space: nowrap; border-radius: 8px; padding: 9px 16px; font-weight: 700; }
 .topbar-actions .btn-assess:disabled { opacity: 0.6; cursor: default; filter: none; }
+
+/* 手機寬度下英文按鈕文字較長，允許折行且不設 min-width，避免撐破版面
+   （放在此規則之後以覆寫上面同層級選擇器；flex 子項預設 min-width:auto 會依內容自然寬度撐開）。 */
+@media (max-width: 720px) {
+  .topbar-actions .btn-assess {
+    white-space: normal;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
 
 .sr-card { min-height: 220px; }
 .sr-empty { opacity: 0.55; font-size: 13px; padding: 12px 4px; }
@@ -2061,7 +2094,7 @@ button.renewal-bar.clickable:hover {
   background: rgba(255,255,255,0.03); color: inherit;
 }
 .sr-row:hover { background: rgba(20, 184, 166, 0.12); }
-.sr-row-name { font-weight: 600; white-space: nowrap; }
+.sr-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
 .sr-row-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.85; font-size: 13px; }
 .sr-row-time { font-style: normal; font-size: 12px; opacity: 0.6; white-space: nowrap; }
 .sr-churn-row { display: grid; grid-template-columns: 1.4fr 2fr 40px; }
@@ -2244,6 +2277,15 @@ button.renewal-bar.clickable:hover {
   background: #fff; color: #0f5f57; font-weight: 600; white-space: nowrap;
 }
 .layout-btn:hover { background: #f0faf6; }
+
+/* 手機寬度下英文「Layout (hidden N)」較長，同 .btn-assess 允許折行、不設 min-width */
+@media (max-width: 720px) {
+  .layout-btn {
+    white-space: normal;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+}
 .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 110; display: flex; justify-content: flex-end; }
 .drawer {
   width: 320px; max-width: 90vw; height: 100vh; background: #fff;

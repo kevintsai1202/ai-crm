@@ -1,0 +1,21 @@
+{
+  "brand": { "name": "AI CRM", "tagline": "Intelligent Sales Assistant" },
+  "nav": {
+    "dashboard": "📊 Dashboard",
+    "customers": "👥 Customer Workbench",
+    "team": "📈 Team Analytics",
+    "adminUsers": "⚙️ User Management",
+    "adminSettings": "🔧 System Settings"
+  },
+  "health": {
+    "ok": "Backend connected",
+    "fail": "Backend unreachable",
+    "noData": "No health data yet",
+    "retry": "Retest"
+  },
+  "userCard": { "logout": "Log out" },
+  "updateBanner": {
+    "message": "A new version is available. Please refresh to use the latest features.",
+    "action": "Update now"
+  }
+}

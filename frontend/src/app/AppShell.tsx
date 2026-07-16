@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useVersionCheck } from "../hooks/useVersionCheck";
 import type { HealthResponse } from "../types";
@@ -9,15 +10,16 @@ import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
  * 顯示後端連線狀態，任何錯誤都以紅燈呈現。
  */
 function HealthBadge({ health, error, onRefresh }: { health: HealthResponse | null; error: boolean; onRefresh: () => void }) {
+  const { t, i18n } = useTranslation("app");
   const ok = !!health && !error;
   return (
     <div className={`health-card ${ok ? "ok" : "fail"}`}>
       <span className="pulse" />
       <div>
-        <strong>{ok ? "後端連線正常" : "後端無法連線"}</strong>
-        <small>{health?.timestamp ? formatDateTime(health.timestamp, "zh-TW", "尚無資料") : "尚未取得健康資訊"}</small>
+        <strong>{ok ? t("health.ok") : t("health.fail")}</strong>
+        <small>{health?.timestamp ? formatDateTime(health.timestamp, i18n.language, t("common:noData")) : t("health.noData")}</small>
       </div>
-      <button type="button" onClick={onRefresh}>重測</button>
+      <button type="button" onClick={onRefresh}>{t("health.retry")}</button>
     </div>
   );
 }
@@ -27,6 +29,8 @@ function HealthBadge({ health, error, onRefresh }: { health: HealthResponse | nu
  * 函式級註解：「立即更新」會清除 JWT token 並強制重載，確保新版本 API 與前端同步。
  */
 function UpdateBanner() {
+  const { t } = useTranslation("app");
+
   function handleUpdate() {
     // cookie 由後端管理，直接重載即可
     window.location.reload();
@@ -36,10 +40,10 @@ function UpdateBanner() {
     <div className="update-banner">
       <span className="update-banner__icon">🚀</span>
       <span className="update-banner__text">
-        系統已更新，請重新整理以使用最新功能
+        {t("updateBanner.message")}
       </span>
       <button type="button" className="update-banner__btn" onClick={handleUpdate}>
-        立即更新
+        {t("updateBanner.action")}
       </button>
     </div>
   );
@@ -50,6 +54,7 @@ function UpdateBanner() {
  * 函式級註解：側邊欄導覽提供「儀表板」與「客戶」兩個主入口，達成儀表板與操作分頁。
  */
 export function AppShell() {
+  const { t } = useTranslation(["app", "common"]);
   const { user, health, healthError, refreshHealth, logout } = useAuth();
   const hasUpdate = useVersionCheck();
 
@@ -58,22 +63,22 @@ export function AppShell() {
       {hasUpdate && <UpdateBanner />}
       <aside className="sidebar">
         <div className="brand-block">
-          <img src="/crm-hero.svg" alt="AI CRM 工作台視覺" />
+          <img src="/crm-hero.svg" alt={t("app:brand.tagline")} />
           <div>
-            <span>AI CRM</span>
-            <h1>智慧業務助理</h1>
+            <span>{t("app:brand.name")}</span>
+            <h1>{t("app:brand.tagline")}</h1>
           </div>
         </div>
         <nav className="side-nav">
-          <NavLink to="/dashboard" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>📊 儀表板</NavLink>
-          <NavLink to="/customers" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>👥 客戶工作台</NavLink>
+          <NavLink to="/dashboard" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.dashboard")}</NavLink>
+          <NavLink to="/customers" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.customers")}</NavLink>
           {user?.role === "MANAGER" || user?.role === "ADMIN" ? (
-            <NavLink to="/team" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>📈 業務分析</NavLink>
+            <NavLink to="/team" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.team")}</NavLink>
           ) : null}
           {user?.role === "ADMIN" ? (
             <>
-              <NavLink to="/admin/users" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>⚙️ 帳號管理</NavLink>
-              <NavLink to="/admin/settings" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>🔧 系統設定</NavLink>
+              <NavLink to="/admin/users" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.adminUsers")}</NavLink>
+              <NavLink to="/admin/settings" className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}>{t("app:nav.adminSettings")}</NavLink>
             </>
           ) : null}
         </nav>
@@ -82,7 +87,7 @@ export function AppShell() {
           <div className="user-card">
             <strong>{user.displayName}</strong>
             <span>{user.role}</span>
-            <button type="button" onClick={logout}>登出</button>
+            <button type="button" onClick={logout}>{t("app:userCard.logout")}</button>
           </div>
         ) : null}
         {/* 語言切換置於側邊欄底部，登入後全站可切換介面語言 */}

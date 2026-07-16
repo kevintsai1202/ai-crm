@@ -1,0 +1,21 @@
+{
+  "brand": { "name": "AI CRM", "tagline": "智慧業務助理" },
+  "nav": {
+    "dashboard": "📊 儀表板",
+    "customers": "👥 客戶工作台",
+    "team": "📈 業務分析",
+    "adminUsers": "⚙️ 帳號管理",
+    "adminSettings": "🔧 系統設定"
+  },
+  "health": {
+    "ok": "後端連線正常",
+    "fail": "後端無法連線",
+    "noData": "尚未取得健康資訊",
+    "retry": "重測"
+  },
+  "userCard": { "logout": "登出" },
+  "updateBanner": {
+    "message": "系統已更新，請重新整理以使用最新功能",
+    "action": "立即更新"
+  }
+}

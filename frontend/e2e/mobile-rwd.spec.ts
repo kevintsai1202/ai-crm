@@ -1,0 +1,78 @@
+import { test, expect, type Page } from "@playwright/test";
+
+/**
+ * 手機 RWD 版面檢測：驗證登入頁、Dashboard、客戶工作台在窄螢幕下無水平溢出（橫向捲動）。
+ * 函式級註解：Phase 2 i18n 遷移後英文字串通常比中文長，容易在窄螢幕撐破原本針對中文設計的
+ * 按鈕/徽章寬度；本測試分別以 en / zh-TW 兩種語言在手機寬度下檢查，找出實際溢出的元素。
+ * 前置：後端需已啟動（127.0.0.1:18080），seed 帳號 sales@aurora.local / password123。
+ */
+
+/** 常見手機視窗尺寸（寬 x 高），涵蓋較窄與較常見的兩種機型。 */
+const MOBILE_VIEWPORTS = [
+  { name: "iPhone SE (375x667)", width: 375, height: 667 },
+  { name: "Android 常見窄機 (360x740)", width: 360, height: 740 }
+];
+
+/**
+ * 檢查目前頁面是否有水平溢出，並回傳溢出元素清單（含 class/尺寸），方便定位問題。
+ * 用 scrollWidth > clientWidth 判斷整頁是否可橫向捲動；再逐一檢查所有元素的
+ * getBoundingClientRect().right 是否超出視窗寬度，找出實際撐破版面的元素。
+ *
+ * @param page Playwright 頁面
+ * @returns 溢出元素描述陣列（空陣列表示無溢出）
+ */
+async function findHorizontalOverflow(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const viewportWidth = window.innerWidth;
+    const offenders: string[] = [];
+    const all = document.querySelectorAll("body *");
+    all.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      // 容許 1px 誤差（次像素捲動軸等瀏覽器差異）；只記錄「確實看得見」且會撐開版面的元素
+      if (rect.right > viewportWidth + 1 && rect.width > 0) {
+        const tag = el.tagName.toLowerCase();
+        const cls = el.className ? `.${String(el.className).split(" ").join(".")}` : "";
+        offenders.push(`${tag}${cls} (right=${Math.round(rect.right)}px, viewport=${viewportWidth}px)`);
+      }
+    });
+    return offenders;
+  });
+}
+
+/** 登入並等待進入 Dashboard。 */
+async function login(page: Page) {
+  await page.goto("/");
+  await page.fill('input[name="username"]', "sales@aurora.local");
+  await page.fill('input[name="password"]', "password123");
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/dashboard/);
+}
+
+for (const viewport of MOBILE_VIEWPORTS) {
+  for (const lang of ["en", "zh-TW"] as const) {
+    test(`${viewport.name} · ${lang}：登入頁與主要頁面無水平溢出`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      // 進頁前先寫入語言選擇，讓 detectLanguage 偵測到已儲存語言，避免受瀏覽器/OS locale 影響
+      await page.addInitScript((l) => localStorage.setItem("ai-crm-lang", l), lang);
+
+      // ① 登入頁
+      await page.goto("/");
+      await expect(page.locator(".login-panel")).toBeVisible();
+      let offenders = await findHorizontalOverflow(page);
+      expect(offenders, `登入頁（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
+
+      // ② Dashboard
+      await login(page);
+      await expect(page.locator(".dashboard-grid")).toBeVisible();
+      offenders = await findHorizontalOverflow(page);
+      expect(offenders, `Dashboard（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
+
+      // ③ 客戶工作台
+      await page.locator('a[href="/customers"], .side-nav-link[href="/customers"]').first().click();
+      await expect(page).toHaveURL(/\/customers/);
+      await expect(page.locator(".workspace-grid")).toBeVisible();
+      offenders = await findHorizontalOverflow(page);
+      expect(offenders, `客戶工作台（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
+    });
+  }
+}

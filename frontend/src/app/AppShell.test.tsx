@@ -32,4 +32,28 @@ describe("AppShell", () => {
     );
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
+
+  it("預設英文顯示側邊欄導覽與登出按鈕", async () => {
+    await i18n.changeLanguage("en");
+    render(
+      <MemoryRouter>
+        <AppShell />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Customer Workbench/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Log out" })).toBeInTheDocument();
+  });
+
+  it("切換繁中顯示側邊欄導覽與登出按鈕", async () => {
+    await i18n.changeLanguage("zh-TW");
+    render(
+      <MemoryRouter>
+        <AppShell />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link", { name: /儀表板/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /客戶工作台/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登出" })).toBeInTheDocument();
+  });
 });
