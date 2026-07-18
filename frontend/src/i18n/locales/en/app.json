@@ -7,7 +7,13 @@
     "adminUsers": "User Management",
     "adminSettings": "System Settings"
   },
-  "menu": { "collapse": "Collapse menu", "expand": "Expand menu" },
+  "menu": {
+    "collapse": "Collapse menu",
+    "expand": "Expand menu",
+    "openMobile": "Open navigation menu",
+    "closeMobile": "Close navigation menu",
+    "navigationLabel": "Primary navigation"
+  },
   "health": {
     "ok": "Backend connected",
     "fail": "Backend unreachable",

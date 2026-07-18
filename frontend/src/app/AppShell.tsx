@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
@@ -62,6 +62,16 @@ export function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("ai-crm-sidebar-collapsed") === "true"
   );
+  // 手機導覽預設收合，避免選單長期佔據首屏；桌面收合偏好與此狀態互不影響。
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      mobileMenuPanelRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
+    }
+  }, [mobileMenuOpen]);
 
   /** 切換側邊欄展開狀態並保存使用者偏好。 */
   function toggleSidebar() {
@@ -72,10 +82,40 @@ export function AppShell() {
     });
   }
 
+  /** 切換手機浮動導覽面板。 */
+  function toggleMobileMenu() {
+    setMobileMenuOpen((current) => !current);
+  }
+
+  /** 收合手機導覽；由背景或 Escape 關閉時將焦點送回選單按鈕。 */
+  function closeMobileMenu(restoreFocus = false) {
+    setMobileMenuOpen(false);
+    if (restoreFocus) {
+      mobileMenuButtonRef.current?.focus();
+    }
+  }
+
+  /** 讓鍵盤使用者可按 Escape 關閉手機選單。 */
+  function handleSidebarKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape" && mobileMenuOpen) {
+      event.preventDefault();
+      closeMobileMenu(true);
+    }
+  }
+
+  /** 登出前先關閉手機選單，避免登入頁仍殘留浮動面板狀態。 */
+  function handleLogout() {
+    closeMobileMenu();
+    logout();
+  }
+
   return (
     <div className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {hasUpdate && <UpdateBanner />}
-      <aside className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
+      <aside
+        className={`sidebar${sidebarCollapsed ? " collapsed" : ""}${mobileMenuOpen ? " mobile-menu-open" : ""}`}
+        onKeyDown={handleSidebarKeyDown}
+      >
         <div className="sidebar-toolbar">
           <LanguageSwitcher className="lang-switcher sidebar-language" />
           <button
@@ -87,6 +127,23 @@ export function AppShell() {
           >
             <span aria-hidden="true">{sidebarCollapsed ? "☰" : "◀"}</span>
           </button>
+          <button
+            ref={mobileMenuButtonRef}
+            type="button"
+            className="mobile-menu-toggle"
+            aria-label={t(mobileMenuOpen ? "app:menu.closeMobile" : "app:menu.openMobile")}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
+            onClick={toggleMobileMenu}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              {mobileMenuOpen ? (
+                <path d="M6 6l12 12M18 6 6 18" />
+              ) : (
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              )}
+            </svg>
+          </button>
         </div>
         <div className="brand-block">
           <img src="/crm-hero.svg" alt={t("app:brand.tagline")} />
@@ -95,27 +152,30 @@ export function AppShell() {
             <h1>{t("app:brand.tagline")}</h1>
           </div>
         </div>
-        <nav className="side-nav">
-          <NavLink to="/dashboard" title={t("app:nav.dashboard")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📊</span><span className="side-nav-label">{t("app:nav.dashboard")}</span></NavLink>
-          <NavLink to="/customers" title={t("app:nav.customers")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">👥</span><span className="side-nav-label">{t("app:nav.customers")}</span></NavLink>
-          {user?.role === "MANAGER" || user?.role === "ADMIN" ? (
-            <NavLink to="/team" title={t("app:nav.team")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📈</span><span className="side-nav-label">{t("app:nav.team")}</span></NavLink>
+        {mobileMenuOpen ? <div className="mobile-menu-backdrop" aria-hidden="true" onClick={() => closeMobileMenu(true)} /> : null}
+        <div id="mobile-navigation" ref={mobileMenuPanelRef} className="sidebar-content">
+          <nav className="side-nav" aria-label={t("app:menu.navigationLabel")}>
+            <NavLink to="/dashboard" title={t("app:nav.dashboard")} onClick={() => closeMobileMenu()} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📊</span><span className="side-nav-label">{t("app:nav.dashboard")}</span></NavLink>
+            <NavLink to="/customers" title={t("app:nav.customers")} onClick={() => closeMobileMenu()} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">👥</span><span className="side-nav-label">{t("app:nav.customers")}</span></NavLink>
+            {user?.role === "MANAGER" || user?.role === "ADMIN" ? (
+              <NavLink to="/team" title={t("app:nav.team")} onClick={() => closeMobileMenu()} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">📈</span><span className="side-nav-label">{t("app:nav.team")}</span></NavLink>
+            ) : null}
+            {user?.role === "ADMIN" ? (
+              <>
+                <NavLink to="/admin/users" title={t("app:nav.adminUsers")} onClick={() => closeMobileMenu()} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">⚙️</span><span className="side-nav-label">{t("app:nav.adminUsers")}</span></NavLink>
+                <NavLink to="/admin/settings" title={t("app:nav.adminSettings")} onClick={() => closeMobileMenu()} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">🔧</span><span className="side-nav-label">{t("app:nav.adminSettings")}</span></NavLink>
+              </>
+            ) : null}
+          </nav>
+          <HealthBadge health={health} error={healthError} onRefresh={refreshHealth} />
+          {user ? (
+            <div className="user-card">
+              <strong>{user.displayName}</strong>
+              <span>{user.role}</span>
+              <button type="button" onClick={handleLogout}>{t("app:userCard.logout")}</button>
+            </div>
           ) : null}
-          {user?.role === "ADMIN" ? (
-            <>
-              <NavLink to="/admin/users" title={t("app:nav.adminUsers")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">⚙️</span><span className="side-nav-label">{t("app:nav.adminUsers")}</span></NavLink>
-              <NavLink to="/admin/settings" title={t("app:nav.adminSettings")} className={({ isActive }) => isActive ? "side-nav-link active" : "side-nav-link"}><span className="side-nav-icon" aria-hidden="true">🔧</span><span className="side-nav-label">{t("app:nav.adminSettings")}</span></NavLink>
-            </>
-          ) : null}
-        </nav>
-        <HealthBadge health={health} error={healthError} onRefresh={refreshHealth} />
-        {user ? (
-          <div className="user-card">
-            <strong>{user.displayName}</strong>
-            <span>{user.role}</span>
-            <button type="button" onClick={logout}>{t("app:userCard.logout")}</button>
-          </div>
-        ) : null}
+        </div>
       </aside>
       <main className="main">
         <Outlet />

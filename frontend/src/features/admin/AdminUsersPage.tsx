@@ -71,39 +71,42 @@ export function AdminUsersPage() {
         ) : error ? (
           <div className="sr-empty">{error}</div>
         ) : (
-          <table className="admin-user-table">
-            <thead>
-              <tr>
-                <th>帳號</th><th>顯示名稱</th><th>角色</th><th>狀態</th><th>建立時間</th><th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className={u.enabled ? "" : "row-disabled"}>
-                  <td>{u.username}{u.username === user?.username ? <span className="me-badge">我</span> : null}</td>
-                  <td>{u.displayName}</td>
-                  <td>{ROLE_LABEL[u.role]}</td>
-                  <td>
-                    <span className={`status-pill ${u.enabled ? "on" : "off"}`}>{u.enabled ? "啟用" : "停用"}</span>
-                  </td>
-                  <td>{formatDateTime(u.createdAt, "zh-TW", "尚無資料")}</td>
-                  <td className="admin-user-actions">
-                    <button type="button" className="btn-secondary" onClick={() => setEditing(u)}>編輯</button>
-                    <button type="button" className="btn-secondary" onClick={() => setResetting(u)}>重設密碼</button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      disabled={u.username === user?.username}
-                      title={u.username === user?.username ? "不可停用自己的帳號" : ""}
-                      onClick={() => toggleEnabled(u)}
-                    >
-                      {u.enabled ? "停用" : "啟用"}
-                    </button>
-                  </td>
+          /* 帳號欄位與操作按鈕需要完整保留，窄螢幕只在表格容器內捲動。 */
+          <div className="table-scroll admin-users-table-scroll" role="region" aria-label="帳號清單" tabIndex={0}>
+            <table className="admin-user-table">
+              <thead>
+                <tr>
+                  <th>帳號</th><th>顯示名稱</th><th>角色</th><th>狀態</th><th>建立時間</th><th>操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className={u.enabled ? "" : "row-disabled"}>
+                    <td>{u.username}{u.username === user?.username ? <span className="me-badge">我</span> : null}</td>
+                    <td>{u.displayName}</td>
+                    <td>{ROLE_LABEL[u.role]}</td>
+                    <td>
+                      <span className={`status-pill ${u.enabled ? "on" : "off"}`}>{u.enabled ? "啟用" : "停用"}</span>
+                    </td>
+                    <td>{formatDateTime(u.createdAt, "zh-TW", "尚無資料")}</td>
+                    <td className="admin-user-actions">
+                      <button type="button" className="btn-secondary" onClick={() => setEditing(u)}>編輯</button>
+                      <button type="button" className="btn-secondary" onClick={() => setResetting(u)}>重設密碼</button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={u.username === user?.username}
+                        title={u.username === user?.username ? "不可停用自己的帳號" : ""}
+                        onClick={() => toggleEnabled(u)}
+                      >
+                        {u.enabled ? "停用" : "啟用"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

@@ -7,7 +7,13 @@
     "adminUsers": "帳號管理",
     "adminSettings": "系統設定"
   },
-  "menu": { "collapse": "收合選單", "expand": "展開選單" },
+  "menu": {
+    "collapse": "收合選單",
+    "expand": "展開選單",
+    "openMobile": "開啟導覽選單",
+    "closeMobile": "關閉導覽選單",
+    "navigationLabel": "主要導覽"
+  },
   "health": {
     "ok": "後端連線正常",
     "fail": "後端無法連線",

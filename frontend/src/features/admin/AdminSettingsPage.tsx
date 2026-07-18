@@ -520,7 +520,7 @@ export default function AdminSettingsPage() {
     || (transcriptionModelKey !== "" && !transcriptionOptions.some((option) => modelOptionKey(option) === transcriptionModelKey));
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 900 }}>
+    <div className="admin-settings-page" style={{ padding: "24px 28px", maxWidth: 900 }}>
       {/* 頁首 */}
       <h1 style={{ fontSize: 22, fontWeight: 700, color: "#122232", margin: "0 0 4px" }}>系統設定</h1>
       <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 20px" }}>
@@ -545,7 +545,7 @@ export default function AdminSettingsPage() {
         <>
           {/* ── Provider 管理卡片 ── */}
           <div className="panel" style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🔑 AI 供應商</span>
               <span style={{ fontSize: 12, color: "#94a3b8" }}>管理 API 金鑰與 Base URL，模型選項關聯至供應商</span>
             </div>
@@ -563,13 +563,13 @@ export default function AdminSettingsPage() {
                 <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>尚無供應商，請在下方新增。</p>
               )}
               {providers.map(p => (
-                <div key={p.id} style={{
+                <div key={p.id} className="settings-responsive-row" style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
                   padding: "10px 14px", background: "#f8fafc",
                   border: `1.5px solid ${editingProviderId === p.id ? "#6366f1" : "#e2e8f0"}`,
                   borderRadius: 8,
                 }}>
-                  <div>
+                  <div className="settings-row-copy">
                     <span style={{ fontWeight: 600, fontSize: 14, color: "#122232", marginRight: 8 }}>{p.name}</span>
                     <span style={{ fontSize: 12, color: "#64748b" }}>{p.baseUrl || "預設 OpenAI URL"}</span>
                     <span style={{
@@ -580,7 +580,7 @@ export default function AdminSettingsPage() {
                       {p.apiKeySet ? "🔐 金鑰已設定" : "⚠️ 未設定金鑰"}
                     </span>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div className="settings-inline-actions" style={{ display: "flex", gap: 6 }}>
                     <button type="button" className="btn-secondary"
                       aria-label={`重新查詢 ${p.name} 模型`}
                       disabled={savingProvider}
@@ -622,7 +622,7 @@ export default function AdminSettingsPage() {
                   onChange={e => setProviderForm(prev => ({ ...prev, apiKey: e.target.value }))}
                   style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
                 />
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="settings-inline-actions" style={{ display: "flex", gap: 8 }}>
                   <button type="button" className="btn-primary"
                     disabled={savingProvider || !providerForm.name.trim()}
                     onClick={saveProviderForm}
@@ -645,7 +645,7 @@ export default function AdminSettingsPage() {
 
           {/* ── 模型設定卡片 ── */}
           <div className="panel" style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>AI 對話模型</span>
               {currentModel
                 ? <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>系統設定</span>
@@ -671,6 +671,7 @@ export default function AdminSettingsPage() {
                 const providerName = providers.find(p => p.id === opt.providerId)?.name;
                 return (
                   <div
+                    className="settings-model-row"
                     key={`${opt.model}-${opt.providerId ?? "none"}`}
                     data-model-name={opt.model}
                     data-provider-id={opt.providerId ?? ""}
@@ -685,7 +686,7 @@ export default function AdminSettingsPage() {
                       transition: "border-color 0.15s, background 0.15s",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div className="settings-model-copy" style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {/* checkbox 控制是否加入競速，stopPropagation 避免觸發 selectModel */}
                       <input
                         type="checkbox"
@@ -726,7 +727,7 @@ export default function AdminSettingsPage() {
                       }}>{opt.capabilitySource}</span>
                     </div>
                     {canEditCapabilities(opt) && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", marginRight: 10 }}>
+                      <div className="settings-capability-actions" style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto", marginRight: 10 }}>
                         <label style={{ fontSize: 11, color: "#475569" }}>
                           <input type="checkbox"
                             aria-label={`${opt.model} Vision`}
@@ -765,8 +766,9 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* 新增輸入列（含供應商下拉） */}
-            <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid #f1f5f9", marginBottom: 16, flexWrap: "wrap" }}>
+            <div className="settings-add-model-row" style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid #f1f5f9", marginBottom: 16, flexWrap: "wrap" }}>
               <select
+                className="settings-fluid-select"
                 value={newModelProviderId ?? ""}
                 onChange={e => setNewModelProviderId(e.target.value ? Number(e.target.value) : null)}
                 style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none", minWidth: 140 }}
@@ -791,10 +793,10 @@ export default function AdminSettingsPage() {
             {/* OCR／語音轉錄用途模型只顯示已確認相容的候選。 */}
             <div data-testid="model-assignments" style={{ paddingTop: 12, borderTop: "1px solid #f1f5f9", marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>AI 用途模型</div>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
+              <div className="settings-form-row" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <label className="settings-form-field" style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
                   OCR（僅 👁 Vision）
-                  <select data-testid="ocr-model-select" value={ocrModelKey} onChange={(event) => setOcrModelKey(event.target.value)}
+                  <select className="settings-fluid-select" data-testid="ocr-model-select" value={ocrModelKey} onChange={(event) => setOcrModelKey(event.target.value)}
                     style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
                     <option value="">未設定</option>
                     {visionOptions.map((option) => {
@@ -805,9 +807,9 @@ export default function AdminSettingsPage() {
                     })}
                   </select>
                 </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
+                <label className="settings-form-field" style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
                   Transcription（僅 👂 Audio）
-                  <select data-testid="transcription-model-select" value={transcriptionModelKey}
+                  <select className="settings-fluid-select" data-testid="transcription-model-select" value={transcriptionModelKey}
                     onChange={(event) => setTranscriptionModelKey(event.target.value)}
                     style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
                     <option value="">未設定</option>
@@ -836,7 +838,7 @@ export default function AdminSettingsPage() {
               <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>
                 模型參數 <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>（留空＝用預設；套用於 AI 呼叫與模型測試）</span>
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <div className="settings-form-row" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
                   Temperature (0~2)
                   <input type="number" step="0.1" min="0" max="2" value={temperature} placeholder="預設"
@@ -874,7 +876,7 @@ export default function AdminSettingsPage() {
 
           {/* ── 多模型競速測試卡片 ── */}
           <div className="panel">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+            <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🏁 多模型競速測試</span>
               <span style={{ fontSize: 12, color: "#94a3b8" }}>同時呼叫所有候選模型，比較回應速度與品質</span>
             </div>
@@ -884,7 +886,7 @@ export default function AdminSettingsPage() {
             ) : (
               <>
                 {/* 固定任務說明 + 啟動按鈕 */}
-                <div style={{
+                <div className="settings-responsive-row" style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
                   padding: "12px 14px", background: "#f0fdf4",
                   border: "1px solid #bbf7d0", borderRadius: 8, marginBottom: 16
@@ -909,7 +911,7 @@ export default function AdminSettingsPage() {
                 {/* 競速結果並排顯示 */}
                 {hasRaceResults && (
                   <>
-                    <div style={{
+                    <div className="settings-race-grid" style={{
                       display: "grid",
                       gridTemplateColumns: `repeat(${Math.min(options.length, 2)}, 1fr)`,
                       gap: 12,
