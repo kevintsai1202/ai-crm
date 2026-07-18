@@ -1102,6 +1102,7 @@ button {
 
 .action-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -2393,6 +2394,11 @@ button.renewal-bar.clickable:hover {
 .status-pill.off { background: #fee2e2; color: #b91c1c; }
 .admin-user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .admin-user-actions .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 寬表格在自身容器內捲動，避免把整個頁面撐出視窗。 */
+.table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; -webkit-overflow-scrolling: touch; }
+.table-scroll:focus-visible { outline: 2px solid #14b8a6; outline-offset: 3px; }
+.team-performance-table-scroll .admin-user-table { min-width: 900px; }
+.admin-users-table-scroll .admin-user-table { min-width: 760px; }
 /* 表單錯誤訊息 */
 .form-error { color: #b91c1c; font-size: 13px; margin: 4px 0 0; }
 
@@ -2574,4 +2580,169 @@ button.renewal-bar.clickable:hover {
 }
 .workspace-chat-bar select {
   padding: 7px 10px; border: 1px solid #d8dee9; border-radius: 8px; background: #fff; color: #334155; font-size: 13px;
+}
+
+/* ===== 全站響應式版面收斂 ===== */
+/* 平板改用緊湊的頂部導覽，避免原本完整側欄先佔掉約一個視窗高度。 */
+@media (max-width: 1180px) {
+  .sidebar,
+  .sidebar.collapsed {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    height: auto;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand toolbar"
+      "nav nav"
+      "health user";
+    align-items: center;
+    gap: 8px 12px;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .sidebar .sidebar-toolbar,
+  .sidebar.collapsed .sidebar-toolbar { grid-area: toolbar; flex-direction: row; justify-content: flex-end; }
+  .sidebar .brand-block,
+  .sidebar.collapsed .brand-block { grid-area: brand; justify-content: flex-start; min-width: 0; }
+  .sidebar .brand-block img,
+  .sidebar.collapsed .brand-block img { width: 40px; height: 40px; }
+  .sidebar .brand-copy,
+  .sidebar.collapsed .brand-copy { display: block; min-width: 0; }
+  .sidebar .brand-block span { display: none; }
+  .sidebar .brand-block h1 { overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+  .sidebar .sidebar-toggle { display: none; }
+
+  .sidebar .side-nav,
+  .sidebar.collapsed .side-nav {
+    grid-area: nav;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .sidebar .side-nav::-webkit-scrollbar { display: none; }
+  .sidebar .side-nav-link,
+  .sidebar.collapsed .side-nav-link { flex: 0 0 auto; justify-content: flex-start; padding: 8px 11px; }
+  .sidebar .side-nav-label,
+  .sidebar.collapsed .side-nav-label { display: initial; }
+
+  .sidebar .health-card,
+  .sidebar.collapsed .health-card {
+    grid-area: health;
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+  .sidebar .health-card small { display: none; }
+  .sidebar .health-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar .health-card button { padding: 6px 9px; }
+
+  .sidebar .user-card,
+  .sidebar.collapsed .user-card {
+    grid-area: user;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+  .sidebar .user-card strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sidebar .user-card > span { display: none; }
+  .sidebar .user-card button { flex: none; padding: 6px 9px; }
+
+  /* 620px 的桌面彈性基準在平板會把 topbar 撐高，於此恢復依內容排版。 */
+  .topbar-actions { flex: 0 1 auto; }
+}
+
+/* 768px 平板也採 Dashboard 單欄自然流，避免縮放圖表與絕對定位產生 1~11px 溢出。 */
+@media (max-width: 820px) {
+  .dashboard-grid { height: auto !important; }
+  .dashboard-grid > .react-grid-item {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 0 12px !important;
+  }
+  .dashboard-grid .react-resizable-handle { display: none; }
+  .dashboard-grid > .react-grid-item .bar-list,
+  .dashboard-grid > .react-grid-item .leaderboard,
+  .dashboard-grid > .react-grid-item .activity-report,
+  .dashboard-grid > .react-grid-item .sr-intent-list,
+  .dashboard-grid > .react-grid-item .rfm-table,
+  .dashboard-grid > .react-grid-item .sr-list { max-height: 320px; overflow-y: auto; }
+}
+
+/* 風險卡片即使被使用者縮窄，也讓三個指標留在卡內並維持對齊。 */
+.risk-report { grid-template-columns: repeat(3, minmax(64px, 1fr)); gap: 6px; }
+.risk-chip { min-width: 0; padding-inline: 4px; grid-template-rows: minmax(32px, auto) 1fr 18px; }
+.risk-chip strong { white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 16px; }
+.risk-chip b { max-width: 100%; font-size: clamp(24px, 3vw, 32px); }
+
+/* 系統設定只調整呈現方式，不改變任何儲存或模型操作流程。 */
+.admin-settings-page { width: 100%; min-width: 0; }
+.settings-row-copy,
+.settings-model-copy { min-width: 0; overflow-wrap: anywhere; }
+.settings-inline-actions,
+.settings-capability-actions { flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .sidebar,
+  .sidebar.collapsed {
+    padding: 10px 12px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand toolbar"
+      "nav nav"
+      "health user";
+    gap: 7px 8px;
+  }
+
+  .sidebar .side-nav-link,
+  .sidebar.collapsed .side-nav-link { padding: 7px 10px; }
+  .sidebar .health-card,
+  .sidebar.collapsed .health-card,
+  .sidebar .user-card,
+  .sidebar.collapsed .user-card { min-height: 42px; }
+
+  /* 客戶篩選在手機採兩欄網格，關鍵字維持滿版，縮短進入資料區前的距離。 */
+  .search-box {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .search-box > :first-child { grid-column: 1 / -1; }
+  .search-box > input,
+  .search-box > select,
+  .search-box > button { width: 100%; min-width: 0; box-sizing: border-box; }
+
+  .topbar-actions { width: 100%; flex: 0 1 auto; justify-content: stretch; }
+  .topbar-actions > * { flex: 1 1 140px; }
+
+  .admin-settings-page { max-width: 100% !important; padding: 16px !important; }
+  .settings-section-heading { align-items: flex-start !important; flex-wrap: wrap; }
+  .settings-responsive-row,
+  .settings-model-row { align-items: stretch !important; flex-direction: column; gap: 10px; }
+  .settings-inline-actions { width: 100%; }
+  .settings-inline-actions > button { flex: 1 1 110px; }
+  .settings-model-copy { flex-wrap: wrap; }
+  .settings-capability-actions { margin: 0 !important; }
+  .settings-add-model-row > input,
+  .settings-add-model-row > select,
+  .settings-add-model-row > button { width: 100%; flex: 1 1 100%; }
+  .settings-form-row { align-items: stretch !important; }
+  .settings-form-field { width: 100%; min-width: 0; }
+  .settings-fluid-select { width: 100%; min-width: 0 !important; max-width: 100%; }
+  .settings-race-grid { grid-template-columns: 1fr !important; }
 }

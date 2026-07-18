@@ -82,33 +82,36 @@ export function TeamAnalyticsPage() {
             </select>
           </label>
         </div>
-        <table className="admin-user-table">
-          <thead>
-            <tr>
-              <th>業務</th><th>客戶</th><th>高風險</th><th>進行中商機</th>
-              <th>已成交</th><th>成交率</th><th>平均互動間隔</th><th>本季續約</th><th>Coaching</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedOwners.map((o) => (
-              <tr key={o.ownerName}>
-                <td>{o.ownerName}</td>
-                <td>{o.customerCount}</td>
-                <td>{o.highRiskCount}</td>
-                <td>{formatCompactMoney(o.pipelineAmount, "zh-TW")}（{o.activeOpportunityCount}）</td>
-                <td>{formatCompactMoney(o.wonAmount, "zh-TW")}（{o.wonCount}）</td>
-                <td>{Math.round(o.winRate * 100)}%</td>
-                <td>{o.avgDaysSinceInteraction == null ? "—" : `${Math.round(o.avgDaysSinceInteraction)} 天`}</td>
-                <td>{o.renewalsThisQuarter}</td>
-                <td>
-                  <button type="button" className="btn-secondary" onClick={() => setModal({ scope: "OWNER", owner: o.ownerName })}>
-                    輔導報告 <AiBadge />
-                  </button>
-                </td>
+        {/* 欄位較多時保留表格可讀寬度，窄螢幕改由此區塊局部橫向捲動。 */}
+        <div className="table-scroll team-performance-table-scroll" role="region" aria-label="各業務績效表" tabIndex={0}>
+          <table className="admin-user-table">
+            <thead>
+              <tr>
+                <th>業務</th><th>客戶</th><th>高風險</th><th>進行中商機</th>
+                <th>已成交</th><th>成交率</th><th>平均互動間隔</th><th>本季續約</th><th>Coaching</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {sortedOwners.map((o) => (
+                <tr key={o.ownerName}>
+                  <td>{o.ownerName}</td>
+                  <td>{o.customerCount}</td>
+                  <td>{o.highRiskCount}</td>
+                  <td>{formatCompactMoney(o.pipelineAmount, "zh-TW")}（{o.activeOpportunityCount}）</td>
+                  <td>{formatCompactMoney(o.wonAmount, "zh-TW")}（{o.wonCount}）</td>
+                  <td>{Math.round(o.winRate * 100)}%</td>
+                  <td>{o.avgDaysSinceInteraction == null ? "—" : `${Math.round(o.avgDaysSinceInteraction)} 天`}</td>
+                  <td>{o.renewalsThisQuarter}</td>
+                  <td>
+                    <button type="button" className="btn-secondary" onClick={() => setModal({ scope: "OWNER", owner: o.ownerName })}>
+                      輔導報告 <AiBadge />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {modal ? (
