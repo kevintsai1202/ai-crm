@@ -7,8 +7,9 @@ import { test, expect, type Page } from "@playwright/test";
  * 前置：後端需已啟動（127.0.0.1:18080），seed 帳號 admin@aurora.local / password123。
  */
 
-/** 常見手機視窗尺寸（寬 x 高），涵蓋較窄與較常見的兩種機型。 */
+/** 手機視窗尺寸，涵蓋 320px 最小支援寬度與兩種常見窄機。 */
 const MOBILE_VIEWPORTS = [
+  { name: "Minimum mobile (320x700)", width: 320, height: 700 },
   { name: "iPhone SE (375x667)", width: 375, height: 667 },
   { name: "Android 常見窄機 (360x740)", width: 360, height: 740 }
 ];
@@ -76,10 +77,22 @@ for (const viewport of MOBILE_VIEWPORTS) {
       offenders = await findHorizontalOverflow(page);
       expect(offenders, `Dashboard（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
 
+      // 手機列首預設只佔一列；完整導覽由按鈕開啟為浮動面板。
+      const sidebarHeight = await page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().height);
+      expect(sidebarHeight).toBeLessThanOrEqual(68);
+      const mobileMenuToggle = page.locator(".mobile-menu-toggle");
+      await expect(mobileMenuToggle).toHaveAttribute("aria-expanded", "false");
+      await mobileMenuToggle.click();
+      await expect(page.locator(".sidebar-content")).toBeVisible();
+      await expect(mobileMenuToggle).toHaveAttribute("aria-expanded", "true");
+      offenders = await findHorizontalOverflow(page);
+      expect(offenders, `手機浮動選單（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
+
       // ③ 客戶工作台
       await page.locator('a[href="/customers"], .side-nav-link[href="/customers"]').first().click();
       await expect(page).toHaveURL(/\/customers/);
       await expect(page.locator(".workspace-grid")).toBeVisible();
+      await expect(mobileMenuToggle).toHaveAttribute("aria-expanded", "false");
       offenders = await findHorizontalOverflow(page);
       expect(offenders, `客戶工作台（${lang}）溢出元素：\n${offenders.join("\n")}`).toEqual([]);
 

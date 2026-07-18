@@ -49,6 +49,28 @@ describe("AppShell", () => {
     expect(localStorage.getItem("ai-crm-sidebar-collapsed")).toBe("true");
   });
 
+  it("手機導覽預設收合，並可用按鈕與 Escape 開關", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AppShell />
+      </MemoryRouter>
+    );
+
+    const sidebar = container.querySelector(".sidebar");
+    const openButton = screen.getByRole("button", { name: "Open navigation menu" });
+    expect(openButton).toHaveAttribute("aria-expanded", "false");
+    expect(sidebar).not.toHaveClass("mobile-menu-open");
+
+    fireEvent.click(openButton);
+    expect(sidebar).toHaveClass("mobile-menu-open");
+    expect(screen.getByRole("button", { name: "Close navigation menu" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: /Dashboard/i })).toHaveFocus();
+
+    fireEvent.keyDown(sidebar!, { key: "Escape" });
+    expect(sidebar).not.toHaveClass("mobile-menu-open");
+    expect(screen.getByRole("button", { name: "Open navigation menu" })).toHaveFocus();
+  });
+
   it("預設英文顯示側邊欄導覽與登出按鈕", async () => {
     await i18n.changeLanguage("en");
     render(

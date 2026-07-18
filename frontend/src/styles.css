@@ -32,7 +32,8 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  /* 不鎖死 320px；含垂直捲軸的 320px 視窗實際內容寬度更窄，鎖定會產生水平溢出。 */
+  min-width: 0;
   min-height: 100vh;
   background:
     linear-gradient(135deg, rgba(18, 185, 129, .16), transparent 34%),
@@ -131,6 +132,31 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* 桌面／平板沿用側欄既有排版；手機才把內容收進浮動面板。 */
+.sidebar-content { display: contents; }
+.mobile-menu-toggle,
+.mobile-menu-backdrop { display: none; }
+
+.mobile-menu-toggle {
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, .42);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .08);
+  color: #f8fffd;
+}
+
+.mobile-menu-toggle svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .sidebar-toggle {
@@ -2606,6 +2632,8 @@ button.renewal-bar.clickable:hover {
 
   .sidebar .sidebar-toolbar,
   .sidebar.collapsed .sidebar-toolbar { grid-area: toolbar; flex-direction: row; justify-content: flex-end; }
+  .sidebar .sidebar-content,
+  .sidebar.collapsed .sidebar-content { display: contents; }
   .sidebar .brand-block,
   .sidebar.collapsed .brand-block { grid-area: brand; justify-content: flex-start; min-width: 0; }
   .sidebar .brand-block img,
@@ -2699,21 +2727,84 @@ button.renewal-bar.clickable:hover {
 @media (max-width: 720px) {
   .sidebar,
   .sidebar.collapsed {
-    padding: 10px 12px;
+    min-height: 60px;
+    padding: 8px 12px;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand toolbar"
-      "nav nav"
-      "health user";
-    gap: 7px 8px;
+    grid-template-areas: "brand toolbar";
+    gap: 8px;
+    overflow: visible;
   }
 
-  .sidebar .side-nav-link,
-  .sidebar.collapsed .side-nav-link { padding: 7px 10px; }
-  .sidebar .health-card,
-  .sidebar.collapsed .health-card,
-  .sidebar .user-card,
-  .sidebar.collapsed .user-card { min-height: 42px; }
+  .sidebar .brand-block img,
+  .sidebar.collapsed .brand-block img { width: 36px; height: 36px; }
+  .sidebar .brand-block h1 { font-size: 15px; }
+  .sidebar .sidebar-toolbar,
+  .sidebar.collapsed .sidebar-toolbar { gap: 6px; }
+  .sidebar .mobile-menu-toggle { display: inline-grid; }
+
+  /* 手機預設不渲染完整導覽；展開時以浮動面板覆蓋內容，不再推低主畫面。 */
+  .sidebar .sidebar-content,
+  .sidebar.collapsed .sidebar-content { display: none; }
+  .sidebar.mobile-menu-open .sidebar-content,
+  .sidebar.collapsed.mobile-menu-open .sidebar-content {
+    position: fixed;
+    top: 68px;
+    right: 12px;
+    left: 12px;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "nav"
+      "health"
+      "user";
+    gap: 10px;
+    max-height: calc(100vh - 80px);
+    padding: 12px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, .28);
+    border-radius: 10px;
+    background: #123047;
+    box-shadow: 0 16px 36px rgba(15, 34, 55, .28);
+    animation: mobile-menu-in .14s ease-out;
+  }
+
+  .sidebar .mobile-menu-backdrop {
+    position: fixed;
+    inset: 60px 0 0;
+    z-index: 1;
+    display: block;
+    background: rgba(15, 34, 55, .32);
+  }
+
+  .sidebar.mobile-menu-open .side-nav,
+  .sidebar.collapsed.mobile-menu-open .side-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+  }
+  .sidebar.mobile-menu-open .side-nav-link,
+  .sidebar.collapsed.mobile-menu-open .side-nav-link {
+    min-width: 0;
+    padding: 9px 10px;
+    white-space: normal;
+  }
+  .sidebar.mobile-menu-open .side-nav-label { white-space: normal; }
+
+  .sidebar.mobile-menu-open .health-card,
+  .sidebar.collapsed.mobile-menu-open .health-card,
+  .sidebar.mobile-menu-open .user-card,
+  .sidebar.collapsed.mobile-menu-open .user-card { min-height: 44px; }
+
+  @keyframes mobile-menu-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar.mobile-menu-open .sidebar-content { animation: none; }
+  }
 
   /* 客戶篩選在手機採兩欄網格，關鍵字維持滿版，縮短進入資料區前的距離。 */
   .search-box {
