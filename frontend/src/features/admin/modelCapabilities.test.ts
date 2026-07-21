@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ModelOptionItem } from "../../types";
+import type { AiSettingsResponse, ModelOptionItem } from "../../types";
 import {
   buildModelAssignments,
   canEditCapabilities,
@@ -7,6 +7,7 @@ import {
   hasCapability,
   isSameModelPair,
   modelOptionKey,
+  purposeDeploymentDefaultLabel,
 } from "./modelCapabilities";
 
 describe("model capability helpers", () => {
@@ -59,5 +60,19 @@ describe("model capability helpers", () => {
     expect(canEditCapabilities({ model: "auto", providerId: 1, capabilities: ["VISION"], capabilitySource: "AUTO" })).toBe(false);
     expect(canEditCapabilities({ model: "unknown", providerId: 1, capabilities: [], capabilitySource: "UNKNOWN" })).toBe(true);
     expect(canEditCapabilities({ model: "manual", providerId: 1, capabilities: [], capabilitySource: "MANUAL" })).toBe(true);
+  });
+
+  it("分別顯示 OCR 與語音轉錄的部署預設", () => {
+    const settings = {
+      envDefaultOcrProviderName: "Vision Hub",
+      envDefaultOcrModel: "vision-model",
+      envDefaultTranscriptionProviderName: "Audio Hub",
+      envDefaultTranscriptionModel: "audio-model",
+    } as AiSettingsResponse;
+
+    expect(purposeDeploymentDefaultLabel(settings, "ocr")).toBe("vision-model — Vision Hub");
+    expect(purposeDeploymentDefaultLabel(settings, "transcription")).toBe("audio-model — Audio Hub");
+    expect(purposeDeploymentDefaultLabel({ ...settings, envDefaultOcrModel: "" }, "ocr"))
+      .toBe("未設定部署預設");
   });
 });

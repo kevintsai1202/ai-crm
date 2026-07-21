@@ -87,6 +87,17 @@ public class TemporaryMediaService {
         }
     }
 
+    /**
+     * 驗證用途測試上傳檔並回傳記憶體內容；不寫入 object storage、metadata 或 CRM 資料。
+     */
+    public ValidatedMedia validateOnly(MultipartFile file, MediaPurpose purpose) {
+        rejectDeclaredOversize(file, purpose);
+        byte[] bytes = readBytes(file);
+        String mime = normalizeMime(file.getContentType());
+        validate(bytes, mime, purpose);
+        return new ValidatedMedia(bytes, mime);
+    }
+
     /** 先用 multipart 宣告大小阻擋明顯超限內容。 */
     private void rejectDeclaredOversize(MultipartFile file, MediaPurpose purpose) {
         if (file == null) throw new IllegalArgumentException("媒體檔案不可為空");

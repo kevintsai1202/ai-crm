@@ -60,17 +60,31 @@ public class SystemSettingService {
     private final ObjectMapper objectMapper;
     /** 環境變數預設模型（spring.ai.openai.chat.model），供留空時在 UI 顯示回退目標。 */
     private final String envDefaultModel;
+    /** OCR 部署預設 Provider 名稱與模型；只在 DB assignment 留空時使用。 */
+    private final String envDefaultOcrProviderName;
+    private final String envDefaultOcrModel;
+    /** 語音轉錄部署預設 Provider 名稱與模型；只在 DB assignment 留空時使用。 */
+    private final String envDefaultTranscriptionProviderName;
+    private final String envDefaultTranscriptionModel;
 
     public SystemSettingService(SystemSettingRepository repository,
                                 AiProviderRepository providerRepository,
                                 ModelCatalogClient modelCatalogClient,
                                 ObjectMapper objectMapper,
-                                @Value("${spring.ai.openai.chat.model:}") String envDefaultModel) {
+                                @Value("${spring.ai.openai.chat.model:}") String envDefaultModel,
+                                @Value("${app.ai.defaults.ocr.provider-name:}") String envDefaultOcrProviderName,
+                                @Value("${app.ai.defaults.ocr.model:}") String envDefaultOcrModel,
+                                @Value("${app.ai.defaults.transcription.provider-name:}") String envDefaultTranscriptionProviderName,
+                                @Value("${app.ai.defaults.transcription.model:}") String envDefaultTranscriptionModel) {
         this.repository = repository;
         this.providerRepository = providerRepository;
         this.modelCatalogClient = modelCatalogClient;
         this.objectMapper = objectMapper;
         this.envDefaultModel = envDefaultModel;
+        this.envDefaultOcrProviderName = normalizeModel(envDefaultOcrProviderName);
+        this.envDefaultOcrModel = normalizeModel(envDefaultOcrModel);
+        this.envDefaultTranscriptionProviderName = normalizeModel(envDefaultTranscriptionProviderName);
+        this.envDefaultTranscriptionModel = normalizeModel(envDefaultTranscriptionModel);
     }
 
     /**
@@ -259,10 +273,21 @@ public class SystemSettingService {
         var options = getModelOptions();
         var providers = getProviders();
         var source = current.isBlank() ? "ENV" : "DB";
+        var storedOcrModel = getTextSetting(KEY_AI_OCR_MODEL);
+        var storedOcrProviderId = getLongSetting(KEY_AI_OCR_PROVIDER_ID);
+        var storedTranscriptionModel = getTextSetting(KEY_AI_TRANSCRIPTION_MODEL);
+        var storedTranscriptionProviderId = getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID);
         return new Dtos.AiSettingsResponse(current, currentProviderId, options, providers, envDefaultModel, source,
                 getTemperature().orElse(null), getMaxCompletionTokens().orElse(null), getReasoningEffort().orElse(null),
-                getTextSetting(KEY_AI_OCR_MODEL), getLongSetting(KEY_AI_OCR_PROVIDER_ID),
-                getTextSetting(KEY_AI_TRANSCRIPTION_MODEL), getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID));
+                storedOcrModel, storedOcrProviderId,
+                storedTranscriptionModel, storedTranscriptionProviderId,
+                envDefaultOcrProviderName, envDefaultOcrModel,
+                assignmentSource(storedOcrModel, storedOcrProviderId,
+                        envDefaultOcrProviderName, envDefaultOcrModel, ModelCapability.VISION),
+                envDefaultTranscriptionProviderName, envDefaultTranscriptionModel,
+                assignmentSource(storedTranscriptionModel, storedTranscriptionProviderId,
+                        envDefaultTranscriptionProviderName, envDefaultTranscriptionModel,
+                        ModelCapability.AUDIO_TRANSCRIPTION));
     }
 
     /** 取得文字設定；缺少或空白時回空字串。 */
@@ -284,15 +309,8 @@ public class SystemSettingService {
     public com.aicrm.crm.service.vision.AiModelAssignment resolveOcrAssignment() {
         String model = getTextSetting(KEY_AI_OCR_MODEL);
         Long providerId = getLongSetting(KEY_AI_OCR_PROVIDER_ID);
-        if (!StringUtils.hasText(model) || providerId == null) return null;
-        var option = getModelOptions().stream()
-                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
-                .filter(item -> item.capabilities().contains(ModelCapability.VISION)).findFirst().orElse(null);
-        if (option == null) return null;
-        var provider = providerRepository.findById(providerId).orElse(null);
-        if (provider == null || !provider.isApiKeySet()) return null;
-        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
-                provider.getBaseUrl(), provider.getApiKey());
+        return resolvePurposeAssignment(model, providerId,
+                envDefaultOcrProviderName, envDefaultOcrModel, ModelCapability.VISION);
     }
 
     /** 解析並再次驗證轉錄 assignment 必須是同一 Provider/model pair 且具有 AUDIO_TRANSCRIPTION。 */
@@ -300,15 +318,52 @@ public class SystemSettingService {
     public com.aicrm.crm.service.vision.AiModelAssignment resolveTranscriptionAssignment() {
         String model = getTextSetting(KEY_AI_TRANSCRIPTION_MODEL);
         Long providerId = getLongSetting(KEY_AI_TRANSCRIPTION_PROVIDER_ID);
-        if (!StringUtils.hasText(model) || providerId == null) return null;
-        var option = getModelOptions().stream()
-                .filter(item -> item.model().equals(model) && java.util.Objects.equals(item.providerId(), providerId))
-                .filter(item -> item.capabilities().contains(ModelCapability.AUDIO_TRANSCRIPTION)).findFirst().orElse(null);
-        if (option == null) return null;
-        var provider = providerRepository.findById(providerId).orElse(null);
+        return resolvePurposeAssignment(model, providerId,
+                envDefaultTranscriptionProviderName, envDefaultTranscriptionModel,
+                ModelCapability.AUDIO_TRANSCRIPTION);
+    }
+
+    /**
+     * 依 DB assignment 優先、部署預設次之解析用途模型；任何 pair、能力或金鑰不完整都 fail closed。
+     */
+    private com.aicrm.crm.service.vision.AiModelAssignment resolvePurposeAssignment(
+            String storedModel, Long storedProviderId, String envProviderName, String envModel,
+            ModelCapability requiredCapability) {
+        if (StringUtils.hasText(storedModel) || storedProviderId != null) {
+            if (!StringUtils.hasText(storedModel) || storedProviderId == null) return null;
+            return resolvePurposePair(storedModel, providerRepository.findById(storedProviderId).orElse(null),
+                    requiredCapability);
+        }
+        if (!StringUtils.hasText(envProviderName) || !StringUtils.hasText(envModel)) return null;
+        return resolvePurposePair(envModel, providerRepository.findByName(envProviderName).orElse(null),
+                requiredCapability);
+    }
+
+    /** 驗證用途模型 pair、顯式能力與 Provider 金鑰後建立外部呼叫 assignment。 */
+    private com.aicrm.crm.service.vision.AiModelAssignment resolvePurposePair(
+            String model, AiProvider provider, ModelCapability requiredCapability) {
         if (provider == null || !provider.isApiKeySet()) return null;
-        return new com.aicrm.crm.service.vision.AiModelAssignment(model, providerId,
+        boolean compatible = getModelOptions().stream()
+                .filter(item -> item.model().equals(model))
+                .filter(item -> java.util.Objects.equals(item.providerId(), provider.getId()))
+                .anyMatch(item -> item.capabilities().contains(requiredCapability));
+        if (!compatible) return null;
+        return new com.aicrm.crm.service.vision.AiModelAssignment(model, provider.getId(),
                 provider.getBaseUrl(), provider.getApiKey());
+    }
+
+    /** 顯示經 pair、能力與金鑰驗證後的實際 assignment 來源。 */
+    private String assignmentSource(String storedModel, Long storedProviderId,
+                                    String envProviderName, String envModel,
+                                    ModelCapability requiredCapability) {
+        if (StringUtils.hasText(storedModel) || storedProviderId != null) {
+            if (!StringUtils.hasText(storedModel) || storedProviderId == null) return "UNSET";
+            return resolvePurposePair(storedModel, providerRepository.findById(storedProviderId).orElse(null),
+                    requiredCapability) == null ? "UNSET" : "DB";
+        }
+        if (!StringUtils.hasText(envProviderName) || !StringUtils.hasText(envModel)) return "UNSET";
+        return resolvePurposePair(envModel, providerRepository.findByName(envProviderName).orElse(null),
+                requiredCapability) == null ? "UNSET" : "ENV";
     }
 
     /**

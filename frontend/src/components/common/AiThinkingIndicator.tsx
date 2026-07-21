@@ -4,7 +4,8 @@
  *
  * @param label 顯示文字（預設「AI 正在思考」）
  */
-export function AiThinkingIndicator({ label = "AI 正在思考" }: { label?: string }) {
+export function AiThinkingIndicator({ label }: { label?: string }) {
+  const { t } = useTranslation("common");
   return (
     <div className="ai-thinking">
       <div className="ai-thinking__dots">
@@ -12,7 +13,8 @@ export function AiThinkingIndicator({ label = "AI 正在思考" }: { label?: str
         <span className="ai-thinking__dot" />
         <span className="ai-thinking__dot" />
       </div>
-      <span className="ai-thinking__label">{label}</span>
+      <span className="ai-thinking__label">{label ?? t("ai.thinking")}</span>
     </div>
   );
 }
+import { useTranslation } from "react-i18next";

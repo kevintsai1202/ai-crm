@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -14,6 +15,7 @@ import com.aicrm.crm.domain.CapabilitySource;
 import com.aicrm.crm.domain.ModelCapability;
 import com.aicrm.crm.repository.AiProviderRepository;
 import com.aicrm.crm.service.SystemSettingService;
+import com.aicrm.crm.service.AiPurposeModelTestService;
 import com.aicrm.crm.service.ai.ModelCatalogClient;
 import com.aicrm.crm.support.PostgresTestBase;
 import com.jayway.jsonpath.JsonPath;
@@ -25,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
@@ -41,6 +44,7 @@ class AdminModelCapabilityIntegrationTest extends PostgresTestBase {
     @Autowired AiProviderRepository providerRepository;
     @Autowired SystemSettingService systemSettings;
     @MockitoBean ModelCatalogClient modelCatalogClient;
+    @MockitoBean AiPurposeModelTestService purposeModelTests;
 
     /** 建立套用 security filter 的 MockMvc。 */
     private MockMvc mockMvc() {
@@ -184,6 +188,33 @@ class AdminModelCapabilityIntegrationTest extends PostgresTestBase {
         mockMvc().perform(put("/api/admin/settings/ai/assignments")
                         .header("Authorization", "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON).content(assignments))
+                .andExpect(status().isForbidden());
+    }
+
+    /** 用途模型測試會接受實際檔案，僅回傳不含辨識內容的安全摘要。 */
+    @Test
+    void purposeModelTests_acceptFilesAndReturnSafeSummary() throws Exception {
+        var image = new MockMultipartFile("file", "card.png", "image/png", new byte[] {1, 2, 3});
+        when(purposeModelTests.testOcr(any())).thenReturn(new Dtos.AiPurposeModelTestResponse(
+                true, "BUSINESS_CARD_OCR", "vision-model", 7L, 123L, "名片結構化辨識成功"));
+
+        mockMvc().perform(multipart("/api/admin/settings/ai/assignments/ocr/test")
+                        .file(image)
+                        .header("Authorization", "Bearer " + adminToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purpose").value("BUSINESS_CARD_OCR"))
+                .andExpect(jsonPath("$.model").value("vision-model"))
+                .andExpect(jsonPath("$.summary").value("名片結構化辨識成功"));
+    }
+
+    /** 用途模型測試端點同樣只允許 ADMIN。 */
+    @Test
+    void purposeModelTests_requireAdminRole() throws Exception {
+        var audio = new MockMultipartFile("file", "meeting.wav", "audio/wav", new byte[] {1, 2, 3});
+
+        mockMvc().perform(multipart("/api/admin/settings/ai/assignments/transcription/test")
+                        .file(audio)
+                        .header("Authorization", "Bearer " + tokenFor("sales@aurora.local")))
                 .andExpect(status().isForbidden());
     }
 }

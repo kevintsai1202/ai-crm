@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { sendAiFeedback } from "../../api";
+import { useTranslation } from "react-i18next";
 
 /**
  * AI 回答採納/拒絕回饋按鈕（SP4）。
  * 函式級註解：自帶送出狀態，對指定 callId 呼叫 /api/ai/calls/{id}/feedback；送出後鎖定並顯示結果。
  */
 export function FeedbackButtons({ callId }: { callId?: number | null }) {
+  const { t } = useTranslation("common");
   // 已送出的決定（null 表示尚未回饋）
   const [decision, setDecision] = useState<"ADOPTED" | "REJECTED" | null>(null);
   const [sending, setSending] = useState(false);
@@ -30,16 +32,16 @@ export function FeedbackButtons({ callId }: { callId?: number | null }) {
   if (decision) {
     return (
       <div className="ai-feedback done">
-        {decision === "ADOPTED" ? "已標記為採納 👍" : "已標記為不採納 👎"}
+        {decision === "ADOPTED" ? t("ai.adopted") : t("ai.rejected")}
       </div>
     );
   }
 
   return (
     <div className="ai-feedback">
-      <span>這則建議有幫助嗎？</span>
-      <button type="button" disabled={sending} onClick={() => submit("ADOPTED")} title="採納">👍</button>
-      <button type="button" disabled={sending} onClick={() => submit("REJECTED")} title="不採納">👎</button>
+      <span>{t("ai.helpful")}</span>
+      <button type="button" disabled={sending} onClick={() => submit("ADOPTED")} title={t("ai.adopt")}>👍</button>
+      <button type="button" disabled={sending} onClick={() => submit("REJECTED")} title={t("ai.reject")}>👎</button>
     </div>
   );
 }

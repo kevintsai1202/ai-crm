@@ -4,11 +4,13 @@ import { AiBadge } from "../../../components/common/AiBadge";
 import { AiThinkingIndicator } from "../../../components/common/AiThinkingIndicator";
 import { FeedbackButtons } from "../../../components/common/FeedbackButtons";
 import type { ChatMessage } from "../useAiChat";
+import { useTranslation } from "react-i18next";
 
 /**
  * 單則聊天氣泡：使用者為純文字，AI 以 Markdown 渲染並附風險與引用。
  */
 export function ChatBubble({ msg }: { msg: ChatMessage }) {
+  const { t } = useTranslation("operations");
   if (msg.role === "user") {
     return (
       <div className="chat-msg user">
@@ -19,7 +21,7 @@ export function ChatBubble({ msg }: { msg: ChatMessage }) {
   const hasRisk = msg.risk && (msg.risk.churnRisk > 0 || msg.risk.renewalDelayRisk > 0);
   return (
     <div className="chat-msg assistant">
-      <span className="chat-author"><AiBadge /> AI 助理</span>
+      <span className="chat-author"><AiBadge /> {t("assistant.name")}</span>
       <div className="chat-bubble">
         {msg.content ? (
           <div className={msg.pending ? "markdown-body ai-streaming-body" : "markdown-body"}>
@@ -27,12 +29,12 @@ export function ChatBubble({ msg }: { msg: ChatMessage }) {
             {msg.pending && <span className="ai-stream-cursor" />}
           </div>
         ) : (
-          <AiThinkingIndicator label="AI 正在查詢資料庫" />
+          <AiThinkingIndicator label={t("assistant.database")} />
         )}
         {hasRisk ? (
           <div className="chat-risk">
-            <span>流失 {msg.risk!.churnRisk}</span>
-            <span>續約延遲 {msg.risk!.renewalDelayRisk}</span>
+            <span>{t("assistant.churn", { value: msg.risk!.churnRisk })}</span>
+            <span>{t("assistant.renewalDelay", { value: msg.risk!.renewalDelayRisk })}</span>
           </div>
         ) : null}
         {msg.citations && msg.citations.length > 0 ? (

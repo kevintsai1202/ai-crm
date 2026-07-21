@@ -1,4 +1,5 @@
 import type { MeetingChange } from "../../types";
+import { useTranslation } from "react-i18next";
 
 /** 變更審核面板屬性。 */
 interface ChangeReviewPaneProps {
@@ -14,23 +15,16 @@ interface ChangeReviewPaneProps {
   onConfirm: () => void;
 }
 
-/** 變更類型對應的中文標籤。 */
-const TYPE_LABEL: Record<MeetingChange["type"], string> = {
-  INTERACTION: "互動紀錄",
-  TASK: "後續任務",
-  OPPORTUNITY_PATCH: "商機更新",
-  STAKEHOLDER_SUGGESTION: "決策鏈建議",
-};
-
 /** 會議審核右側：逐項勾選要套用的 CRM 變更，確認鈕顯示實際套用數。 */
 export function ChangeReviewPane({ changes, selected, onToggle, submitting, onConfirm }: ChangeReviewPaneProps) {
+  const { t } = useTranslation("operations");
   const selectedCount = changes.filter((change) => selected.has(change.changeId)).length;
 
   return (
     <div data-testid="mc-change-pane" style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>套用哪些 CRM 變更？</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>{t("meeting.reviewTitle")}</div>
       {changes.length === 0 && (
-        <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>本次會議未產生可套用的變更。</p>
+        <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>{t("meeting.noChanges")}</p>
       )}
       {changes.map((change) => {
         const checked = selected.has(change.changeId);
@@ -53,12 +47,12 @@ export function ChangeReviewPane({ changes, selected, onToggle, submitting, onCo
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                 <span style={{ fontSize: 11, color: "#6366f1", background: "#ede9fe", padding: "1px 6px", borderRadius: 4 }}>
-                  {TYPE_LABEL[change.type]}
+                  {t(`meeting.types.${change.type}`)}
                 </span>
                 {change.lowConfidence && (
                   <span data-testid={`mc-lowconf-${change.changeId}`} style={{ fontSize: 11, color: "#b45309",
                     background: "#fef3c7", padding: "1px 6px", borderRadius: 4 }}>
-                    低信心・預設不套用
+                    {t("meeting.lowConfidence")}
                   </span>
                 )}
               </div>
@@ -75,7 +69,7 @@ export function ChangeReviewPane({ changes, selected, onToggle, submitting, onCo
         onClick={onConfirm}
         style={{ alignSelf: "flex-start", padding: "8px 20px", fontWeight: 700 }}
       >
-        {submitting ? "套用中…" : `確認套用 ${selectedCount} 項變更`}
+        {submitting ? t("meeting.applying") : t("meeting.confirm", { count: selectedCount })}
       </button>
     </div>
   );

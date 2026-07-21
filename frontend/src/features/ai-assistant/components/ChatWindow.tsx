@@ -3,15 +3,7 @@ import type { CustomerSummary } from "../../../types";
 import { AiBadge } from "../../../components/common/AiBadge";
 import { ChatBubble } from "./ChatBubble";
 import type { ChatMessage } from "../useAiChat";
-
-/**
- * 預設提問建議，協助使用者快速開始對話。
- */
-const CHAT_SUGGESTIONS = [
-  "分析這位客戶的續約風險並建議下一步",
-  "用三點條列總結最近的互動重點",
-  "這位客戶最大的成交障礙是什麼？"
-];
+import { useTranslation } from "react-i18next";
 
 /**
  * 浮動 AI 聊天視窗：多輪對話歷史、Markdown 渲染、串流打字機。
@@ -33,8 +25,11 @@ export function ChatWindow({
   onSend: (message: string) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("operations");
   const [input, setInput] = useState("");
   const bodyRef = useRef<HTMLDivElement>(null);
+  /** 依目前語言顯示快速提問，不把中文固定在元件模組中。 */
+  const suggestions = t("assistant.suggestions", { returnObjects: true }) as string[];
 
   // 訊息更新時自動捲動到底部
   useEffect(() => {
@@ -64,26 +59,26 @@ export function ChatWindow({
   }
 
   return (
-    <section className="chat-window" role="dialog" aria-label="AI 助理聊天視窗">
+    <section className="chat-window" role="dialog" aria-label={t("assistant.dialog")}>
       <header className="chat-header">
         <div>
-          <strong>AI 助理 <AiBadge onDark /></strong>
-          <small>{customer ? customer.name : "尚未選取客戶"} · RAG + 對話記憶</small>
+          <strong>{t("assistant.name")} <AiBadge onDark /></strong>
+          <small>{customer ? customer.name : t("assistant.noCustomer")} · {t("assistant.memory")}</small>
         </div>
-        <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+        <button type="button" className="chat-close" onClick={onClose} aria-label={t("assistant.close")}>✕</button>
       </header>
 
       <div className="chat-body" ref={bodyRef}>
         {historyLoading ? (
           <div className="chat-empty">
-            <p>載入對話紀錄中…</p>
+            <p>{t("assistant.loading")}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="chat-empty">
-            <p>{customer ? `向 AI 助理詢問關於「${customer.name}」的問題` : "請先在左側選取客戶"}</p>
+            <p>{customer ? t("assistant.askCustomer", { customer: customer.name }) : t("assistant.selectLeft")}</p>
             {customer ? (
               <div className="chat-suggestions">
-                {CHAT_SUGGESTIONS.map((s) => (
+                {suggestions.map((s) => (
                   <button type="button" key={s} onClick={() => onSend(s)} disabled={sending}>{s}</button>
                 ))}
               </div>
@@ -100,10 +95,10 @@ export function ChatWindow({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={2}
-          placeholder={customer ? "輸入問題後按 Enter 送出（Shift+Enter 換行）" : "請先選取客戶"}
+          placeholder={customer ? t("assistant.placeholder") : t("assistant.selectCustomer")}
           disabled={!customer || sending}
         />
-        <button type="submit" disabled={!customer || !input.trim() || sending}>{sending ? "回應中…" : "送出"}</button>
+        <button type="submit" disabled={!customer || !input.trim() || sending}>{sending ? t("assistant.responding") : t("assistant.send")}</button>
       </form>
     </section>
   );

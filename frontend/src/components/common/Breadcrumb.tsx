@@ -9,8 +9,9 @@ export interface Crumb {
 }
 
 export function Breadcrumb({ crumbs }: { crumbs: Crumb[] }) {
+  const { t } = useTranslation("common");
   return (
-    <nav className="breadcrumb" aria-label="麵包屑">
+    <nav className="breadcrumb" aria-label={t("breadcrumb")}>
       {crumbs.map((c, i) => (
         <span key={i}>
           {i > 0 ? <span className="breadcrumb-sep">›</span> : null}
@@ -24,3 +25,4 @@ export function Breadcrumb({ crumbs }: { crumbs: Crumb[] }) {
     </nav>
   );
 }
+import { useTranslation } from "react-i18next";

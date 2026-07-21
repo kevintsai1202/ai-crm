@@ -4,15 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { AiCallHistoryItem } from "../../types";
 import { formatDateTime } from "../../lib/format";
 import { AiBadge } from "./AiBadge";
-
-/** AI 呼叫類型的中文標籤（涵蓋客戶與管理層各類型）。 */
-const CALL_TYPE_LABELS: Record<string, string> = {
-  CHAT: "對話",
-  ASSESSMENT: "整體評估",
-  PORTFOLIO: "全公司評估",
-  TEAM_ANALYSIS: "團隊診斷",
-  OWNER_COACHING: "業務輔導"
-};
+import { useTranslation } from "react-i18next";
 
 /**
  * 通用 AI 歷程 Modal：列出一組 AI 呼叫紀錄（新到舊，可展開看完整答案）。
@@ -29,6 +21,7 @@ export function AiCallHistoryModal({ title, calls, loading, onClose }: {
   loading: boolean;
   onClose: () => void;
 }) {
+  const { t, i18n } = useTranslation("common");
   // 目前展開中的呼叫 id（預設收合，點選展開）
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -38,16 +31,16 @@ export function AiCallHistoryModal({ title, calls, loading, onClose }: {
         <div className="report-header">
           <div>
             <h3>{title} <AiBadge onDark /></h3>
-            <small>歷次 AI 呼叫紀錄</small>
+            <small>{t("ai.historySubtitle")}</small>
           </div>
-          <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+          <button type="button" className="chat-close" onClick={onClose} aria-label={t("actions.close")}>✕</button>
         </div>
         <div className="report-body">
-          <h4 className="ai-history-section">AI 呼叫歷史（{calls.length}）</h4>
+          <h4 className="ai-history-section">{t("ai.historyCount", { count: calls.length })}</h4>
           {loading ? (
-            <p className="chat-typing">載入中<span>…</span></p>
+            <p className="chat-typing">{t("common:loading", { defaultValue: "Loading" })}<span>…</span></p>
           ) : calls.length === 0 ? (
-            <p className="trace-empty">尚無 AI 呼叫紀錄。點「重新分析」後即會記錄。</p>
+            <p className="trace-empty">{t("ai.historyEmpty")}</p>
           ) : (
             <div className="ai-history-list">
               {calls.map((call) => {
@@ -55,10 +48,10 @@ export function AiCallHistoryModal({ title, calls, loading, onClose }: {
                 return (
                   <article className={`ai-history-item ${open ? "open" : ""}`} key={call.id}>
                     <button type="button" className="ai-history-head" onClick={() => setExpandedId(open ? null : call.id)}>
-                      <span className="ai-history-type">{CALL_TYPE_LABELS[call.callType] ?? call.callType}</span>
-                      <span className="ai-history-time">{formatDateTime(call.createdAt, "zh-TW", "尚無資料")}</span>
+                      <span className="ai-history-type">{t(`ai.callTypes.${call.callType}`, { defaultValue: call.callType })}</span>
+                      <span className="ai-history-time">{formatDateTime(call.createdAt, i18n.language, t("noData"))}</span>
                       <span className={`ai-history-mode ${call.aiEnabled ? "real" : "fallback"}`}>
-                        {call.aiEnabled ? (call.model ?? "LLM") : "樣板 fallback"}
+                        {call.aiEnabled ? (call.model ?? "LLM") : t("ai.fallback")}
                       </span>
                       <span className="ai-history-toggle">{open ? "▲" : "▼"}</span>
                     </button>
@@ -74,7 +67,7 @@ export function AiCallHistoryModal({ title, calls, loading, onClose }: {
           )}
         </div>
         <div className="report-footer">
-          <button type="button" onClick={onClose}>關閉</button>
+          <button type="button" onClick={onClose}>{t("actions.close")}</button>
         </div>
       </div>
     </div>

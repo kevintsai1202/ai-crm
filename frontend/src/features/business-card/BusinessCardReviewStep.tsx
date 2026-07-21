@@ -1,5 +1,6 @@
 import type { BusinessCardDuplicateCandidate, RecognizedBusinessCard } from "../../types";
 import { lowConfidenceFields, type BusinessCardForm, type DuplicateStrategy } from "./businessCardState";
+import { useTranslation } from "react-i18next";
 
 /** 審核步驟屬性。 */
 interface ReviewStepProps {
@@ -34,6 +35,7 @@ const FIELD_MAP: Record<string, keyof BusinessCardForm> = {
 export function BusinessCardReviewStep({
   recognized, form, onChange, candidates, strategy, onStrategyChange, canProceed, onNext,
 }: ReviewStepProps) {
+  const { t } = useTranslation("operations");
   // 需人工複查的表單欄位集合。
   const lowConfFields = new Set(
     lowConfidenceFields(recognized ?? { personName: null, title: null, email: null, phone: null, companyName: null, website: null, confidence: {}, warnings: [] })
@@ -50,7 +52,7 @@ export function BusinessCardReviewStep({
           {label}{required && <span style={{ color: "#b91c1c" }}> *</span>}
           {low && (
             <span data-testid={`bc-lowconf-${key}`} style={{ marginLeft: 6, fontSize: 11, color: "#b45309", background: "#fef3c7", padding: "1px 6px", borderRadius: 4 }}>
-              信心偏低，請確認
+              {t("businessCard.lowConfidence")}
             </span>
           )}
         </span>
@@ -67,33 +69,33 @@ export function BusinessCardReviewStep({
   return (
     <div data-testid="bc-review-step" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {field("公司名稱", "customerName")}
-        {field("統一編號", "taxId")}
-        {field("產業", "industry")}
-        {field("客戶 Email", "customerEmail")}
-        {field("客戶電話", "customerPhone")}
-        {field("聯絡人姓名", "contactName")}
-        {field("聯絡人職稱", "contactTitle", false)}
-        {field("聯絡人 Email", "contactEmail")}
+        {field(t("businessCard.fields.customerName"), "customerName")}
+        {field(t("businessCard.fields.taxId"), "taxId")}
+        {field(t("businessCard.fields.industry"), "industry")}
+        {field(t("businessCard.fields.customerEmail"), "customerEmail")}
+        {field(t("businessCard.fields.customerPhone"), "customerPhone")}
+        {field(t("businessCard.fields.contactName"), "contactName")}
+        {field(t("businessCard.fields.contactTitle"), "contactTitle", false)}
+        {field(t("businessCard.fields.contactEmail"), "contactEmail")}
       </div>
 
       {candidates.length > 0 && (
         <div data-testid="bc-duplicates" style={{ border: "1px solid #fcd34d", background: "#fffbeb", borderRadius: 8, padding: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#92400e", marginBottom: 8 }}>
-            ⚠️ 偵測到 {candidates.length} 筆可能重複的客戶，請選擇處理方式：
+            ⚠️ {t("businessCard.duplicates", { count: candidates.length })}
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, marginBottom: 6 }}>
             <input type="radio" name="duplicateStrategy" value="CREATE"
               checked={strategy?.action === "CREATE"}
               onChange={() => onStrategyChange({ action: "CREATE" })} />
-            仍建立為新客戶
+            {t("businessCard.createNew")}
           </label>
           {candidates.map((candidate) => (
             <label key={candidate.customerId} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14, marginBottom: 6 }}>
               <input type="radio" name="duplicateStrategy" value={`MERGE-${candidate.customerId}`}
                 checked={strategy?.action === "MERGE" && strategy.customerId === candidate.customerId}
                 onChange={() => onStrategyChange({ action: "MERGE", customerId: candidate.customerId })} />
-              合併至「{candidate.customerName}」
+              {t("businessCard.merge", { customer: candidate.customerName })}
               <span style={{ fontSize: 11, color: "#a16207" }}>（{candidate.matchedBy.join("、")}）</span>
             </label>
           ))}
@@ -108,7 +110,7 @@ export function BusinessCardReviewStep({
         onClick={onNext}
         style={{ alignSelf: "flex-start", padding: "8px 20px", fontWeight: 700 }}
       >
-        下一步：商機與任務
+        {t("businessCard.next")}
       </button>
     </div>
   );

@@ -36,8 +36,9 @@ public class WorkspaceController {
      */
     @PostMapping("/recommendation")
     public SseEmitter streamRecommendation(@AuthenticationPrincipal AuthPrincipal principal,
-                                           @RequestParam(defaultValue = "self") String scope) {
-        return workspaceAiService.streamRecommendation(principal, scope);
+                                           @RequestParam(defaultValue = "self") String scope,
+                                           @RequestParam(required = false) String lang) {
+        return workspaceAiService.streamRecommendation(principal, scope, lang);
     }
 
     /**

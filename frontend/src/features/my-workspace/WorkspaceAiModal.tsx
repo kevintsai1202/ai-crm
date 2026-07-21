@@ -17,12 +17,13 @@ import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { AddOpportunityModal } from "../customers/components/AddOpportunityModal";
 import { TaskFormModal } from "../tasks/TaskFormModal";
 import { TaskPanel } from "../tasks/TaskPanel";
+import { useTranslation } from "react-i18next";
 
-/** 待辦類型對應的中文標籤與色票 class。 */
-const TODO_META: Record<string, { label: string; cls: string }> = {
-  HIGH_RISK: { label: "高風險", cls: "high" },
-  RENEWAL_DUE: { label: "即將續約", cls: "medium" },
-  STALE_OPPORTUNITY: { label: "停滯商機", cls: "medium" }
+/** 待辦類型對應的色票 class；顯示文字由 i18n 資源提供。 */
+const TODO_CLASS: Record<string, string> = {
+  HIGH_RISK: "high",
+  RENEWAL_DUE: "medium",
+  STALE_OPPORTUNITY: "medium"
 };
 
 /**
@@ -32,6 +33,7 @@ const TODO_META: Record<string, { label: string; cls: string }> = {
  * @param onClose 關閉 callback
  */
 export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
+  const { t, i18n } = useTranslation("operations");
   const { user } = useAuth();
   const navigate = useNavigate();
   const canSwitchScope = user?.role !== "SALES";
@@ -47,7 +49,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
   // 一鍵建立：勾選的草稿索引（預設全選）、建立中狀態、結果訊息
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [creating, setCreating] = useState(false);
-  const [createMsg, setCreateMsg] = useState<string | null>(null);
+  const [createResult, setCreateResult] = useState<{ ok: number; fail: number } | null>(null);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
@@ -77,7 +79,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
     setGenerating(true);
     setSummary("");
     setDrafts([]);
-    setCreateMsg(null);
+    setCreateResult(null);
     const onChunk = (chunk: SseChunk) => {
       if (chunk.type === "todos") setTodos((chunk.items as WorkspaceTodoItem[]) ?? []);
       else if (chunk.type === "drafts") setDrafts((chunk.items as SuggestedOpportunityDraft[]) ?? []);
@@ -108,7 +110,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
     const picks = drafts.filter((_, i) => selected.has(i));
     if (picks.length === 0 || creating) return;
     setCreating(true);
-    setCreateMsg(null);
+    setCreateResult(null);
     const results = await Promise.allSettled(picks.map((d) =>
       createOpportunity({
         customerId: d.customerId,
@@ -126,7 +128,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
     // 移除已成功建立的草稿
     const createdSet = new Set(picks.filter((_, idx) => results[idx].status === "fulfilled"));
     setDrafts((prev) => prev.filter((d) => !createdSet.has(d)));
-    setCreateMsg(`已建立 ${ok} 筆商機${fail > 0 ? `，${fail} 筆失敗` : ""}`);
+    setCreateResult({ ok, fail });
     setCreating(false);
   }
 
@@ -150,40 +152,40 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
         <div className="modal-content report-modal workspace-ai-modal" onClick={(e) => e.stopPropagation()}>
           <div className="report-header">
             <div>
-              <h3>AI 工作建議 <AiBadge onDark /></h3>
-              <small>依待辦自動排序今日優先工作</small>
+              <h3>{t("workspace.title")} <AiBadge onDark /></h3>
+              <small>{t("workspace.subtitle")}</small>
             </div>
             <div className="workspace-modal-head-actions">
               {canSwitchScope ? (
-                <select value={scope} onChange={(e) => setScope(e.target.value as "self" | "all")} aria-label="資料範圍">
-                  <option value="self">範圍：自己</option>
-                  <option value="all">範圍：全部</option>
+                <select value={scope} onChange={(e) => setScope(e.target.value as "self" | "all")} aria-label={t("workspace.scope")}>
+                  <option value="self">{t("workspace.self")}</option>
+                  <option value="all">{t("workspace.all")}</option>
                 </select>
               ) : null}
-              <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+              <button type="button" className="chat-close" onClick={onClose} aria-label={t("workspace.close")}>✕</button>
             </div>
           </div>
 
           <div className="report-body workspace-ai-grid">
             {/* 左：待辦清單 */}
             <div className="workspace-col">
-              <h4 className="workspace-col-title">今日待辦</h4>
+              <h4 className="workspace-col-title">{t("workspace.today")}</h4>
               {loading ? (
-                <AiThinkingIndicator label="載入中" />
+                <AiThinkingIndicator label={t("workspace.loading")} />
               ) : todos.length === 0 ? (
-                <p className="workspace-empty">目前沒有待辦事項 🎉</p>
+                <p className="workspace-empty">{t("workspace.empty")}</p>
               ) : (
                 <ul className="workspace-todos">
-                  {todos.map((t, i) => {
-                    const meta = TODO_META[t.type] ?? { label: t.type, cls: "medium" };
+                  {todos.map((todo, i) => {
+                    const cls = TODO_CLASS[todo.type] ?? "medium";
                     return (
                       <li key={i}>
-                        <button type="button" className={`todo-item sev-${meta.cls}`} onClick={() => { onClose(); navigate(`/customers/${t.customerId}`); }}>
-                          <span className="todo-tag">{meta.label}</span>
-                          <span className="todo-customer">{t.customerName}</span>
-                          <span className="todo-reason">{t.reason}</span>
+                        <button type="button" className={`todo-item sev-${cls}`} onClick={() => { onClose(); navigate(`/customers/${todo.customerId}`); }}>
+                          <span className="todo-tag">{t(`workspace.todoTypes.${todo.type}`, { defaultValue: todo.type })}</span>
+                          <span className="todo-customer">{todo.customerName}</span>
+                          <span className="todo-reason">{todo.reason}</span>
                         </button>
-                        <button type="button" className="btn-secondary todo-call-task" onClick={() => setTaskCustomer({ id: t.customerId, name: t.customerName })}>☎ 安排電話</button>
+                        <button type="button" className="btn-secondary todo-call-task" onClick={() => setTaskCustomer({ id: todo.customerId, name: todo.customerName })}>☎ {t("workspace.scheduleCall")}</button>
                       </li>
                     );
                   })}
@@ -194,10 +196,10 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
 
             {/* 右：AI 總結 + 建議商機 */}
             <div className="workspace-col">
-              <h4 className="workspace-col-title">AI 工作建議</h4>
+              <h4 className="workspace-col-title">{t("workspace.title")}</h4>
               <div className="workspace-ai-summary">
                 {!summary && generating ? (
-                  <AiThinkingIndicator label="AI 正在分析" />
+                  <AiThinkingIndicator label={t("workspace.analyzing")} />
                 ) : summary ? (
                   <div className={generating ? "markdown-body ai-streaming-body" : "markdown-body"}>
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
@@ -205,19 +207,19 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
                     {!generating && model ? <small className="workspace-ai-model">（{model}）</small> : null}
                   </div>
                 ) : (
-                  <p className="workspace-empty">點下方「產生我的工作建議」由 AI 依待辦給出今日優先順序。</p>
+                  <p className="workspace-empty">{t("workspace.summaryEmpty")}</p>
                 )}
               </div>
 
               {/* 建立結果訊息（放區塊外，草稿建立後清空仍可見） */}
-              {createMsg ? <p className="draft-create-msg">{createMsg}</p> : null}
+              {createResult ? <p className="draft-create-msg">{t("workspace.createResult", { ok: createResult.ok, failed: createResult.fail > 0 ? t("workspace.failedSuffix", { count: createResult.fail }) : "" })}</p> : null}
 
               {drafts.length > 0 ? (
                 <div className="workspace-drafts">
                   <div className="workspace-drafts-head">
-                    <h4 className="workspace-col-title">AI 建議商機</h4>
+                    <h4 className="workspace-col-title">{t("workspace.drafts")}</h4>
                     <button type="button" className="btn-assess draft-create-all" disabled={creating || selected.size === 0} onClick={handleCreateAll}>
-                      {creating ? "建立中…" : `✅ 全部建立（${selected.size}）`}
+                      {creating ? t("workspace.creating") : `✅ ${t("workspace.createAll", { count: selected.size })}`}
                     </button>
                   </div>
                   <ul>
@@ -228,13 +230,13 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
                           <div className="draft-body">
                             <div className="draft-main">
                               <strong>{d.customerName}</strong><span>{d.name}</span>
-                              {d.amount ? <em className="draft-amount">預估 {d.amount.toLocaleString()} 元</em> : null}
+                              {d.amount ? <em className="draft-amount">{t("workspace.estimated", { amount: d.amount.toLocaleString(i18n.language) })}</em> : null}
                               <span className={`draft-stage stage-${d.suggestedStage.toLowerCase()}`}>{d.suggestedStage}</span>
                             </div>
                             <div className="draft-rationale">{d.rationale}</div>
                           </div>
                         </label>
-                        <button type="button" className="btn-secondary draft-create" onClick={() => setDraftFor(d)}>編輯後建立</button>
+                        <button type="button" className="btn-secondary draft-create" onClick={() => setDraftFor(d)}>{t("workspace.editCreate")}</button>
                       </li>
                     ))}
                   </ul>
@@ -244,11 +246,11 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="report-footer">
-            <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
+            <button type="button" className="btn-secondary" onClick={openHistory}>🕘 {t("workspace.history")}</button>
             <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
-              {generating ? "產生中…" : "✨ 產生我的工作建議"}
+              {generating ? t("workspace.generating") : `✨ ${t("workspace.generate")}`}
             </button>
-            <button type="button" onClick={onClose}>關閉</button>
+            <button type="button" onClick={onClose}>{t("workspace.close")}</button>
           </div>
         </div>
       </div>
@@ -273,7 +275,7 @@ export function WorkspaceAiModal({ onClose }: { onClose: () => void }) {
 
       {/* AI 歷程彈窗 */}
       {historyOpen ? (
-        <AiCallHistoryModal title="我的工作檯 AI 歷程" calls={calls} loading={callsLoading} onClose={() => setHistoryOpen(false)} />
+        <AiCallHistoryModal title={t("workspace.historyTitle")} calls={calls} loading={callsLoading} onClose={() => setHistoryOpen(false)} />
       ) : null}
       {taskCustomer && user ? <TaskFormModal customerId={taskCustomer.id} customerName={taskCustomer.name} assigneeId={user.id} onCreated={() => { setTaskCustomer(null); setTaskRefreshKey((key) => key + 1); }} onClose={() => setTaskCustomer(null)} /> : null}
     </>

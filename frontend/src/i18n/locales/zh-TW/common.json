@@ -1,9 +1,19 @@
 {
   "lang": { "label": "語言", "en": "English", "zh-TW": "繁體中文" },
   "noData": "尚無資料",
+  "loading": "載入中",
   "notFilled": "未填",
   "pagination": { "prev": "上一頁", "next": "下一頁", "pageOf": "第 {{page}} / {{total}} 頁" },
   "actions": { "edit": "編輯", "delete": "刪除", "save": "儲存", "cancel": "取消", "close": "關閉", "add": "新增" },
+  "ai": {
+    "powered": "此功能由 AI 驅動", "thinking": "AI 正在思考", "analyzing": "AI 正在綜合分析", "helpful": "這則建議有幫助嗎？",
+    "adopt": "採納", "reject": "不採納", "adopted": "已標記為採納 👍", "rejected": "已標記為不採納 👎",
+    "historySubtitle": "歷次 AI 呼叫紀錄", "historyCount": "AI 呼叫歷史（{{count}}）", "historyEmpty": "尚無 AI 呼叫紀錄。執行分析後即會記錄。",
+    "fallback": "樣板 fallback", "downloadMd": "下載 MD",
+    "callTypes": { "CHAT": "對話", "ASSESSMENT": "整體評估", "PORTFOLIO": "全公司評估", "TEAM_ANALYSIS": "團隊診斷", "OWNER_COACHING": "業務輔導" }
+  },
+  "breadcrumb": "麵包屑",
+  "drilldown": { "summary": "{{count}} 筆 · 金額合計 {{amount}}", "loading": "載入明細中", "empty": "查無明細", "status": { "completed": "已完成", "lost": "已流失" } },
   "enums": {
     "risk": { "LOW": "低風險", "MEDIUM": "中風險", "HIGH": "高風險" },
     "intent": {

@@ -6,10 +6,14 @@ Base URL：`http://127.0.0.1:18080/api`
 
 All endpoints below require the `ADMIN` role. Model capabilities are explicit and never inferred from model names.
 
-- `GET /admin/settings/ai` returns model options with `capabilities` (`VISION`, `AUDIO_TRANSCRIPTION`) and `capabilitySource` (`AUTO`, `MANUAL`, `UNKNOWN`), plus OCR/transcription assignments.
+- `GET /admin/settings/ai` returns model options with `capabilities` (`VISION`, `AUDIO_TRANSCRIPTION`) and `capabilitySource` (`AUTO`, `MANUAL`, `UNKNOWN`), OCR/transcription assignments, their deployment defaults, and the effective `ocrSource` / `transcriptionSource` (`DB`, `ENV`, `UNSET`).
 - `POST /admin/settings/ai/providers/{id}/models/refresh` refreshes the provider catalog. Reliable input-modality metadata produces `AUTO`; missing metadata produces `UNKNOWN`.
 - `PUT /admin/settings/ai/models/{model}/capabilities` accepts `{ "providerId": 1, "capabilities": ["VISION"] }` and records `MANUAL`.
 - `PUT /admin/settings/ai/assignments` updates Chat/OCR/transcription model-provider pairs. OCR requires `VISION`; transcription requires `AUDIO_TRANSCRIPTION`; incompatible assignments return `400`.
+- `POST /admin/settings/ai/assignments/ocr/test` accepts multipart `file` (JPEG/PNG/WebP), validates and invokes the currently effective OCR assignment, then returns only model/provider, latency, and a safe success summary.
+- `POST /admin/settings/ai/assignments/transcription/test` accepts multipart `file` (MP3/M4A/WAV), validates and invokes the currently effective transcription assignment, then returns only model/provider, latency, and transcript character count.
+
+OCR/transcription assignment resolution is `complete database pair → complete deployment-default pair → unavailable`. A partial/stale database pair does not silently fall back. The deployment provider name must match a stored provider with an API key, and the model-provider pair must exist in the catalog with the required capability.
 
 ```json
 {
@@ -19,6 +23,19 @@ All endpoints below require the `ADMIN` role. Model capabilities are explicit an
   "ocrProviderId": 1,
   "transcriptionModel": "whisper-1",
   "transcriptionProviderId": 1
+}
+```
+
+用途模型測試成功回應：
+
+```json
+{
+  "success": true,
+  "purpose": "BUSINESS_CARD_OCR",
+  "model": "gpt-4o",
+  "providerId": 1,
+  "latencyMs": 842,
+  "summary": "名片結構化辨識成功"
 }
 ```
 

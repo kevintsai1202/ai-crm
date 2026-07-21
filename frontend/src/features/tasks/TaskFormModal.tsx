@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createTask } from "../../api/index";
 import type { CrmTask } from "../../types";
+import { useTranslation } from "react-i18next";
 
 interface TaskFormModalProps {
   customerId: number;
@@ -18,8 +19,9 @@ function toLocalInput(date: Date): string {
 
 /** 建立電話追蹤任務 Modal；正式狀態只由建立 API 回應產生。 */
 export function TaskFormModal({ customerId, customerName, assigneeId, onCreated, onClose }: TaskFormModalProps) {
+  const { t } = useTranslation("operations");
   const startDefault = new Date(Date.now() + 60 * 60_000);
-  const [title, setTitle] = useState(`電話追蹤${customerName ? `－${customerName}` : ""}`);
+  const [title, setTitle] = useState(t("tasks.defaultTitle", { customer: customerName ? ` - ${customerName}` : "" }));
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<CrmTask["priority"]>("NORMAL");
   const [scheduledStart, setScheduledStart] = useState(toLocalInput(startDefault));
@@ -38,7 +40,7 @@ export function TaskFormModal({ customerId, customerName, assigneeId, onCreated,
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (scheduledEnd <= scheduledStart) {
-      setError("結束時間必須晚於開始時間。");
+      setError(t("tasks.timeError"));
       return;
     }
     setSaving(true);
@@ -51,7 +53,7 @@ export function TaskFormModal({ customerId, customerName, assigneeId, onCreated,
       });
       onCreated(created);
     } catch {
-      setError("建立任務失敗，請確認資料後重試。");
+      setError(t("tasks.createError"));
     } finally {
       setSaving(false);
     }
@@ -59,15 +61,15 @@ export function TaskFormModal({ customerId, customerName, assigneeId, onCreated,
 
   return <div className="modal-overlay" onClick={onClose}>
     <form className="modal-content task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onSubmit={handleSubmit} onClick={(event) => event.stopPropagation()}>
-      <div className="modal-header"><h3 id="task-form-title">安排電話追蹤</h3><button type="button" className="chat-close" aria-label="關閉安排電話追蹤" onClick={onClose}>✕</button></div>
-      <label>客戶<input value={customerName ?? `客戶 #${customerId}`} disabled /></label>
-      <label>標題<input name="taskTitle" required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
-      <label>優先級<select name="taskPriority" value={priority} onChange={(event) => setPriority(event.target.value as CrmTask["priority"])}><option value="LOW">低</option><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label>
-      <label>開始時間<input name="taskStart" type="datetime-local" required value={scheduledStart} onChange={(event) => setScheduledStart(event.target.value)} /></label>
-      <label>結束時間<input name="taskEnd" type="datetime-local" required value={scheduledEnd} onChange={(event) => setScheduledEnd(event.target.value)} /></label>
-      <label>說明<textarea name="taskDescription" value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+      <div className="modal-header"><h3 id="task-form-title">{t("tasks.formTitle")}</h3><button type="button" className="chat-close" aria-label={t("tasks.closeAria")} onClick={onClose}>✕</button></div>
+      <label>{t("tasks.customer")}<input value={customerName ?? t("tasks.customerNumber", { id: customerId })} disabled /></label>
+      <label>{t("tasks.titleLabel")}<input name="taskTitle" required value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>{t("tasks.priority")}<select name="taskPriority" value={priority} onChange={(event) => setPriority(event.target.value as CrmTask["priority"])}>{(["LOW", "NORMAL", "HIGH", "URGENT"] as const).map((value) => <option key={value} value={value}>{t(`tasks.priorities.${value}`)}</option>)}</select></label>
+      <label>{t("tasks.start")}<input name="taskStart" type="datetime-local" required value={scheduledStart} onChange={(event) => setScheduledStart(event.target.value)} /></label>
+      <label>{t("tasks.end")}<input name="taskEnd" type="datetime-local" required value={scheduledEnd} onChange={(event) => setScheduledEnd(event.target.value)} /></label>
+      <label>{t("tasks.description")}<textarea name="taskDescription" value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <div className="modal-actions"><button type="button" className="btn-secondary" onClick={onClose}>取消</button><button type="submit" disabled={saving}>{saving ? "建立中…" : "建立電話任務"}</button></div>
+      <div className="modal-actions"><button type="button" className="btn-secondary" onClick={onClose}>{t("tasks.cancel")}</button><button type="submit" disabled={saving}>{saving ? t("tasks.creating") : t("tasks.create")}</button></div>
     </form>
   </div>;
 }

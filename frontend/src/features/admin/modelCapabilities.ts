@@ -1,4 +1,4 @@
-import type { ModelCapability, ModelOptionItem } from "../../types";
+import type { AiSettingsResponse, ModelCapability, ModelOptionItem } from "../../types";
 
 /** AI 用途 assignment API 的完整 model-provider pair payload。 */
 export interface ModelAssignmentsPayload {
@@ -63,4 +63,20 @@ export function buildModelAssignments(
     transcriptionModel: selectedTranscription?.model ?? null,
     transcriptionProviderId: selectedTranscription?.providerId ?? null,
   };
+}
+
+/** 顯示 OCR／語音用途的部署預設 model-provider pair；缺任一欄即視為未設定。 */
+export function purposeDeploymentDefaultLabel(
+  settings: AiSettingsResponse | null,
+  purpose: "ocr" | "transcription",
+  unsetLabel = "未設定部署預設",
+): string {
+  if (!settings) return unsetLabel;
+  const provider = purpose === "ocr"
+    ? settings.envDefaultOcrProviderName
+    : settings.envDefaultTranscriptionProviderName;
+  const model = purpose === "ocr"
+    ? settings.envDefaultOcrModel
+    : settings.envDefaultTranscriptionModel;
+  return provider && model ? `${model} — ${provider}` : unsetLabel;
 }

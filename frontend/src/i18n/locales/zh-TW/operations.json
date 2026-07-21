@@ -1,0 +1,196 @@
+{
+  "team": {
+    "console": "Manager Console",
+    "title": "業務分析",
+    "loadError": "載入業務分析失敗",
+    "loading": "載入中…",
+    "noData": "無資料",
+    "teamDiagnosis": "🤖 團隊整體診斷",
+    "kpi": {
+      "customers": "客戶總數",
+      "wonAmount": "全團隊成交金額",
+      "pipeline": "進行中商機",
+      "highRisk": "高風險客戶",
+      "winRate": "平均成交率",
+      "owners": "業務人數"
+    },
+    "performance": "各業務績效",
+    "sort": "排序：",
+    "sortOptions": {
+      "wonAmount": "成交金額",
+      "winRate": "成交率",
+      "pipelineAmount": "進行中商機",
+      "customerCount": "客戶數",
+      "highRiskCount": "高風險數"
+    },
+    "tableLabel": "各業務績效表",
+    "columns": {
+      "owner": "業務",
+      "customers": "客戶",
+      "highRisk": "高風險",
+      "pipeline": "進行中商機",
+      "won": "已成交",
+      "winRate": "成交率",
+      "interactionGap": "平均互動間隔",
+      "renewals": "本季續約",
+      "coaching": "Coaching"
+    },
+    "days": "{{count}} 天",
+    "coachingReport": "輔導報告",
+    "insight": {
+      "teamTitle": "團隊整體診斷",
+      "ownerTitle": "{{owner}} 的輔導報告",
+      "readError": "讀取失敗",
+      "generateError": "產生失敗，請稍後再試",
+      "lastAnalyzed": "上次分析：{{date}}",
+      "teachingSummary": "教學版摘要",
+      "loading": "載入分析中",
+      "analyzing": "AI 正在分析",
+      "empty": "尚未產生分析，點「重新分析」由 AI 產出。",
+      "history": "🕘 AI 歷程",
+      "download": "⬇ 下載 MD",
+      "generating": "分析中…",
+      "regenerate": "重新分析",
+      "historyTitle": "{{title}} AI 歷程"
+    }
+  },
+  "adminUsers": {
+    "subtitle": "Hahow AI Full-stack Teaching Build",
+    "title": "帳號管理",
+    "loadError": "載入帳號清單失敗",
+    "toggleError": "切換狀態失敗",
+    "add": "＋ 新增帳號",
+    "loading": "載入中…",
+    "tableLabel": "帳號清單",
+    "columns": { "username": "帳號", "displayName": "顯示名稱", "role": "角色", "status": "狀態", "createdAt": "建立時間", "actions": "操作" },
+    "roles": { "SALES": "業務", "MANAGER": "經理", "ADMIN": "管理員" },
+    "me": "我",
+    "enabled": "啟用",
+    "disabled": "停用",
+    "edit": "編輯",
+    "resetPassword": "重設密碼",
+    "cannotDisableSelf": "不可停用自己的帳號",
+    "createTitle": "新增帳號",
+    "username": "帳號（Email）",
+    "displayName": "顯示名稱",
+    "role": "角色",
+    "initialPassword": "初始密碼",
+    "creating": "建立中…",
+    "create": "建立",
+    "createError": "新增失敗",
+    "editTitle": "編輯帳號 — {{username}}",
+    "saving": "儲存中…",
+    "save": "儲存",
+    "updateError": "更新失敗",
+    "resetTitle": "重設密碼 — {{username}}",
+    "resetDone": "密碼已重設完成。",
+    "newPassword": "新密碼",
+    "resetting": "重設中…",
+    "confirmReset": "確認重設",
+    "resetError": "重設失敗",
+    "cancel": "取消",
+    "close": "關閉",
+    "noData": "尚無資料"
+  },
+  "workspace": {
+    "title": "AI 工作建議", "subtitle": "依待辦自動排序今日優先工作", "scope": "資料範圍", "self": "範圍：自己", "all": "範圍：全部", "close": "關閉",
+    "today": "今日待辦", "loading": "載入中", "empty": "目前沒有待辦事項 🎉", "todoTypes": { "HIGH_RISK": "高風險", "RENEWAL_DUE": "即將續約", "STALE_OPPORTUNITY": "停滯商機" }, "scheduleCall": "安排電話",
+    "analyzing": "AI 正在分析", "summaryEmpty": "點下方「產生我的工作建議」由 AI 依待辦給出今日優先順序。", "drafts": "AI 建議商機", "creating": "建立中…", "createAll": "全部建立（{{count}}）",
+    "createResult": "已建立 {{ok}} 筆商機{{failed}}", "failedSuffix": "，{{count}} 筆失敗", "estimated": "預估 {{amount}} 元", "editCreate": "編輯後建立", "history": "AI 歷程", "generating": "產生中…", "generate": "產生我的工作建議", "historyTitle": "我的工作檯 AI 歷程"
+  },
+  "opportunityIntelligence": {
+    "title": "商機智能", "intro": "以可解釋的規則評分呈現商機健康度與下一最佳行動；分數不會自動改變商機階段或成交機率。",
+    "loadError": "載入健康度失敗", "recalculateError": "重算失敗", "calculating": "計算中…", "recalculating": "重算中…", "recalculate": "重新計算",
+    "tiers": { "good": "健康", "warn": "留意", "bad": "風險" }, "nextAction": "下一最佳行動：", "components": "分數構成與依據", "evidence": "依據：", "trend": "趨勢：", "ruleVersion": "規則版本 {{version}}", "model": "模型 {{model}}", "deterministic": "deterministic", "createTask": "建立後續 Task", "followUp": "產生跟進信", "back": "返回客戶工作台"
+  },
+  "stakeholder": {
+    "title": "決策鏈", "intro": "已確認的角色與關係為事實（實線）；AI 建議為待確認（虛線），需人工確認後才成為事實。",
+    "loadError": "載入決策鏈失敗", "generateError": "產生建議失敗", "actionError": "操作失敗", "loading": "載入中…", "processing": "處理中…", "generate": "產生 AI 建議",
+    "influence": "影響力 {{value}}", "stance": "立場 {{value}}", "suggestions": "AI 待確認建議", "emptySuggestions": "目前沒有待確認建議。", "pending": "待確認", "confirm": "確認", "reject": "拒絕", "back": "返回客戶工作台",
+    "roles": "已確認角色", "emptyRoles": "尚無已確認角色。", "relations": "已確認關係", "emptyRelations": "尚無已確認關係。"
+  },
+  "followUp": {
+    "title": "AI 跟進信", "intro": "AI 依客戶脈絡草擬跟進信，人工確認後透過 Zeabur Sendmail 以公司統一信箱寄送、Reply-To 為負責業務。",
+    "draftError": "產生草稿失敗", "saveError": "存檔失敗", "saveFirst": "請先將修改存為新版本再寄送。", "sendError": "寄送失敗", "retryError": "重試失敗", "drafting": "AI 草擬中…",
+    "grounding": "AI 引用依據", "noGrounding": "（無引用依據）", "version": "草稿版本 v{{version}}", "edited": "（已修改）", "subject": "主旨", "body": "內容",
+    "sendPreview": "寄送資訊：寄件者為公司統一信箱、Reply-To 為客戶／商機負責業務、收件者為客戶 Email。", "saving": "存檔中…", "saveVersion": "存為新版本", "sending": "寄送中…", "send": "透過 Zeabur Sendmail 寄送",
+    "status": { "SENT": "已寄出", "FAILED": "寄送失敗", "QUEUED": "排入寄送" }, "messageId": "訊息 ID：{{id}}", "from": "寄件者", "replyTo": "Reply-To", "recipient": "收件者", "retry": "重試寄送", "back": "返回客戶工作台"
+  },
+  "meeting": {
+    "title": "會議 Copilot", "intro": "上傳會議或電話錄音，AI 轉錄並草擬 CRM 變更；逐項確認後才寫入，逐字稿確認後保留為互動依據。",
+    "uploadError": "上傳失敗", "applyError": "套用失敗", "uploading": "上傳中…", "upload": "上傳並轉錄", "failed": "轉錄失敗：{{reason}}。", "audioError": "無法處理音訊", "reupload": "重新上傳", "processing": "AI 轉錄與草擬中，請稍候…",
+    "applied": "已套用 {{count}} 項變更。", "interaction": "互動紀錄 #{{id}}", "tasks": "後續任務 {{ids}}", "opportunity": "商機更新 #{{id}}", "stakeholders": "決策鏈建議 {{count}} 項", "backCustomer": "返回客戶", "backWorkspace": "返回客戶工作台",
+    "summary": "AI 摘要", "noSummary": "（無摘要）", "transcript": "逐字稿", "noTranscript": "（無逐字稿）", "reviewTitle": "套用哪些 CRM 變更？", "noChanges": "本次會議未產生可套用的變更。",
+    "types": { "INTERACTION": "互動紀錄", "TASK": "後續任務", "OPPORTUNITY_PATCH": "商機更新", "STAKEHOLDER_SUGGESTION": "決策鏈建議" }, "lowConfidence": "低信心・預設不套用", "applying": "套用中…", "confirm": "確認套用 {{count}} 項變更"
+  },
+  "businessCard": {
+    "title": "名片建檔精靈", "intro": "以 AI 辨識名片，人工校正後一次建立客戶、聯絡人、商機與電話任務。",
+    "uploadError": "上傳失敗", "createError": "建檔失敗", "recognitionFailed": "名片辨識失敗：{{reason}}。請返回重新上傳。", "parseFailed": "無法解析名片內容",
+    "reupload": "重新上傳", "processing": "AI 辨識中，請稍候…", "done": "建檔完成！已建立以下正式資料：",
+    "entities": { "customer": "客戶", "contact": "聯絡人", "opportunity": "商機", "task": "電話任務" }, "goCustomer": "前往客戶", "another": "再建一張", "backWorkspace": "返回客戶工作台",
+    "uploadHint": "上傳名片照片（JPEG／PNG／WebP，10 MB 以內），系統將以 AI 辨識欄位供你校正。", "recognizing": "辨識中…", "startRecognition": "開始辨識",
+    "lowConfidence": "信心偏低，請確認", "fields": { "customerName": "公司名稱", "taxId": "統一編號", "industry": "產業", "customerEmail": "客戶 Email", "customerPhone": "客戶電話", "contactName": "聯絡人姓名", "contactTitle": "聯絡人職稱", "contactEmail": "聯絡人 Email" },
+    "duplicates": "偵測到 {{count}} 筆可能重複的客戶，請選擇處理方式：", "createNew": "仍建立為新客戶", "merge": "合併至「{{customer}}」", "next": "下一步：商機與任務",
+    "opportunityName": "商機名稱", "amount": "預估金額", "closeDate": "預計成交日", "callAt": "預定通話時間", "back": "上一步", "creating": "建檔中…", "confirm": "確認建檔", "defaultOpportunity": "{{company}} 新商機", "genericOpportunity": "名片新商機"
+  },
+  "assistant": {
+    "name": "AI 助理", "askTitle": "詢問 AI 助理：{{customer}}", "selectCustomer": "請先選取客戶", "dialog": "AI 助理聊天視窗",
+    "database": "AI 正在查詢資料庫", "churn": "流失 {{value}}", "renewalDelay": "續約延遲 {{value}}", "memory": "RAG + 對話記憶",
+    "noCustomer": "尚未選取客戶", "loading": "載入對話紀錄中…", "askCustomer": "向 AI 助理詢問關於「{{customer}}」的問題", "selectLeft": "請先在左側選取客戶",
+    "placeholder": "輸入問題後按 Enter 送出（Shift+Enter 換行）", "responding": "回應中…", "send": "送出", "close": "關閉",
+    "suggestions": ["分析這位客戶的續約風險並建議下一步", "用三點條列總結最近的互動重點", "這位客戶最大的成交障礙是什麼？"]
+  },
+  "tasks": {
+    "title": "CRM 正式任務", "refresh": "重新整理", "loading": "載入任務中…", "loadError": "任務載入失敗。", "empty": "目前沒有待處理的正式任務。",
+    "phone": "電話", "customerNumber": "客戶 #{{id}}", "overdue": "已逾期", "postpone": "延期一天", "calendar": "下載行事曆", "complete": "完成",
+    "formTitle": "安排電話追蹤", "closeAria": "關閉安排電話追蹤", "customer": "客戶", "titleLabel": "標題", "defaultTitle": "電話追蹤{{customer}}",
+    "priority": "優先級", "priorities": { "LOW": "低", "NORMAL": "一般", "HIGH": "高", "URGENT": "緊急" }, "start": "開始時間", "end": "結束時間", "description": "說明",
+    "timeError": "結束時間必須晚於開始時間。", "createError": "建立任務失敗，請確認資料後重試。", "cancel": "取消", "creating": "建立中…", "create": "建立電話任務"
+  },
+  "adminSettings": {
+    "title": "系統設定",
+    "intro": "共用一份模型目錄，分別指定 AI 對話、名片 OCR 與會議語音轉錄模型；留空時使用各用途的部署預設。",
+    "loading": "載入中…",
+    "unset": "未設定",
+    "errors": {
+      "load": "載入失敗", "save": "儲存失敗", "providerSave": "供應商儲存失敗", "providerDelete": "刪除失敗",
+      "catalogRefresh": "模型目錄更新失敗", "capabilitySave": "模型能力儲存失敗", "assignmentSave": "用途模型儲存失敗",
+      "selectCard": "請先選擇名片圖片。", "selectAudio": "請先選擇會議音訊。", "purposeTest": "用途模型測試失敗", "connection": "連線失敗", "score": "⚠️ 評分失敗，請稍後再試。"
+    },
+    "messages": {
+      "defaultSet": "已設定 {{model}} 為預設對話模型。", "chatCleared": "已清除對話模型，改用部署預設。", "saved": "已儲存，AI 呼叫即時生效。", "catalogUpdated": "模型目錄與能力已更新。",
+      "capabilityUpdated": "已更新 {{model}} 的模型能力。", "assignmentsSaved": "OCR 與語音轉錄模型已儲存。", "testSuccess": "{{purpose}} 測試成功：{{model}}，{{latency}} ms。"
+    },
+    "confirmDeleteProvider": "確定刪除此供應商？相關模型選項的 provider 關聯將清除。",
+    "providers": {
+      "title": "AI 供應商", "subtitle": "管理 API 金鑰與 Base URL，模型選項關聯至供應商", "empty": "尚無供應商，請在下方新增。", "defaultUrl": "預設 OpenAI URL",
+      "keySet": "金鑰已設定", "keyMissing": "未設定金鑰", "refresh": "更新模型", "refreshAria": "重新查詢 {{provider}} 模型", "edit": "編輯", "delete": "刪除", "editTitle": "編輯供應商", "addTitle": "新增供應商",
+      "namePlaceholder": "供應商名稱，如 OpenAI、Anthropic", "urlPlaceholder": "Base URL（留空使用 OpenAI 預設）", "keyEditPlaceholder": "API Key（留空保留現有金鑰）", "keyAddPlaceholder": "API Key",
+      "saving": "儲存中…", "update": "更新供應商", "add": "新增供應商", "cancel": "取消"
+    },
+    "models": {
+      "title": "模型目錄與 AI 對話設定", "system": "後台指派", "env": "部署預設", "envHint": "未選用對話模型，AI 呼叫將使用部署預設：", "empty": "尚無候選模型，請在下方輸入後新增。",
+      "raceToggle": "勾選加入競速比較", "active": "使用中", "visionTitle": "支援圖片輸入", "audioTitle": "支援語音轉錄", "delete": "刪除", "chooseProvider": "選擇供應商",
+      "namePlaceholder": "輸入模型名，如 claude-sonnet-4-6", "add": "新增"
+    },
+    "purposes": {
+      "title": "用途模型設定", "hint": "空白指派會使用該用途的部署預設；測試呼叫目前已儲存的生效模型。", "save": "儲存用途模型", "saving": "儲存中…",
+      "admin": "後台指派", "deployment": "部署預設", "unset": "未設定", "chat": "AI 對話", "chatHint": "由上方模型目錄點選；既有對話流程維持不變。",
+      "ocr": "名片 OCR", "ocrName": "名片 OCR", "visionModel": "Vision 模型", "useDefault": "使用部署預設", "defaultPrefix": "部署預設：", "cardFile": "測試名片圖片", "testing": "測試中…",
+      "testEffective": "測試目前生效模型", "ocrSuccess": "名片結構化辨識成功", "transcription": "會議語音轉錄", "transcriptionName": "會議語音轉錄", "audioModel": "Audio transcription 模型", "audioFile": "測試會議音訊",
+      "transcriptionSuccess": "逐字稿產生成功", "invalid": "已指派模型不再具備所需能力，請先清除或改選相容模型。"
+    },
+    "params": {
+      "title": "模型參數", "hint": "留空＝用預設；套用於 AI 呼叫與模型測試", "default": "預設", "tokensPlaceholder": "如 8000", "reasoning": "Reasoning Effort（推理模型）",
+      "save": "儲存參數", "saving": "儲存中…", "tip": "提示：推理型模型的 reasoning_effort 設 low/minimal 可減少思考 token 與延遲；max tokens 太低可能導致空輸出。"
+    },
+    "race": {
+      "title": "多模型競速測試", "subtitle": "同時呼叫所有候選模型，比較回應速度與品質", "empty": "請先在上方新增候選模型才能執行測試。", "taskTitle": "測試任務（使用真實 CRM 資料）",
+      "task": "分析全公司客戶組合，找出最需立即關注的前 3 名客戶（含風險原因與建議行動）。", "testing": "測試中…", "start": "開始比較",
+      "status": { "idle": "–", "waiting": "等待中", "streaming": "生成中", "done": "完成", "error": "失敗" }, "firstToken": "首字", "total": "總計",
+      "visibleReasoning": "可見 {{visible}} + 推理 {{reasoning}}", "finishTitle": "回應因此原因結束", "waitingResponse": "等待回應", "history": "歷程", "download": "下載 MD", "answerFile": "回答",
+      "scoreReport": "評分報告", "scoreHistory": "評分歷程", "scoreFile": "00_評分報告.md", "downloadZip": "下載全部 ZIP", "zipName": "競速測試_{{timestamp}}", "scoring": "評分中…",
+      "score": "claude-opus-4-8 評分", "reportTitle": "多模型競速評分報告", "historyTitle": "評分 AI 歷程（claude-opus-4-8）", "modelHistoryTitle": "{{model}} 測試歷程"
+    }
+  }
+}

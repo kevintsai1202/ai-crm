@@ -1,9 +1,19 @@
 {
   "lang": { "label": "Language", "en": "English", "zh-TW": "繁體中文" },
   "noData": "No data yet",
+  "loading": "Loading",
   "notFilled": "Not filled",
   "pagination": { "prev": "Previous page", "next": "Next page", "pageOf": "Page {{page}} of {{total}}" },
   "actions": { "edit": "Edit", "delete": "Delete", "save": "Save", "cancel": "Cancel", "close": "Close", "add": "Add" },
+  "ai": {
+    "powered": "Powered by AI", "thinking": "AI is thinking", "analyzing": "AI is analyzing", "helpful": "Was this suggestion helpful?",
+    "adopt": "Adopt", "reject": "Reject", "adopted": "Marked as adopted 👍", "rejected": "Marked as not adopted 👎",
+    "historySubtitle": "Previous AI calls", "historyCount": "AI call history ({{count}})", "historyEmpty": "No AI calls yet. Run an analysis to create one.",
+    "fallback": "Template fallback", "downloadMd": "Download MD",
+    "callTypes": { "CHAT": "Chat", "ASSESSMENT": "Assessment", "PORTFOLIO": "Company assessment", "TEAM_ANALYSIS": "Team diagnosis", "OWNER_COACHING": "Sales coaching" }
+  },
+  "breadcrumb": "Breadcrumb",
+  "drilldown": { "summary": "{{count}} items · Total {{amount}}", "loading": "Loading details", "empty": "No details found", "status": { "completed": "Completed", "lost": "Lost" } },
   "enums": {
     "risk": { "LOW": "Low risk", "MEDIUM": "Medium risk", "HIGH": "High risk" },
     "intent": {

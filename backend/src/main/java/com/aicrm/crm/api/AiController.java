@@ -82,8 +82,9 @@ public class AiController {
      * @return 含評估報告、引用與風險的回應
      */
     @GetMapping(value = "/customers/{id}/assessment", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Dtos.ChatResponse customerAssessment(@PathVariable Long id) {
-        return insightService.customerAssessment(id);
+    public Dtos.ChatResponse customerAssessment(@PathVariable Long id,
+                                                @RequestParam(required = false) String lang) {
+        return insightService.customerAssessment(id, lang);
     }
 
     /**
@@ -93,8 +94,9 @@ public class AiController {
      * @return SseEmitter 串流發送器
      */
     @GetMapping(value = "/customers/{id}/assessment", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamCustomerAssessment(@PathVariable Long id) {
-        return insightService.streamCustomerAssessment(id);
+    public SseEmitter streamCustomerAssessment(@PathVariable Long id,
+                                               @RequestParam(required = false) String lang) {
+        return insightService.streamCustomerAssessment(id, lang);
     }
 
     /**
@@ -103,8 +105,8 @@ public class AiController {
      * @return Portfolio 評估回應
      */
     @GetMapping(value = "/portfolio/assessment", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
-    public Dtos.PortfolioAssessmentResponse portfolioAssessment() {
-        return insightService.portfolioAssessment();
+    public Dtos.PortfolioAssessmentResponse portfolioAssessment(@RequestParam(required = false) String lang) {
+        return insightService.portfolioAssessment(lang);
     }
 
     /**
@@ -113,8 +115,8 @@ public class AiController {
      * @return SseEmitter 串流發送器
      */
     @GetMapping(value = "/portfolio/assessment", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamPortfolioAssessment() {
-        return insightService.streamPortfolioAssessment();
+    public SseEmitter streamPortfolioAssessment(@RequestParam(required = false) String lang) {
+        return insightService.streamPortfolioAssessment(lang);
     }
 
     /**

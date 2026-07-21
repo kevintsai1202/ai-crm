@@ -7,6 +7,7 @@ import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.domain.Role;
 import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.service.JwtService.AuthPrincipal;
+import static com.aicrm.crm.service.ai.AiResponseLanguage.directive;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,7 +143,7 @@ public class WorkspaceAiService {
      * @param todos 已算好的待辦
      * @return 提示詞
      */
-    String buildRecommendationPrompt(AuthPrincipal principal, List<Dtos.WorkspaceTodoItem> todos) {
+    String buildRecommendationPrompt(AuthPrincipal principal, List<Dtos.WorkspaceTodoItem> todos, String lang) {
         var sb = new StringBuilder();
         sb.append("你是 CRM 業務助理。以下為業務「").append(principal.displayName())
           .append("」目前由系統計算出的待辦（數字與對象已由資料庫確認，請勿更改）：\n");
@@ -155,6 +156,7 @@ public class WorkspaceAiService {
             }
         }
         sb.append("\n請用繁體中文，依急迫性排序，給出今天的工作優先建議（150 字內），不要編造未列出的客戶或數字。");
+        sb.append(directive(lang));
         return sb.toString();
     }
 
@@ -233,7 +235,7 @@ public class WorkspaceAiService {
      * @return 商機建議草稿清單
      */
     List<Dtos.SuggestedOpportunityDraft> generateAiDrafts(List<Customer> customers, ChatModel chatModel,
-                                                          List<Dtos.SuggestedOpportunityDraft> fallback) {
+                                                          List<Dtos.SuggestedOpportunityDraft> fallback, String lang) {
         if (chatModel == null || customers.isEmpty()) {
             return fallback;
         }
@@ -263,6 +265,7 @@ public class WorkspaceAiService {
                 + "amount(預估金額，整數元，依產業與客戶規模合理估算)、"
                 + "rationale(繁中，說明『為何現在該推進』的行動方向，30-60 字)。"
                 + "不要輸出清單以外的客戶，不要捏造 customerId。");
+        sb.append(directive(lang));
         try {
             var draftSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(sb.toString());
             var draftOpts = systemSettings.resolveChatOptions();
@@ -317,14 +320,14 @@ public class WorkspaceAiService {
      * @param scope 請求範圍（SALES 會被強制為自己）
      * @return SseEmitter
      */
-    public SseEmitter streamRecommendation(AuthPrincipal principal, String scope) {
+    public SseEmitter streamRecommendation(AuthPrincipal principal, String scope, String lang) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         // 交易內先載入客戶一次，算好純值（待辦、規則式 fallback、提示詞）
         var customers = loadScopedCustomers(principal, scope);
         var todos = computeTodosFrom(customers);
         final String fallback = deterministicRecommendation(principal, todos);
-        final String userPrompt = buildRecommendationPrompt(principal, todos);
+        final String userPrompt = buildRecommendationPrompt(principal, todos, lang);
         final String subject = principal.username();
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
 
@@ -338,7 +341,7 @@ public class WorkspaceAiService {
 
         // LLM 主導的商機建議（失敗回退規則式）；於交易內呼叫，僅讀已載入客戶
         var ruleDrafts = computeDraftsFrom(customers);
-        var drafts = generateAiDrafts(customers, chatModel, ruleDrafts);
+        var drafts = generateAiDrafts(customers, chatModel, ruleDrafts, lang);
         try {
             emitter.send(SseEmitter.event().data(Map.of("type", "drafts", "items", drafts)));
         } catch (Exception e) {
@@ -444,13 +447,13 @@ public class WorkspaceAiService {
         if (req.customerId() != null) {
             // 深入單客戶：先驗證可見性，再複用既有客戶對話（含 RAG/PII/治理）
             assertCustomerVisible(principal, req.scope(), req.customerId());
-            return insightService.streamChat(new Dtos.ChatRequest(req.customerId(), req.message()));
+            return insightService.streamChat(new Dtos.ChatRequest(req.customerId(), req.message(), req.lang()));
         }
         // 總覽問答：以個人客戶組合摘要當 grounding
         SseEmitter emitter = new SseEmitter(300_000L);
         var customers = loadScopedCustomers(principal, req.scope());
         final String subject = principal.username();
-        final String userPrompt = buildPortfolioPrompt(principal, customers, req.message());
+        final String userPrompt = buildPortfolioPrompt(principal, customers, req.message(), req.lang());
         final String fallback = deterministicPortfolioAnswer(customers);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
         streamLlmText(emitter, AiCallType.WORKSPACE_CHAT, subject, userPrompt, fallback, chatModel);
@@ -460,7 +463,7 @@ public class WorkspaceAiService {
     /**
      * 組個人客戶組合的 grounding 提示詞（名稱 / 風險 / 續約 / 開放商機數），明示不可竄改。
      */
-    String buildPortfolioPrompt(AuthPrincipal principal, List<Customer> customers, String question) {
+    String buildPortfolioPrompt(AuthPrincipal principal, List<Customer> customers, String question, String lang) {
         var today = LocalDate.now();
         var sb = new StringBuilder();
         sb.append("以下為業務「").append(principal.displayName()).append("」負責的客戶組合摘要（資料庫事實，請勿更改）：\n");
@@ -474,6 +477,7 @@ public class WorkspaceAiService {
         }
         sb.append("\n（今日為 ").append(today).append("）\n# 業務提問\n").append(question)
           .append("\n請用繁體中文，只根據上述客戶資料回答，不要編造未列出的客戶或數字。");
+        sb.append(directive(lang));
         return sb.toString();
     }
 

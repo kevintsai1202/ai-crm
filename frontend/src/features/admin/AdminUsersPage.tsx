@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { createAdminUser, fetchAdminUsers, resetAdminUserPassword, setAdminUserEnabled, updateAdminUser } from "../../api";
 import type { AdminUser, Role } from "../../types";
 import { useAuth } from "../../context/AuthContext";
@@ -6,14 +7,13 @@ import { formatDateTime } from "../../lib/format";
 
 /** 角色選項（與後端 Role enum 對應）。 */
 const ROLES: Role[] = ["SALES", "MANAGER", "ADMIN"];
-/** 角色顯示名稱。 */
-const ROLE_LABEL: Record<Role, string> = { SALES: "業務", MANAGER: "經理", ADMIN: "管理員" };
 
 /**
  * 帳號管理頁（僅 ADMIN）：列出所有帳號，支援新增、編輯（顯示名稱/角色）、重設密碼、啟用/停用。
  * 函式級註解：所有異動後重新載入清單以反映最新狀態；操作自己的帳號時後端會擋下停用/降級。
  */
 export function AdminUsersPage() {
+  const { t, i18n } = useTranslation(["operations", "common"]);
   const { user } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +32,8 @@ export function AdminUsersPage() {
     try {
       setUsers(await fetchAdminUsers());
     } catch (e) {
-      console.error("載入帳號清單失敗:", e);
-      setError("載入帳號清單失敗");
+      console.error("Failed to load user accounts:", e);
+      setError(t("adminUsers.loadError"));
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export function AdminUsersPage() {
       await setAdminUserEnabled(target.id, !target.enabled);
       await load();
     } catch (e) {
-      alert(extractError(e, "切換狀態失敗"));
+      alert(extractError(e, t("adminUsers.toggleError")));
     }
   }
 
@@ -57,49 +57,49 @@ export function AdminUsersPage() {
     <>
       <section className="topbar">
         <div>
-          <p>Hahow AI Full-stack Teaching Build</p>
-          <h2>帳號管理</h2>
+          <p>{t("adminUsers.subtitle")}</p>
+          <h2>{t("adminUsers.title")}</h2>
         </div>
         <div className="topbar-actions">
-          <button type="button" className="btn-assess" onClick={() => setShowCreate(true)}>＋ 新增帳號</button>
+          <button type="button" className="btn-assess" onClick={() => setShowCreate(true)}>{t("adminUsers.add")}</button>
         </div>
       </section>
 
       <div className="panel">
         {loading ? (
-          <div className="sr-empty">載入中…</div>
+          <div className="sr-empty">{t("adminUsers.loading")}</div>
         ) : error ? (
           <div className="sr-empty">{error}</div>
         ) : (
           /* 帳號欄位與操作按鈕需要完整保留，窄螢幕只在表格容器內捲動。 */
-          <div className="table-scroll admin-users-table-scroll" role="region" aria-label="帳號清單" tabIndex={0}>
+          <div className="table-scroll admin-users-table-scroll" role="region" aria-label={t("adminUsers.tableLabel")} tabIndex={0}>
             <table className="admin-user-table">
               <thead>
                 <tr>
-                  <th>帳號</th><th>顯示名稱</th><th>角色</th><th>狀態</th><th>建立時間</th><th>操作</th>
+                  <th>{t("adminUsers.columns.username")}</th><th>{t("adminUsers.columns.displayName")}</th><th>{t("adminUsers.columns.role")}</th><th>{t("adminUsers.columns.status")}</th><th>{t("adminUsers.columns.createdAt")}</th><th>{t("adminUsers.columns.actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className={u.enabled ? "" : "row-disabled"}>
-                    <td>{u.username}{u.username === user?.username ? <span className="me-badge">我</span> : null}</td>
+                    <td>{u.username}{u.username === user?.username ? <span className="me-badge">{t("adminUsers.me")}</span> : null}</td>
                     <td>{u.displayName}</td>
-                    <td>{ROLE_LABEL[u.role]}</td>
+                    <td>{t(`adminUsers.roles.${u.role}`)}</td>
                     <td>
-                      <span className={`status-pill ${u.enabled ? "on" : "off"}`}>{u.enabled ? "啟用" : "停用"}</span>
+                      <span className={`status-pill ${u.enabled ? "on" : "off"}`}>{t(u.enabled ? "adminUsers.enabled" : "adminUsers.disabled")}</span>
                     </td>
-                    <td>{formatDateTime(u.createdAt, "zh-TW", "尚無資料")}</td>
+                    <td>{formatDateTime(u.createdAt, i18n.language, t("adminUsers.noData"))}</td>
                     <td className="admin-user-actions">
-                      <button type="button" className="btn-secondary" onClick={() => setEditing(u)}>編輯</button>
-                      <button type="button" className="btn-secondary" onClick={() => setResetting(u)}>重設密碼</button>
+                      <button type="button" className="btn-secondary" onClick={() => setEditing(u)}>{t("adminUsers.edit")}</button>
+                      <button type="button" className="btn-secondary" onClick={() => setResetting(u)}>{t("adminUsers.resetPassword")}</button>
                       <button
                         type="button"
                         className="btn-secondary"
                         disabled={u.username === user?.username}
-                        title={u.username === user?.username ? "不可停用自己的帳號" : ""}
+                        title={u.username === user?.username ? t("adminUsers.cannotDisableSelf") : ""}
                         onClick={() => toggleEnabled(u)}
                       >
-                        {u.enabled ? "停用" : "啟用"}
+                        {t(u.enabled ? "adminUsers.disabled" : "adminUsers.enabled")}
                       </button>
                     </td>
                   </tr>
@@ -142,6 +142,7 @@ function extractError(e: unknown, fallback: string): string {
 
 /** 新增帳號 Modal。 */
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useTranslation("operations");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function handle(e: FormEvent<HTMLFormElement>) {
@@ -158,7 +159,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
       });
       onCreated();
     } catch (e2) {
-      setErr(extractError(e2, "新增失敗"));
+      setErr(extractError(e2, t("adminUsers.createError")));
     } finally {
       setSubmitting(false);
     }
@@ -166,20 +167,20 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>新增帳號</h3>
-        <label>帳號（Email）<input name="username" type="email" required placeholder="user@aurora.local" /></label>
-        <label>顯示名稱 <input name="displayName" required /></label>
+        <h3>{t("adminUsers.createTitle")}</h3>
+        <label>{t("adminUsers.username")}<input name="username" type="email" required placeholder="user@aurora.local" /></label>
+        <label>{t("adminUsers.displayName")} <input name="displayName" required /></label>
         <label>
-          角色
+          {t("adminUsers.role")}
           <select name="role" defaultValue="SALES">
-            {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+            {ROLES.map((r) => <option key={r} value={r}>{t(`adminUsers.roles.${r}`)}</option>)}
           </select>
         </label>
-        <label>初始密碼 <input name="password" type="password" required minLength={6} /></label>
+        <label>{t("adminUsers.initialPassword")} <input name="password" type="password" required minLength={6} /></label>
         {err ? <p className="form-error">{err}</p> : null}
         <div className="modal-actions">
-          <button type="submit" disabled={submitting}>{submitting ? "建立中…" : "建立"}</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit" disabled={submitting}>{t(submitting ? "adminUsers.creating" : "adminUsers.create")}</button>
+          <button type="button" onClick={onClose}>{t("adminUsers.cancel")}</button>
         </div>
       </form>
     </div>
@@ -188,6 +189,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
 /** 編輯帳號（顯示名稱 + 角色）Modal。 */
 function EditUserModal({ target, onClose, onSaved }: { target: AdminUser; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation("operations");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function handle(e: FormEvent<HTMLFormElement>) {
@@ -199,7 +201,7 @@ function EditUserModal({ target, onClose, onSaved }: { target: AdminUser; onClos
       await updateAdminUser(target.id, { displayName: String(fd.get("displayName")), role: String(fd.get("role")) as Role });
       onSaved();
     } catch (e2) {
-      setErr(extractError(e2, "更新失敗"));
+      setErr(extractError(e2, t("adminUsers.updateError")));
     } finally {
       setSubmitting(false);
     }
@@ -207,18 +209,18 @@ function EditUserModal({ target, onClose, onSaved }: { target: AdminUser; onClos
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>編輯帳號 — {target.username}</h3>
-        <label>顯示名稱 <input name="displayName" required defaultValue={target.displayName} /></label>
+        <h3>{t("adminUsers.editTitle", { username: target.username })}</h3>
+        <label>{t("adminUsers.displayName")} <input name="displayName" required defaultValue={target.displayName} /></label>
         <label>
-          角色
+          {t("adminUsers.role")}
           <select name="role" defaultValue={target.role}>
-            {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
+            {ROLES.map((r) => <option key={r} value={r}>{t(`adminUsers.roles.${r}`)}</option>)}
           </select>
         </label>
         {err ? <p className="form-error">{err}</p> : null}
         <div className="modal-actions">
-          <button type="submit" disabled={submitting}>{submitting ? "儲存中…" : "儲存"}</button>
-          <button type="button" onClick={onClose}>取消</button>
+          <button type="submit" disabled={submitting}>{t(submitting ? "adminUsers.saving" : "adminUsers.save")}</button>
+          <button type="button" onClick={onClose}>{t("adminUsers.cancel")}</button>
         </div>
       </form>
     </div>
@@ -227,6 +229,7 @@ function EditUserModal({ target, onClose, onSaved }: { target: AdminUser; onClos
 
 /** 重設密碼 Modal。 */
 function ResetPasswordModal({ target, onClose, onSaved }: { target: AdminUser; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation("operations");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -239,7 +242,7 @@ function ResetPasswordModal({ target, onClose, onSaved }: { target: AdminUser; o
       await resetAdminUserPassword(target.id, String(fd.get("password")));
       setDone(true);
     } catch (e2) {
-      setErr(extractError(e2, "重設失敗"));
+      setErr(extractError(e2, t("adminUsers.resetError")));
     } finally {
       setSubmitting(false);
     }
@@ -247,19 +250,19 @@ function ResetPasswordModal({ target, onClose, onSaved }: { target: AdminUser; o
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal-content" onClick={(e) => e.stopPropagation()} onSubmit={handle}>
-        <h3>重設密碼 — {target.username}</h3>
+        <h3>{t("adminUsers.resetTitle", { username: target.username })}</h3>
         {done ? (
           <>
-            <p>密碼已重設完成。</p>
-            <div className="modal-actions"><button type="button" onClick={onSaved}>關閉</button></div>
+            <p>{t("adminUsers.resetDone")}</p>
+            <div className="modal-actions"><button type="button" onClick={onSaved}>{t("adminUsers.close")}</button></div>
           </>
         ) : (
           <>
-            <label>新密碼 <input name="password" type="password" required minLength={6} autoFocus /></label>
+            <label>{t("adminUsers.newPassword")} <input name="password" type="password" required minLength={6} autoFocus /></label>
             {err ? <p className="form-error">{err}</p> : null}
             <div className="modal-actions">
-              <button type="submit" disabled={submitting}>{submitting ? "重設中…" : "確認重設"}</button>
-              <button type="button" onClick={onClose}>取消</button>
+              <button type="submit" disabled={submitting}>{t(submitting ? "adminUsers.resetting" : "adminUsers.confirmReset")}</button>
+              <button type="button" onClick={onClose}>{t("adminUsers.cancel")}</button>
             </div>
           </>
         )}
