@@ -5,6 +5,7 @@ import { createMeetingSession, fetchMeetingSession, confirmMeetingSession } from
 import { initialSelectedIds, selectedChangeIds, toggleSelection } from "./changeSelection";
 import { TranscriptPane } from "./TranscriptPane";
 import { ChangeReviewPane } from "./ChangeReviewPane";
+import { useTranslation } from "react-i18next";
 
 /** 頁面步驟。 */
 type Step = "upload" | "review" | "done";
@@ -14,6 +15,7 @@ const POLL_INTERVAL_MS = 1000;
 
 /** V24 會議 Copilot：上傳音訊 → 轉錄/草稿 → 並排審核選取 → 選擇性套用。 */
 export function MeetingCopilotPage() {
+  const { t } = useTranslation("operations");
   const navigate = useNavigate();
   const { customerId } = useParams();
   const [searchParams] = useSearchParams();
@@ -43,7 +45,7 @@ export function MeetingCopilotPage() {
       setSession(created);
       setStep("review");
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "上傳失敗");
+      setUploadError(e instanceof Error ? e.message : t("meeting.uploadError"));
       setBusy(false);
     }
   }
@@ -84,7 +86,7 @@ export function MeetingCopilotPage() {
       setResult(confirmed);
       setStep("done");
     } catch (e) {
-      setConfirmError(e instanceof Error ? e.message : "套用失敗");
+      setConfirmError(e instanceof Error ? e.message : t("meeting.applyError"));
     } finally {
       setSubmitting(false);
     }
@@ -95,9 +97,9 @@ export function MeetingCopilotPage() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "24px 16px" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: "#122232", marginBottom: 6 }}>會議 Copilot</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: "#122232", marginBottom: 6 }}>{t("meeting.title")}</h1>
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
-        上傳會議或電話錄音，AI 轉錄並草擬 CRM 變更；逐項確認後才寫入，逐字稿確認後保留為互動依據。
+        {t("meeting.intro")}
       </p>
 
       {step === "upload" && (
@@ -113,7 +115,7 @@ export function MeetingCopilotPage() {
           <button type="button" className="btn-primary" data-testid="mc-upload-submit"
             disabled={busy || !file} onClick={handleUpload}
             style={{ alignSelf: "flex-start", padding: "8px 20px", fontWeight: 700 }}>
-            {busy ? "上傳中…" : "上傳並轉錄"}
+            {busy ? t("meeting.uploading") : t("meeting.upload")}
           </button>
         </div>
       )}
@@ -121,15 +123,15 @@ export function MeetingCopilotPage() {
       {step === "review" && failed && (
         <div data-testid="mc-failed" style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8,
           padding: 12, color: "#b91c1c" }}>
-          ⚠️ 轉錄失敗：{session?.errorSummary ?? "無法處理音訊"}。
+          ⚠️ {t("meeting.failed", { reason: session?.errorSummary ?? t("meeting.audioError") })}
           <div style={{ marginTop: 8 }}>
-            <button type="button" className="btn-secondary" onClick={() => { setSession(null); setStep("upload"); }}>重新上傳</button>
+            <button type="button" className="btn-secondary" onClick={() => { setSession(null); setStep("upload"); }}>{t("meeting.reupload")}</button>
           </div>
         </div>
       )}
 
       {step === "review" && processing && (
-        <div data-testid="mc-processing" style={{ color: "#475569" }}>AI 轉錄與草擬中，請稍候…</div>
+        <div data-testid="mc-processing" style={{ color: "#475569" }}>{t("meeting.processing")}</div>
       )}
 
       {step === "review" && session?.status === "REVIEW_PENDING" && (
@@ -152,17 +154,17 @@ export function MeetingCopilotPage() {
         <div data-testid="mc-summary-done" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 14,
             color: "#166534", fontWeight: 700 }}>
-            ✅ 已套用 {result.appliedChangeIds.length} 項變更。
+            ✅ {t("meeting.applied", { count: result.appliedChangeIds.length })}
           </div>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6, fontSize: 14 }}>
-            {result.interactionId != null && <li data-testid="mc-done-interaction">互動紀錄 #{result.interactionId}</li>}
-            {result.taskIds.length > 0 && <li data-testid="mc-done-tasks">後續任務 {result.taskIds.map((id) => `#${id}`).join("、")}</li>}
-            {result.opportunityId != null && <li data-testid="mc-done-opportunity">商機更新 #{result.opportunityId}</li>}
-            {result.stakeholderSuggestionCount > 0 && <li data-testid="mc-done-stakeholder">決策鏈建議 {result.stakeholderSuggestionCount} 項</li>}
+            {result.interactionId != null && <li data-testid="mc-done-interaction">{t("meeting.interaction", { id: result.interactionId })}</li>}
+            {result.taskIds.length > 0 && <li data-testid="mc-done-tasks">{t("meeting.tasks", { ids: result.taskIds.map((id) => `#${id}`).join(", ") })}</li>}
+            {result.opportunityId != null && <li data-testid="mc-done-opportunity">{t("meeting.opportunity", { id: result.opportunityId })}</li>}
+            {result.stakeholderSuggestionCount > 0 && <li data-testid="mc-done-stakeholder">{t("meeting.stakeholders", { count: result.stakeholderSuggestionCount })}</li>}
           </ul>
           <div>
             <button type="button" className="btn-primary" onClick={() => navigate(`/customers/${customerId}`)}
-              style={{ padding: "8px 20px", fontWeight: 700 }}>返回客戶</button>
+              style={{ padding: "8px 20px", fontWeight: 700 }}>{t("meeting.backCustomer")}</button>
           </div>
         </div>
       )}
@@ -170,7 +172,7 @@ export function MeetingCopilotPage() {
       <div style={{ marginTop: 24 }}>
         <button type="button" onClick={() => navigate(`/customers/${customerId}`)}
           style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 13 }}>
-          ← 返回客戶工作台
+          ← {t("meeting.backWorkspace")}
         </button>
       </div>
     </div>

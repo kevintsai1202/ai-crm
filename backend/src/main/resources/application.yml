@@ -124,6 +124,15 @@ app:
   # reasoning，上限太低（如 2000）會在輸出可見內容前就截斷成空回應；預設 8000，可以
   # MODEL_TEST_MAX_COMPLETION_TOKENS 調整。
   ai:
+    # OCR／語音轉錄各自擁有部署預設；資料庫用途指派存在時優先使用資料庫設定。
+    # provider-name 必須與管理後台已建立且具 API Key 的供應商名稱完全一致。
+    defaults:
+      ocr:
+        provider-name: ${AI_OCR_PROVIDER_NAME:}
+        model: ${AI_OCR_MODEL:}
+      transcription:
+        provider-name: ${AI_TRANSCRIPTION_PROVIDER_NAME:}
+        model: ${AI_TRANSCRIPTION_MODEL:}
     model-test:
       max-completion-tokens: ${MODEL_TEST_MAX_COMPLETION_TOKENS:8000}
 

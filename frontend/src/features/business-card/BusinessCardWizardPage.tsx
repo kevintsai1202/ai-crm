@@ -9,6 +9,7 @@ import {
 import { BusinessCardUploadStep } from "./BusinessCardUploadStep";
 import { BusinessCardReviewStep } from "./BusinessCardReviewStep";
 import { BusinessCardConfirmStep } from "./BusinessCardConfirmStep";
+import { useTranslation } from "react-i18next";
 
 /** 精靈目前步驟。 */
 type WizardStep = "upload" | "review" | "confirm" | "done";
@@ -18,6 +19,7 @@ const POLL_INTERVAL_MS = 1000;
 
 /** 名片三步精靈：上傳 → 校正／解重複 → 確認建檔 → 結果導向。 */
 export function BusinessCardWizardPage() {
+  const { t } = useTranslation("operations");
   const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>("upload");
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,16 @@ export function BusinessCardWizardPage() {
   // 辨識結果只用於初始化表單一次，避免步驟切換時覆蓋使用者校正。
   const formInitializedRef = useRef(false);
 
+  /** 建立依目前語言顯示的名片表單初值，避免商機名稱固定為中文。 */
+  function localizedInitialForm(recognized: BusinessCardIntakeResponse["recognized"]) {
+    const next = initialFormFromRecognized(recognized);
+    const company = recognized?.companyName?.trim();
+    next.opportunityName = company
+      ? t("businessCard.defaultOpportunity", { company })
+      : t("businessCard.genericOpportunity");
+    return next;
+  }
+
   /** 更新單一表單欄位。 */
   const updateField = useCallback((field: keyof BusinessCardForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -47,7 +59,7 @@ export function BusinessCardWizardPage() {
       setIntake(created);
       setStep("review");
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "上傳失敗");
+      setUploadError(e instanceof Error ? e.message : t("businessCard.uploadError"));
       setBusy(false);
     }
   }
@@ -60,7 +72,7 @@ export function BusinessCardWizardPage() {
       // 表單只在辨識結果首次到達時初始化，之後（含返回上一步）不再覆蓋。
       if (!formInitializedRef.current) {
         formInitializedRef.current = true;
-        setForm(initialFormFromRecognized(intake.recognized));
+        setForm(localizedInitialForm(intake.recognized));
       }
       return;
     }
@@ -92,7 +104,7 @@ export function BusinessCardWizardPage() {
       setResult(confirmed);
       setStep("done");
     } catch (e) {
-      setConfirmError(e instanceof Error ? e.message : "建檔失敗");
+      setConfirmError(e instanceof Error ? e.message : t("businessCard.createError"));
     } finally {
       setSubmitting(false);
     }
@@ -103,17 +115,17 @@ export function BusinessCardWizardPage() {
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: "#122232", marginBottom: 6 }}>名片建檔精靈</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: "#122232", marginBottom: 6 }}>{t("businessCard.title")}</h1>
       <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
-        以 AI 辨識名片，人工校正後一次建立客戶、聯絡人、商機與電話任務。
+        {t("businessCard.intro")}
       </p>
 
       {failed && (
         <div data-testid="bc-failed" style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 8, padding: 12, marginBottom: 16, color: "#b91c1c" }}>
-          ⚠️ 名片辨識失敗：{intake?.errorSummary ?? "無法解析名片內容"}。請返回重新上傳。
+          ⚠️ {t("businessCard.recognitionFailed", { reason: intake?.errorSummary ?? t("businessCard.parseFailed") })}
           <div style={{ marginTop: 8 }}>
             <button type="button" className="btn-secondary" onClick={() => { setIntake(null); setStep("upload"); }}>
-              重新上傳
+              {t("businessCard.reupload")}
             </button>
           </div>
         </div>
@@ -125,7 +137,7 @@ export function BusinessCardWizardPage() {
 
       {step === "review" && !failed && (
         intake?.status === "PROCESSING"
-          ? <div data-testid="bc-processing" style={{ color: "#475569" }}>AI 辨識中，請稍候…</div>
+          ? <div data-testid="bc-processing" style={{ color: "#475569" }}>{t("businessCard.processing")}</div>
           : <BusinessCardReviewStep
               recognized={intake?.recognized ?? null}
               form={form}
@@ -152,24 +164,24 @@ export function BusinessCardWizardPage() {
       {step === "done" && result && (
         <div data-testid="bc-summary" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: 14, color: "#166534", fontWeight: 700 }}>
-            ✅ 建檔完成！已建立以下正式資料：
+            ✅ {t("businessCard.done")}
           </div>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
             {buildConfirmSummary(result).map((item) => (
               <li key={item.entity} data-testid={`bc-summary-${item.entity}`} style={{ fontSize: 14 }}>
-                {item.label}：<span data-testid={`bc-summary-${item.entity}-id`}>#{item.id}</span>
+                {t(`businessCard.entities.${item.entity}`)}：<span data-testid={`bc-summary-${item.entity}-id`}>#{item.id}</span>
               </li>
             ))}
           </ul>
           <div style={{ display: "flex", gap: 8 }}>
             <Link to={`/customers/${result.customerId}`} className="btn-primary"
               data-testid="bc-goto-customer" style={{ padding: "8px 20px", fontWeight: 700, textDecoration: "none" }}>
-              前往客戶
+              {t("businessCard.goCustomer")}
             </Link>
             <button type="button" className="btn-secondary"
-              onClick={() => { setIntake(null); setStrategy(null); setResult(null); idempotencyKeyRef.current = null; formInitializedRef.current = false; setForm(initialFormFromRecognized(null)); setStep("upload"); }}
+              onClick={() => { setIntake(null); setStrategy(null); setResult(null); idempotencyKeyRef.current = null; formInitializedRef.current = false; setForm(localizedInitialForm(null)); setStep("upload"); }}
               style={{ padding: "8px 16px" }}>
-              再建一張
+              {t("businessCard.another")}
             </button>
           </div>
         </div>
@@ -178,7 +190,7 @@ export function BusinessCardWizardPage() {
       <div style={{ marginTop: 24 }}>
         <button type="button" className="btn-link" onClick={() => navigate("/customers")}
           style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 13 }}>
-          ← 返回客戶工作台
+          ← {t("businessCard.backWorkspace")}
         </button>
       </div>
     </div>

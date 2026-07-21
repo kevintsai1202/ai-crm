@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /** 上傳步驟屬性。 */
 interface UploadStepProps {
@@ -12,13 +13,14 @@ interface UploadStepProps {
 
 /** 名片精靈第一步：選擇圖片並送出辨識。 */
 export function BusinessCardUploadStep({ busy, error, onSubmit }: UploadStepProps) {
+  const { t } = useTranslation("operations");
   // 目前選定的名片圖片，尚未送出。
   const [file, setFile] = useState<File | null>(null);
 
   return (
     <div data-testid="bc-upload-step" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ margin: 0, color: "#475569", fontSize: 14 }}>
-        上傳名片照片（JPEG／PNG／WebP，10 MB 以內），系統將以 AI 辨識欄位供你校正。
+        {t("businessCard.uploadHint")}
       </p>
       <input
         type="file"
@@ -35,7 +37,7 @@ export function BusinessCardUploadStep({ busy, error, onSubmit }: UploadStepProp
         onClick={() => file && onSubmit(file)}
         style={{ alignSelf: "flex-start", padding: "8px 20px", fontWeight: 700 }}
       >
-        {busy ? "辨識中…" : "開始辨識"}
+        {busy ? t("businessCard.recognizing") : t("businessCard.startRecognition")}
       </button>
     </div>
   );

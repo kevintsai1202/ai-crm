@@ -39,6 +39,12 @@ import type {
   StakeholderSuggestionDto,
 } from "../types";
 import { apiClient, getAuthHeaders, AI_TIMEOUT } from "./client";
+import i18n from "../i18n";
+
+/** 取得目前 UI 語系碼（如 "en"、"zh-TW"），附加到 AI 請求讓後端回覆對應語言。 */
+function currentLang(): string {
+  return i18n.language;
+}
 
 /** 取得登入者可見的正式 CRM 任務。 */
 export async function fetchTasks() {
@@ -333,7 +339,7 @@ export async function fetchCustomerDetail(id: number) {
  * 呼叫 AI 助理分析客戶。
  */
 export async function askAssistant(customerId: number, message: string) {
-  const { data } = await apiClient.post<ChatResponse>("/ai/chat", { customerId, message }, { timeout: AI_TIMEOUT });
+  const { data } = await apiClient.post<ChatResponse>("/ai/chat", { customerId, message, lang: currentLang() }, { timeout: AI_TIMEOUT });
   return data;
 }
 
@@ -417,7 +423,7 @@ export async function askAssistantStream(
         Accept: "text/event-stream",
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ customerId, message })
+      body: JSON.stringify({ customerId, message, lang: currentLang() })
     });
     if (!response.ok) {
       handleStreamUnauthorized(response);
@@ -446,7 +452,7 @@ export async function fetchCustomerAssessmentStream(
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
-    const response = await fetch(`${baseUrl}/ai/customers/${customerId}/assessment`, {
+    const response = await fetch(`${baseUrl}/ai/customers/${customerId}/assessment?lang=${encodeURIComponent(currentLang())}`, {
       method: "GET",
       headers: {
         Accept: "text/event-stream",
@@ -728,7 +734,7 @@ export async function fetchPortfolioCalls() {
  * @returns 含評估報告（Markdown）、引用與風險
  */
 export async function fetchCustomerAssessment(customerId: number) {
-  const { data } = await apiClient.get<ChatResponse>(`/ai/customers/${customerId}/assessment`, { timeout: AI_TIMEOUT });
+  const { data } = await apiClient.get<ChatResponse>(`/ai/customers/${customerId}/assessment`, { params: { lang: currentLang() }, timeout: AI_TIMEOUT });
   return data;
 }
 
@@ -738,7 +744,7 @@ export async function fetchCustomerAssessment(customerId: number) {
  * @returns 含評估報告（Markdown）與彙總統計
  */
 export async function fetchPortfolioAssessment() {
-  const { data } = await apiClient.get<PortfolioAssessment>("/ai/portfolio/assessment", { timeout: AI_TIMEOUT });
+  const { data } = await apiClient.get<PortfolioAssessment>("/ai/portfolio/assessment", { params: { lang: currentLang() }, timeout: AI_TIMEOUT });
   return data;
 }
 
@@ -836,7 +842,7 @@ export async function streamPortfolioAssessment(
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
-    const response = await fetch(`${baseUrl}/ai/portfolio/assessment`, {
+    const response = await fetch(`${baseUrl}/ai/portfolio/assessment?lang=${encodeURIComponent(currentLang())}`, {
       method: "GET",
       headers: {
         Accept: "text/event-stream",
@@ -946,7 +952,7 @@ export async function streamWorkspaceRecommendation(
 ) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
   try {
-    const response = await fetch(`${baseUrl}/workspace/recommendation?scope=${encodeURIComponent(scope)}`, {
+    const response = await fetch(`${baseUrl}/workspace/recommendation?scope=${encodeURIComponent(scope)}&lang=${encodeURIComponent(currentLang())}`, {
       method: "POST",
       headers: { Accept: "text/event-stream", ...getAuthHeaders() }
     });
@@ -983,7 +989,7 @@ export async function streamWorkspaceChat(
     const response = await fetch(`${baseUrl}/workspace/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream", ...getAuthHeaders() },
-      body: JSON.stringify({ scope, customerId, message })
+      body: JSON.stringify({ scope, customerId, message, lang: currentLang() })
     });
     if (!response.ok) {
       handleStreamUnauthorized(response);
@@ -1085,6 +1091,17 @@ export async function saveAiModelAssignments(assignments: {
   const { data } = await apiClient.put<import("../types").AiSettingsResponse>(
     "/admin/settings/ai/assignments",
     assignments,
+  );
+  return data;
+}
+
+/** 以上傳的實際名片或會議音訊驗證目前生效的用途模型。 */
+export async function testAiPurposeModel(purpose: "ocr" | "transcription", file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await apiClient.post<import("../types").AiPurposeModelTestResponse>(
+    `/admin/settings/ai/assignments/${purpose}/test`,
+    form,
   );
   return data;
 }

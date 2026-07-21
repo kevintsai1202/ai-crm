@@ -3,6 +3,7 @@ import { completeTask, downloadTaskIcs, fetchTasks, postponeTask } from "../../a
 import type { CrmTask } from "../../types";
 import { mergePostponedTask, parseTaskDateTime, selectActiveTasks, shiftTaskScheduleOneDay } from "./taskState";
 import { executeTaskAction } from "./taskActions";
+import { useTranslation } from "react-i18next";
 
 interface TaskPanelProps {
   customerId?: number;
@@ -11,12 +12,13 @@ interface TaskPanelProps {
 }
 
 /** 格式化工作檯顯示時間。 */
-function formatTaskTime(value: string): string {
-  return new Intl.DateTimeFormat("zh-TW", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Taipei" }).format(parseTaskDateTime(value));
+function formatTaskTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Taipei" }).format(parseTaskDateTime(value));
 }
 
 /** 顯示正式 CRM 任務；規則式 AI 建議由外層另列，絕不冒充持久狀態。 */
 export function TaskPanel({ customerId, refreshKey = 0, compact = false }: TaskPanelProps) {
+  const { t, i18n } = useTranslation("operations");
   const [tasks, setTasks] = useState<CrmTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,9 +30,9 @@ export function TaskPanel({ customerId, refreshKey = 0, compact = false }: TaskP
   const loadTasks = useCallback(async (): Promise<void> => {
     setLoading(true);
     try { setTasks(await fetchTasks()); setError(""); setActionError(""); }
-    catch (cause) { setError("任務載入失敗。"); throw cause; }
+    catch (cause) { setError(t("tasks.loadError")); throw cause; }
     finally { setLoading(false); }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void loadTasks().catch(() => undefined); }, [loadTasks, refreshKey]);
 
@@ -63,12 +65,12 @@ export function TaskPanel({ customerId, refreshKey = 0, compact = false }: TaskP
   const scoped = customerId ? tasks.filter((task) => task.customerId === customerId) : tasks;
   const rows = selectActiveTasks(scoped);
   return <section className={`task-panel${compact ? " task-panel-compact" : ""}`} data-testid="crm-task-panel">
-    <div className="task-panel-head"><h4>CRM 正式任務</h4><button type="button" className="btn-secondary" onClick={() => void loadTasks().catch(() => undefined)}>重新整理</button></div>
+    <div className="task-panel-head"><h4>{t("tasks.title")}</h4><button type="button" className="btn-secondary" onClick={() => void loadTasks().catch(() => undefined)}>{t("tasks.refresh")}</button></div>
     {actionError ? <p className="form-error" role="alert">{actionError}</p> : null}
-    {loading ? <p>載入任務中…</p> : error ? <p role="alert">{error}</p> : rows.length === 0 ? <p className="workspace-empty">目前沒有待處理的正式任務。</p> :
+    {loading ? <p>{t("tasks.loading")}</p> : error ? <p role="alert">{error}</p> : rows.length === 0 ? <p className="workspace-empty">{t("tasks.empty")}</p> :
       <ul className="task-list">{rows.map(({ task, overdue }) => <li key={task.id} data-task-id={task.id} className={overdue ? "task-overdue" : ""}>
-        <div><strong>{task.title}</strong><span>{task.type === "PHONE_CALL" ? "電話" : task.type} · 客戶 #{task.customerId}</span><time>{formatTaskTime(task.scheduledStart)}{overdue ? " · 已逾期" : ""}</time></div>
-        <div className="task-actions"><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handlePostpone(task)}>延期一天</button><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handleDownload(task)}>下載行事曆</button><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handleComplete(task)}>完成</button></div>
+        <div><strong>{task.title}</strong><span>{task.type === "PHONE_CALL" ? t("tasks.phone") : task.type} · {t("tasks.customerNumber", { id: task.customerId })}</span><time>{formatTaskTime(task.scheduledStart, i18n.language)}{overdue ? ` · ${t("tasks.overdue")}` : ""}</time></div>
+        <div className="task-actions"><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handlePostpone(task)}>{t("tasks.postpone")}</button><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handleDownload(task)}>{t("tasks.calendar")}</button><button type="button" disabled={pendingKeys.has(String(task.id))} onClick={() => void handleComplete(task)}>{t("tasks.complete")}</button></div>
       </li>)}</ul>}
   </section>;
 }

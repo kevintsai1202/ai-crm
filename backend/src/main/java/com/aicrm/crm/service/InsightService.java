@@ -9,6 +9,7 @@ import com.aicrm.crm.domain.Opportunity;
 import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.service.ai.AiGroundingService;
 import com.aicrm.crm.service.ai.RagCitationService;
+import static com.aicrm.crm.service.ai.AiResponseLanguage.directive;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -160,7 +161,7 @@ public class InsightService {
         var citations = ragCitations.loadCitations(request.message());
         // 順序：先 recall（不含本則）→ 產生 answer → 再 save 本輪 user+assistant，避免把本則當記憶
         var memory = chatMemory.recall(request.customerId(), request.message());
-        var result = buildAnswer(AiCallType.CHAT, customer, risk, citations, memory, request.message());
+        var result = buildAnswer(AiCallType.CHAT, customer, risk, citations, memory, request.message(), request.lang());
         chatMemory.save(request.customerId(), ChatRole.USER, request.message());
         chatMemory.save(request.customerId(), ChatRole.ASSISTANT, result.answer());
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
@@ -196,7 +197,7 @@ public class InsightService {
         // 在交易內先把 deterministic fallback 文字算好（會讀 customer LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n" + directive(request.lang());
 
         // 對話：最終答案出爐後才存「本輪 user + assistant」對話記憶（延後到串流完成，保持首字延遲低）
         streamAnswer(emitter, AiCallType.CHAT, customerId, chatModel, prompt, citations, risk, fallbackAnswer,
@@ -217,7 +218,7 @@ public class InsightService {
      * @param customerId 客戶 ID
      * @return SseEmitter 串流發送器
      */
-    public SseEmitter streamCustomerAssessment(Long customerId) {
+    public SseEmitter streamCustomerAssessment(Long customerId, String lang) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         var customer = customers.findDetail(customerId);
@@ -226,7 +227,7 @@ public class InsightService {
         // 在交易內先算好 fallback 文字（讀 LAZY 關聯），供 callback 執行緒安全使用
         final String fallbackAnswer = deterministicAnswer(customer, risk);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        var prompt = grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION;
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION + directive(lang);
 
         // 評估非對話，不寫對話記憶 → onFinalAnswer 傳 null
         streamAnswer(emitter, AiCallType.ASSESSMENT, customerId, chatModel, prompt, citations, risk, fallbackAnswer, null);
@@ -378,11 +379,11 @@ public class InsightService {
      * @param customerId 客戶 ID
      * @return 含評估報告、引用與風險的回應
      */
-    public Dtos.ChatResponse customerAssessment(Long customerId) {
+    public Dtos.ChatResponse customerAssessment(Long customerId, String lang) {
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
         var citations = ragCitations.loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
-        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION);
+        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION + directive(lang));
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
     }
 
@@ -391,7 +392,7 @@ public class InsightService {
      *
      * @return Portfolio 評估回應
      */
-    public Dtos.PortfolioAssessmentResponse portfolioAssessment() {
+    public Dtos.PortfolioAssessmentResponse portfolioAssessment(String lang) {
         var all = customers.findAllWithDetail();
         var rows = new java.util.ArrayList<String>();
         var totalPipeline = BigDecimal.ZERO;
@@ -414,7 +415,7 @@ public class InsightService {
                     + "｜最近互動" + lastDate
                     + "｜續約日" + (c.getRenewalDueDate() == null ? "未定" : c.getRenewalDueDate()));
         }
-        var result = buildPortfolioAnswer(rows, all.size(), highRisk, totalPipeline, activeOpportunities);
+        var result = buildPortfolioAnswer(rows, all.size(), highRisk, totalPipeline, activeOpportunities, lang);
         return new Dtos.PortfolioAssessmentResponse(result.answer(), all.size(), highRisk, totalPipeline, activeOpportunities, result.callId());
     }
 
@@ -482,8 +483,8 @@ public class InsightService {
      * @param userMessage 使用者問題
      * @return 回答文字
      */
-    private LlmResult buildAnswer(AiCallType type, Customer customer, Dtos.RiskResponse risk, List<Dtos.CitationResponse> citations, String memory, String userMessage) {
-        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n";
+    private LlmResult buildAnswer(AiCallType type, Customer customer, Dtos.RiskResponse risk, List<Dtos.CitationResponse> citations, String memory, String userMessage, String lang) {
+        var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n" + directive(lang);
         return callLlm(type, customer, risk, prompt);
     }
 
@@ -497,7 +498,7 @@ public class InsightService {
      * @param activeOpportunities 活躍商機數
      * @return 報告 Markdown
      */
-    private LlmResult buildPortfolioAnswer(List<String> rows, int count, int highRisk, BigDecimal pipeline, long activeOpportunities) {
+    private LlmResult buildPortfolioAnswer(List<String> rows, int count, int highRisk, BigDecimal pipeline, long activeOpportunities, String lang) {
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
         if (chatModel == null) {
             // fallback 也要寫 ai_call_log（tokens=0、ai_enabled=false、masked=true）
@@ -522,7 +523,7 @@ public class InsightService {
                     請涵蓋：①整體健康度總評 ②風險分布洞察與「最該優先處理的客戶 Top 3」（附理由） ③Pipeline 重點與機會 ④給銷售主管的具體建議行動。使用繁體中文、條理清楚、勿編造數字。
                     """.formatted(count, highRisk, pipeline, activeOpportunities,
                             // PII 遮罩只作用在送 LLM 的 grounding context
-                            PiiMasker.mask(String.join("\n", rows)));
+                            PiiMasker.mask(String.join("\n", rows))) + directive(lang);
             var portfolioSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
             var portfolioOpts = systemSettings.resolveChatOptions();
             if (portfolioOpts != null) portfolioSpec = portfolioSpec.options(portfolioOpts);
@@ -1005,7 +1006,7 @@ public class InsightService {
      *
      * @return SseEmitter 串流發送器
      */
-    public SseEmitter streamPortfolioAssessment() {
+    public SseEmitter streamPortfolioAssessment(String lang) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         // 在交易內同步建立 grounding context（讀所有客戶 LAZY 關聯）
@@ -1059,7 +1060,7 @@ public class InsightService {
                 # 報告要求
                 請涵蓋：①整體健康度總評 ②風險分布洞察與「最該優先處理的客戶 Top 3」（附理由） ③Pipeline 重點與機會 ④給銷售主管的具體建議行動。使用繁體中文、條理清楚、勿編造數字。
                 """.formatted(all.size(), finalHighRisk, finalPipeline, finalActive,
-                        PiiMasker.mask(String.join("\n", rows)));
+                        PiiMasker.mask(String.join("\n", rows))) + directive(lang);
 
         var fullAnswer = new StringBuilder();
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();

@@ -1,0 +1,202 @@
+{
+  "team": {
+    "console": "Manager Console",
+    "title": "Team Analytics",
+    "loadError": "Failed to load team analytics",
+    "loading": "Loading…",
+    "noData": "No data",
+    "teamDiagnosis": "🤖 Team diagnosis",
+    "kpi": {
+      "customers": "Customers",
+      "wonAmount": "Team closed revenue",
+      "pipeline": "Open pipeline",
+      "highRisk": "High-risk customers",
+      "winRate": "Average win rate",
+      "owners": "Sales reps"
+    },
+    "performance": "Sales performance",
+    "sort": "Sort by:",
+    "sortOptions": {
+      "wonAmount": "Closed revenue",
+      "winRate": "Win rate",
+      "pipelineAmount": "Open pipeline",
+      "customerCount": "Customers",
+      "highRiskCount": "High-risk customers"
+    },
+    "tableLabel": "Sales performance table",
+    "columns": {
+      "owner": "Sales rep",
+      "customers": "Customers",
+      "highRisk": "High risk",
+      "pipeline": "Open pipeline",
+      "won": "Closed",
+      "winRate": "Win rate",
+      "interactionGap": "Avg. interaction gap",
+      "renewals": "Quarter renewals",
+      "coaching": "Coaching"
+    },
+    "days": "{{count}} days",
+    "coachingReport": "Coaching report",
+    "insight": {
+      "teamTitle": "Team diagnosis",
+      "ownerTitle": "Coaching report for {{owner}}",
+      "readError": "Failed to load analysis",
+      "generateError": "Generation failed. Please try again later.",
+      "lastAnalyzed": "Last analysis: {{date}}",
+      "teachingSummary": "Teaching summary",
+      "loading": "Loading analysis",
+      "analyzing": "AI is analyzing",
+      "empty": "No analysis yet. Select Reanalyze to generate one.",
+      "history": "🕘 AI history",
+      "download": "⬇ Download MD",
+      "generating": "Analyzing…",
+      "regenerate": "Reanalyze",
+      "historyTitle": "{{title}} AI history"
+    }
+  },
+  "adminUsers": {
+    "subtitle": "Hahow AI Full-stack Teaching Build",
+    "title": "User Management",
+    "loadError": "Failed to load user accounts",
+    "toggleError": "Failed to change account status",
+    "add": "＋ Add user",
+    "loading": "Loading…",
+    "tableLabel": "User account list",
+    "columns": { "username": "Account", "displayName": "Display name", "role": "Role", "status": "Status", "createdAt": "Created", "actions": "Actions" },
+    "roles": { "SALES": "Sales", "MANAGER": "Manager", "ADMIN": "Administrator" },
+    "me": "Me",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "edit": "Edit",
+    "resetPassword": "Reset password",
+    "cannotDisableSelf": "You cannot disable your own account",
+    "createTitle": "Add user",
+    "username": "Account (Email)",
+    "displayName": "Display name",
+    "role": "Role",
+    "initialPassword": "Initial password",
+    "creating": "Creating…",
+    "create": "Create",
+    "createError": "Failed to create account",
+    "editTitle": "Edit user — {{username}}",
+    "saving": "Saving…",
+    "save": "Save",
+    "updateError": "Failed to update account",
+    "resetTitle": "Reset password — {{username}}",
+    "resetDone": "Password reset complete.",
+    "newPassword": "New password",
+    "resetting": "Resetting…",
+    "confirmReset": "Reset password",
+    "resetError": "Failed to reset password",
+    "cancel": "Cancel",
+    "close": "Close",
+    "noData": "No data"
+  },
+  "workspace": {
+    "title": "AI work recommendations", "subtitle": "Automatically prioritize today's work from your CRM todos", "scope": "Data scope", "self": "Scope: Mine", "all": "Scope: All", "close": "Close",
+    "today": "Today's todos", "loading": "Loading", "empty": "No todos right now 🎉", "todoTypes": { "HIGH_RISK": "High risk", "RENEWAL_DUE": "Renewal due", "STALE_OPPORTUNITY": "Stale opportunity" }, "scheduleCall": "Schedule call",
+    "analyzing": "AI is analyzing", "summaryEmpty": "Select Generate my work recommendations to let AI prioritize today's work.", "drafts": "AI opportunity suggestions", "creating": "Creating…", "createAll": "Create selected ({{count}})",
+    "createResult": "Created {{ok}} opportunities{{failed}}", "failedSuffix": ", {{count}} failed", "estimated": "Estimated {{amount}}", "editCreate": "Edit and create", "history": "AI history", "generating": "Generating…", "generate": "Generate my work recommendations", "historyTitle": "My workspace AI history"
+  },
+  "opportunityIntelligence": {
+    "title": "Opportunity intelligence", "intro": "Explainable rules show opportunity health and next best actions. Scores never change an opportunity stage or probability automatically.",
+    "loadError": "Failed to load opportunity health", "recalculateError": "Recalculation failed", "calculating": "Calculating…", "recalculating": "Recalculating…", "recalculate": "Recalculate",
+    "tiers": { "good": "Healthy", "warn": "Watch", "bad": "At risk" }, "nextAction": "Next best action:", "components": "Score components and evidence", "evidence": "Evidence:", "trend": "Trend:", "ruleVersion": "Rule version {{version}}", "model": "model {{model}}", "deterministic": "deterministic", "createTask": "Create follow-up task", "followUp": "Generate follow-up email", "back": "Back to customer workspace"
+  },
+  "stakeholder": {
+    "title": "Decision chain", "intro": "Confirmed roles and relationships are facts (solid lines). AI suggestions remain pending (dashed lines) until a person confirms them.",
+    "loadError": "Failed to load decision chain", "generateError": "Failed to generate suggestions", "actionError": "Action failed", "loading": "Loading…", "processing": "Processing…", "generate": "Generate AI suggestions",
+    "influence": "influence {{value}}", "stance": "stance {{value}}", "suggestions": "Pending AI suggestions", "emptySuggestions": "No pending suggestions.", "pending": "Pending", "confirm": "Confirm", "reject": "Reject", "back": "Back to customer workspace",
+    "roles": "Confirmed roles", "emptyRoles": "No confirmed roles.", "relations": "Confirmed relationships", "emptyRelations": "No confirmed relationships."
+  },
+  "followUp": {
+    "title": "AI follow-up email", "intro": "AI drafts a follow-up email from customer context. After human approval, Zeabur Sendmail sends it from the company mailbox with the sales owner as Reply-To.",
+    "draftError": "Failed to generate draft", "saveError": "Failed to save", "saveFirst": "Save your changes as a new version before sending.", "sendError": "Failed to send", "retryError": "Retry failed", "drafting": "AI is drafting…",
+    "grounding": "AI grounding", "noGrounding": "(No grounding)", "version": "Draft version v{{version}}", "edited": " (edited)", "subject": "Subject", "body": "Message",
+    "sendPreview": "Delivery: company mailbox as sender, customer or opportunity owner as Reply-To, and customer email as recipient.", "saving": "Saving…", "saveVersion": "Save as new version", "sending": "Sending…", "send": "Send via Zeabur Sendmail",
+    "status": { "SENT": "Sent", "FAILED": "Delivery failed", "QUEUED": "Queued" }, "messageId": "Message ID: {{id}}", "from": "From", "replyTo": "Reply-To", "recipient": "Recipient", "retry": "Retry delivery", "back": "Back to customer workspace"
+  },
+  "meeting": {
+    "title": "Meeting Copilot", "intro": "Upload a meeting or call recording. AI creates a transcript and drafts CRM changes; nothing is written until you review and confirm each item.",
+    "uploadError": "Upload failed", "applyError": "Failed to apply changes", "uploading": "Uploading…", "upload": "Upload and transcribe", "failed": "Transcription failed: {{reason}}.", "audioError": "Unable to process audio", "reupload": "Upload again", "processing": "AI is transcribing and drafting changes. Please wait…",
+    "applied": "Applied {{count}} changes.", "interaction": "Interaction #{{id}}", "tasks": "Follow-up tasks {{ids}}", "opportunity": "Opportunity updated #{{id}}", "stakeholders": "{{count}} decision-chain suggestions", "backCustomer": "Back to customer", "backWorkspace": "Back to customer workspace",
+    "summary": "AI summary", "noSummary": "(No summary)", "transcript": "Transcript", "noTranscript": "(No transcript)", "reviewTitle": "Which CRM changes should be applied?", "noChanges": "This meeting produced no changes to apply.",
+    "types": { "INTERACTION": "Interaction", "TASK": "Follow-up task", "OPPORTUNITY_PATCH": "Opportunity update", "STAKEHOLDER_SUGGESTION": "Decision-chain suggestion" }, "lowConfidence": "Low confidence · off by default", "applying": "Applying…", "confirm": "Apply {{count}} changes"
+  },
+  "businessCard": {
+    "title": "Business-card intake wizard", "intro": "Use AI to recognize a business card, review the fields, and create a customer, contact, opportunity, and phone task in one flow.",
+    "uploadError": "Upload failed", "createError": "Record creation failed", "recognitionFailed": "Business-card recognition failed: {{reason}}. Return and upload again.", "parseFailed": "Unable to parse business-card content",
+    "reupload": "Upload again", "processing": "AI is recognizing the card. Please wait…", "done": "Record creation complete. The following CRM records were created:",
+    "entities": { "customer": "Customer", "contact": "Contact", "opportunity": "Opportunity", "task": "Phone task" }, "goCustomer": "Go to customer", "another": "Create another", "backWorkspace": "Back to customer workspace",
+    "uploadHint": "Upload a business-card image (JPEG, PNG, or WebP, up to 10 MB). AI will recognize fields for your review.", "recognizing": "Recognizing…", "startRecognition": "Start recognition",
+    "lowConfidence": "Low confidence; please verify", "fields": { "customerName": "Company name", "taxId": "Tax ID", "industry": "Industry", "customerEmail": "Customer email", "customerPhone": "Customer phone", "contactName": "Contact name", "contactTitle": "Contact title", "contactEmail": "Contact email" },
+    "duplicates": "{{count}} possible duplicate customers found. Choose how to proceed:", "createNew": "Create as a new customer", "merge": "Merge into “{{customer}}”", "next": "Next: opportunity and task",
+    "opportunityName": "Opportunity name", "amount": "Estimated amount", "closeDate": "Expected close date", "callAt": "Scheduled call time", "back": "Back", "creating": "Creating…", "confirm": "Confirm creation", "defaultOpportunity": "{{company}} new opportunity", "genericOpportunity": "New business-card opportunity"
+  },
+  "assistant": {
+    "name": "AI assistant", "askTitle": "Ask AI assistant about {{customer}}", "selectCustomer": "Select a customer first", "dialog": "AI assistant chat",
+    "database": "AI is querying the database", "churn": "Churn {{value}}", "renewalDelay": "Renewal delay {{value}}", "memory": "RAG + conversation memory",
+    "noCustomer": "No customer selected", "loading": "Loading conversation…", "askCustomer": "Ask AI assistant about “{{customer}}”", "selectLeft": "Select a customer from the left",
+    "placeholder": "Enter a question, then press Enter to send (Shift+Enter for a new line)", "responding": "Responding…", "send": "Send", "close": "Close",
+    "suggestions": ["Analyze this customer's renewal risk and recommend next steps", "Summarize recent interaction highlights in three bullets", "What is this customer's biggest obstacle to closing?"]
+  },
+  "tasks": {
+    "title": "CRM tasks", "refresh": "Refresh", "loading": "Loading tasks…", "loadError": "Failed to load tasks.", "empty": "No pending CRM tasks.",
+    "phone": "Phone call", "customerNumber": "Customer #{{id}}", "overdue": "Overdue", "postpone": "Postpone one day", "calendar": "Download calendar", "complete": "Complete",
+    "formTitle": "Schedule phone follow-up", "closeAria": "Close phone follow-up form", "customer": "Customer", "titleLabel": "Title", "defaultTitle": "Phone follow-up{{customer}}",
+    "priority": "Priority", "priorities": { "LOW": "Low", "NORMAL": "Normal", "HIGH": "High", "URGENT": "Urgent" }, "start": "Start", "end": "End", "description": "Description",
+    "timeError": "End time must be later than start time.", "createError": "Failed to create task. Check the data and try again.", "cancel": "Cancel", "creating": "Creating…", "create": "Create phone task"
+  },
+  "adminSettings": {
+    "title": "System Settings",
+    "intro": "Use one governed model catalog and assign separate models for chat, business-card OCR, and meeting transcription. Empty assignments use purpose-specific deployment defaults.",
+    "loading": "Loading…",
+    "unset": "Not configured",
+    "errors": {
+      "load": "Failed to load settings", "save": "Failed to save settings", "providerSave": "Failed to save provider",
+      "providerDelete": "Failed to delete provider", "catalogRefresh": "Failed to refresh model catalog", "capabilitySave": "Failed to save model capabilities",
+      "assignmentSave": "Failed to save purpose models", "selectCard": "Select a business-card image first.", "selectAudio": "Select meeting audio first.",
+      "purposeTest": "Purpose model test failed", "connection": "Connection failed", "score": "⚠️ Scoring failed. Please try again later."
+    },
+    "messages": {
+      "defaultSet": "Set {{model}} as the default Chat model.", "chatCleared": "Chat model cleared. The deployment default is now active.", "saved": "Saved. AI calls use the new settings immediately.",
+      "catalogUpdated": "Model catalog and capabilities updated.", "capabilityUpdated": "Updated capabilities for {{model}}.",
+      "assignmentsSaved": "OCR and transcription models saved.", "testSuccess": "{{purpose}} test passed: {{model}}, {{latency}} ms."
+    },
+    "confirmDeleteProvider": "Delete this provider? Related model options will lose their provider association.",
+    "providers": {
+      "title": "AI providers", "subtitle": "Manage API keys and base URLs, then associate catalog models with providers.", "empty": "No providers yet. Add one below.",
+      "defaultUrl": "Default OpenAI URL", "keySet": "API key configured", "keyMissing": "API key missing", "refresh": "Refresh models", "refreshAria": "Refresh models for {{provider}}", "edit": "Edit", "delete": "Delete",
+      "editTitle": "Edit provider", "addTitle": "Add provider", "namePlaceholder": "Provider name, e.g. OpenAI or Anthropic",
+      "urlPlaceholder": "Base URL (leave empty for the OpenAI default)", "keyEditPlaceholder": "API key (leave empty to keep the current key)", "keyAddPlaceholder": "API key",
+      "saving": "Saving…", "update": "Update provider", "add": "Add provider", "cancel": "Cancel"
+    },
+    "models": {
+      "title": "Model catalog and chat settings", "system": "Admin assignment", "env": "Deployment default", "envHint": "No Chat model is assigned. AI calls use the deployment default:",
+      "empty": "No candidate models yet. Add one below.", "raceToggle": "Include in comparison", "active": "Active", "visionTitle": "Supports image input", "audioTitle": "Supports audio transcription",
+      "delete": "Delete", "chooseProvider": "Choose provider", "namePlaceholder": "Model name, e.g. claude-sonnet-4-6", "add": "Add"
+    },
+    "purposes": {
+      "title": "Purpose model assignments", "hint": "An empty assignment uses that purpose's deployment default. Tests call the currently saved effective model.",
+      "save": "Save purpose models", "saving": "Saving…", "admin": "Admin assignment", "deployment": "Deployment default", "unset": "Not configured",
+      "chat": "AI chat", "chatHint": "Select the Chat model from the catalog above; existing chat behavior remains unchanged.",
+      "ocr": "Business-card OCR", "ocrName": "Business-card OCR", "visionModel": "Vision model", "useDefault": "Use deployment default", "defaultPrefix": "Deployment default: ",
+      "cardFile": "Test business-card image", "testing": "Testing…", "testEffective": "Test effective model", "ocrSuccess": "Business-card structured recognition succeeded",
+      "transcription": "Meeting transcription", "transcriptionName": "Meeting transcription", "audioModel": "Audio transcription model", "audioFile": "Test meeting audio", "transcriptionSuccess": "Transcript generation succeeded",
+      "invalid": "An assigned model no longer has the required capability. Clear it or select a compatible model."
+    },
+    "params": {
+      "title": "Model parameters", "hint": "Empty fields use defaults; applied to AI calls and model tests.", "default": "Default", "tokensPlaceholder": "e.g. 8000",
+      "reasoning": "Reasoning Effort", "save": "Save parameters", "saving": "Saving…",
+      "tip": "Tip: low/minimal reasoning effort can reduce reasoning tokens and latency for reasoning models; too few max tokens may produce an empty response."
+    },
+    "race": {
+      "title": "Multi-model comparison", "subtitle": "Call selected candidate models concurrently to compare speed and response quality.", "empty": "Add candidate models above before starting a comparison.",
+      "taskTitle": "Test task (uses real CRM data)", "task": "Analyze the company customer portfolio and identify the three customers needing immediate attention, including risks and recommended actions.",
+      "testing": "Testing…", "start": "Start comparison", "status": { "idle": "–", "waiting": "Waiting", "streaming": "Generating", "done": "Done", "error": "Failed" },
+      "firstToken": "First token", "total": "Total", "visibleReasoning": "visible {{visible}} + reasoning {{reasoning}}", "finishTitle": "Response ended for this reason", "waitingResponse": "Waiting for response",
+      "history": "History", "download": "Download MD", "answerFile": "answer", "scoreReport": "Score report", "scoreHistory": "Score history", "scoreFile": "00_score-report.md", "downloadZip": "Download all ZIP", "zipName": "model-comparison_{{timestamp}}",
+      "scoring": "Scoring…", "score": "Score with claude-opus-4-8", "reportTitle": "Multi-model comparison report", "historyTitle": "Scoring AI history (claude-opus-4-8)", "modelHistoryTitle": "{{model}} test history"
+    }
+  }
+}

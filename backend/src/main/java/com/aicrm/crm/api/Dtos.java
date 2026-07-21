@@ -341,7 +341,19 @@ public final class Dtos {
 
     public record DrilldownResponse(String type, String key, String label, BigDecimal totalAmount, int count, List<DrilldownItem> items) {}
 
-    public record ChatRequest(@NotNull Long customerId, @NotBlank String message) {}
+    /**
+     * 聊天請求。
+     *
+     * @param customerId 客戶 ID
+     * @param message 使用者提問
+     * @param lang 回覆語系（前端 i18n 語系碼，如 "en"、"zh-TW"；null 時後端以繁中回覆）
+     */
+    public record ChatRequest(@NotNull Long customerId, @NotBlank String message, String lang) {
+        /** 向後相容建構子：未指定語系時預設 null（後端視為繁中）。 */
+        public ChatRequest(Long customerId, String message) {
+            this(customerId, message, null);
+        }
+    }
 
     public record ChatResponse(String answer, List<CitationResponse> citations, RiskResponse risk, Long callId) {}
 
@@ -633,7 +645,23 @@ public final class Dtos {
         String ocrModel,
         Long ocrProviderId,
         String transcriptionModel,
-        Long transcriptionProviderId
+        Long transcriptionProviderId,
+        String envDefaultOcrProviderName,
+        String envDefaultOcrModel,
+        String ocrSource,
+        String envDefaultTranscriptionProviderName,
+        String envDefaultTranscriptionModel,
+        String transcriptionSource
+    ) {}
+
+    /** OCR／語音轉錄用途模型即時測試結果，不回傳辨識出的個資或逐字稿。 */
+    public record AiPurposeModelTestResponse(
+        boolean success,
+        String purpose,
+        String model,
+        Long providerId,
+        long latencyMs,
+        String summary
     ) {}
 
     /** AI 設定更新請求。 */
@@ -677,7 +705,20 @@ public final class Dtos {
                                             String suggestedStage, BigDecimal amount, String rationale) {}
 
     /** 工作檯問答請求（無 customerId 為總覽；有則深入單客戶）。scope: self / all。 */
-    public record WorkspaceChatRequest(String scope, Long customerId, @NotBlank String message) {}
+    /**
+     * 工作檯個人問答請求。
+     *
+     * @param scope 範圍（self / all）
+     * @param customerId 深入的單一客戶（可為 null，null 時對客戶組合做總覽問答）
+     * @param message 使用者提問
+     * @param lang 回覆語系（前端 i18n 語系碼，如 "en"、"zh-TW"；null 時後端以繁中回覆）
+     */
+    public record WorkspaceChatRequest(String scope, Long customerId, @NotBlank String message, String lang) {
+        /** 向後相容建構子：未指定語系時預設 null（後端視為繁中）。 */
+        public WorkspaceChatRequest(String scope, Long customerId, String message) {
+            this(scope, customerId, message, null);
+        }
+    }
 
     /** 工作檯推薦的非串流回應（GET 讀快取用）。summary 可為 null（尚未產生）。 */
     public record WorkspaceRecommendationResponse(String summary, String model, String generatedAt,

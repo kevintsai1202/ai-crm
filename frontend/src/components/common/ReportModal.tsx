@@ -4,6 +4,7 @@ import { AiBadge } from "./AiBadge";
 import { FeedbackButtons } from "./FeedbackButtons";
 import { AiThinkingIndicator } from "./AiThinkingIndicator";
 import { downloadMarkdown } from "../../lib/download";
+import { useTranslation } from "react-i18next";
 
 /**
  * 整體評估報告 Modal：渲染 AI 產出的 Markdown 報告（單客戶 360° 或 Portfolio 共用）。
@@ -21,6 +22,7 @@ export function ReportModal({ report, onClose }: {
   };
   onClose: () => void;
 }) {
+  const { t } = useTranslation("common");
   const isStreaming = report.streaming ?? false;
 
   return (
@@ -31,12 +33,12 @@ export function ReportModal({ report, onClose }: {
             <h3>{report.title} <AiBadge onDark /></h3>
             {report.meta ? <small>{report.meta}</small> : null}
           </div>
-          <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+          <button type="button" className="chat-close" onClick={onClose} aria-label={t("actions.close")}>✕</button>
         </div>
         <div className="report-body">
           {report.loading ? (
             /* 等待首字 */
-            <AiThinkingIndicator label="AI 正在綜合分析" />
+            <AiThinkingIndicator label={t("ai.analyzing")} />
           ) : (
             /* 串流中或完成：顯示 Markdown 內容 */
             <div className={isStreaming ? "markdown-body ai-streaming-body" : "markdown-body"}>
@@ -54,10 +56,10 @@ export function ReportModal({ report, onClose }: {
               style={{ fontSize: 13 }}
               onClick={() => downloadMarkdown(report.title, report.markdown)}
             >
-              ⬇ 下載 MD
+              ⬇ {t("ai.downloadMd")}
             </button>
           ) : null}
-          <button type="button" onClick={onClose}>關閉</button>
+          <button type="button" onClick={onClose}>{t("actions.close")}</button>
         </div>
       </div>
     </div>

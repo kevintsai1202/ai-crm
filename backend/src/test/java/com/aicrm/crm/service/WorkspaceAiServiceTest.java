@@ -79,7 +79,7 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
         var customers = customerRepository.findByOwnerName("艾美");
         var fallback = workspaceAiService.computeDraftsFrom(customers);
         // 無金鑰（chatModel=null）時應原樣回退規則式草稿
-        var drafts = workspaceAiService.generateAiDrafts(customers, null, fallback);
+        var drafts = workspaceAiService.generateAiDrafts(customers, null, fallback, null);
         assertThat(drafts).isEqualTo(fallback);
     }
 

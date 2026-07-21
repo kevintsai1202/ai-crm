@@ -710,6 +710,22 @@ export interface AiSettingsResponse {
   ocrProviderId: number | null;
   transcriptionModel: string | null;
   transcriptionProviderId: number | null;
+  envDefaultOcrProviderName: string;
+  envDefaultOcrModel: string;
+  ocrSource: "DB" | "ENV" | "UNSET";
+  envDefaultTranscriptionProviderName: string;
+  envDefaultTranscriptionModel: string;
+  transcriptionSource: "DB" | "ENV" | "UNSET";
+}
+
+/** OCR／語音轉錄用途模型的實檔測試結果，不包含辨識原文。 */
+export interface AiPurposeModelTestResponse {
+  success: boolean;
+  purpose: "BUSINESS_CARD_OCR" | "MEETING_TRANSCRIPTION";
+  model: string;
+  providerId: number;
+  latencyMs: number;
+  summary: string;
 }
 
 /** 單一模型競速測試結果（供評分 API 傳送）。 */

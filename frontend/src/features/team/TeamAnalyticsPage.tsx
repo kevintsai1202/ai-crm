@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { fetchManagerAnalytics } from "../../api";
 import type { ManagerAnalyticsResponse } from "../../types";
 import { formatCompactMoney } from "../../lib/format";
@@ -13,9 +14,10 @@ type SortKey = "wonAmount" | "winRate" | "pipelineAmount" | "customerCount" | "h
  * 函式級註解：純統計來自 /api/manager/analytics；AI 走彈窗（比照儀表板）——topbar 開團隊診斷，表格列開業務 coaching。
  */
 export function TeamAnalyticsPage() {
+  const { t, i18n } = useTranslation("operations");
   const [data, setData] = useState<ManagerAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("wonAmount");
   // AI 彈窗狀態：null=未開；{scope, owner?}
   const [modal, setModal] = useState<{ scope: "TEAM" | "OWNER"; owner?: string } | null>(null);
@@ -23,12 +25,12 @@ export function TeamAnalyticsPage() {
   useEffect(() => {
     void (async () => {
       setLoading(true);
-      setError(null);
+      setError(false);
       try {
         setData(await fetchManagerAnalytics());
       } catch (e) {
-        console.error("載入業務分析失敗:", e);
-        setError("載入業務分析失敗");
+        console.error("Failed to load team analytics:", e);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -41,54 +43,53 @@ export function TeamAnalyticsPage() {
     return [...data.owners].sort((a, b) => Number(b[sortKey]) - Number(a[sortKey]));
   }, [data, sortKey]);
 
-  if (loading) return <div className="panel"><div className="sr-empty">載入中…</div></div>;
-  if (error || !data) return <div className="panel"><div className="sr-empty">{error ?? "無資料"}</div></div>;
+  if (loading) return <div className="panel"><div className="sr-empty">{t("team.loading")}</div></div>;
+  if (error || !data) return <div className="panel"><div className="sr-empty">{t(error ? "team.loadError" : "team.noData")}</div></div>;
 
-  const t = data.team;
   return (
     <>
       <section className="topbar">
         <div>
-          <p>Manager Console</p>
-          <h2>業務分析</h2>
+          <p>{t("team.console")}</p>
+          <h2>{t("team.title")}</h2>
         </div>
         <div className="topbar-actions">
           <button type="button" className="btn-assess topbar-assess" onClick={() => setModal({ scope: "TEAM" })}>
-            🤖 團隊整體診斷 <AiBadge onDark />
+            {t("team.teamDiagnosis")} <AiBadge onDark />
           </button>
         </div>
       </section>
 
       <div className="team-kpi-row">
-        <Kpi label="客戶總數" value={String(t.totalCustomers)} />
-        <Kpi label="全團隊成交金額" value={formatCompactMoney(t.totalWonAmount, "zh-TW")} />
-        <Kpi label="進行中商機" value={formatCompactMoney(t.totalPipeline, "zh-TW")} />
-        <Kpi label="高風險客戶" value={String(t.totalHighRisk)} />
-        <Kpi label="平均成交率" value={`${Math.round(t.avgWinRate * 100)}%`} />
-        <Kpi label="業務人數" value={String(t.ownerCount)} />
+        <Kpi label={t("team.kpi.customers")} value={String(data.team.totalCustomers)} />
+        <Kpi label={t("team.kpi.wonAmount")} value={formatCompactMoney(data.team.totalWonAmount, i18n.language)} />
+        <Kpi label={t("team.kpi.pipeline")} value={formatCompactMoney(data.team.totalPipeline, i18n.language)} />
+        <Kpi label={t("team.kpi.highRisk")} value={String(data.team.totalHighRisk)} />
+        <Kpi label={t("team.kpi.winRate")} value={`${Math.round(data.team.avgWinRate * 100)}%`} />
+        <Kpi label={t("team.kpi.owners")} value={String(data.team.ownerCount)} />
       </div>
 
       <div className="panel">
         <div className="panel-head">
-          <h3>各業務績效</h3>
+          <h3>{t("team.performance")}</h3>
           <label className="sort-select">
-            排序：
+            {t("team.sort")}
             <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
-              <option value="wonAmount">成交金額</option>
-              <option value="winRate">成交率</option>
-              <option value="pipelineAmount">進行中商機</option>
-              <option value="customerCount">客戶數</option>
-              <option value="highRiskCount">高風險數</option>
+              <option value="wonAmount">{t("team.sortOptions.wonAmount")}</option>
+              <option value="winRate">{t("team.sortOptions.winRate")}</option>
+              <option value="pipelineAmount">{t("team.sortOptions.pipelineAmount")}</option>
+              <option value="customerCount">{t("team.sortOptions.customerCount")}</option>
+              <option value="highRiskCount">{t("team.sortOptions.highRiskCount")}</option>
             </select>
           </label>
         </div>
         {/* 欄位較多時保留表格可讀寬度，窄螢幕改由此區塊局部橫向捲動。 */}
-        <div className="table-scroll team-performance-table-scroll" role="region" aria-label="各業務績效表" tabIndex={0}>
+        <div className="table-scroll team-performance-table-scroll" role="region" aria-label={t("team.tableLabel")} tabIndex={0}>
           <table className="admin-user-table">
             <thead>
               <tr>
-                <th>業務</th><th>客戶</th><th>高風險</th><th>進行中商機</th>
-                <th>已成交</th><th>成交率</th><th>平均互動間隔</th><th>本季續約</th><th>Coaching</th>
+                <th>{t("team.columns.owner")}</th><th>{t("team.columns.customers")}</th><th>{t("team.columns.highRisk")}</th><th>{t("team.columns.pipeline")}</th>
+                <th>{t("team.columns.won")}</th><th>{t("team.columns.winRate")}</th><th>{t("team.columns.interactionGap")}</th><th>{t("team.columns.renewals")}</th><th>{t("team.columns.coaching")}</th>
               </tr>
             </thead>
             <tbody>
@@ -97,14 +98,14 @@ export function TeamAnalyticsPage() {
                   <td>{o.ownerName}</td>
                   <td>{o.customerCount}</td>
                   <td>{o.highRiskCount}</td>
-                  <td>{formatCompactMoney(o.pipelineAmount, "zh-TW")}（{o.activeOpportunityCount}）</td>
-                  <td>{formatCompactMoney(o.wonAmount, "zh-TW")}（{o.wonCount}）</td>
+                  <td>{formatCompactMoney(o.pipelineAmount, i18n.language)} ({o.activeOpportunityCount})</td>
+                  <td>{formatCompactMoney(o.wonAmount, i18n.language)} ({o.wonCount})</td>
                   <td>{Math.round(o.winRate * 100)}%</td>
-                  <td>{o.avgDaysSinceInteraction == null ? "—" : `${Math.round(o.avgDaysSinceInteraction)} 天`}</td>
+                  <td>{o.avgDaysSinceInteraction == null ? "—" : t("team.days", { count: Math.round(o.avgDaysSinceInteraction) })}</td>
                   <td>{o.renewalsThisQuarter}</td>
                   <td>
                     <button type="button" className="btn-secondary" onClick={() => setModal({ scope: "OWNER", owner: o.ownerName })}>
-                      輔導報告 <AiBadge />
+                      {t("team.coachingReport")} <AiBadge />
                     </button>
                   </td>
                 </tr>

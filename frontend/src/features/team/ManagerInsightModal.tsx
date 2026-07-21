@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -29,6 +30,7 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
   owner?: string;
   onClose: () => void;
 }) {
+  const { t, i18n } = useTranslation(["operations", "common"]);
   const [insight, setInsight] = useState<ManagerInsightResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -38,7 +40,9 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
   const [calls, setCalls] = useState<AiCallHistoryItem[]>([]);
   const [callsLoading, setCallsLoading] = useState(false);
 
-  const title = scope === "TEAM" ? "團隊整體診斷" : `${owner} 的輔導報告`;
+  const title = scope === "TEAM"
+    ? t("team.insight.teamTitle")
+    : t("team.insight.ownerTitle", { owner });
 
   // 開啟先讀快取
   useEffect(() => {
@@ -47,7 +51,7 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
     setErr(null);
     const p = scope === "TEAM" ? fetchTeamInsight() : fetchOwnerInsight(owner as string);
     p.then((r) => { if (alive) setInsight(r); })
-      .catch((e) => { console.error("讀取 AI 分析快取失敗:", e); if (alive) setErr("讀取失敗"); })
+      .catch((e) => { console.error("Failed to load cached AI analysis:", e); if (alive) setErr("team.insight.readError"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [scope, owner]);
@@ -71,8 +75,8 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
       p.then((r) => { if (r) setInsight(r); }).catch(() => {});
     };
     const onError = (e: any) => {
-      console.error("產生 AI 分析串流失敗:", e);
-      setErr("產生失敗，請稍後再試");
+      console.error("Failed to stream AI analysis:", e);
+      setErr("team.insight.generateError");
       setGenerating(false);
     };
 
@@ -91,7 +95,7 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
       const list = scope === "TEAM" ? await fetchTeamInsightCalls() : await fetchOwnerInsightCalls(owner as string);
       setCalls(list);
     } catch (e) {
-      console.error("讀取 AI 歷程失敗:", e);
+      console.error("Failed to load AI history:", e);
       setCalls([]);
     } finally {
       setCallsLoading(false);
@@ -105,32 +109,35 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
           <div className="report-header">
             <div>
               <h3>{title} <AiBadge onDark /></h3>
-              {insight ? <small>上次分析：{formatDateTime(insight.generatedAt, "zh-TW", "尚無資料")}{insight.model ? `（${insight.model}）` : "（教學版摘要）"}</small> : null}
+              {insight ? <small>
+                {t("team.insight.lastAnalyzed", { date: formatDateTime(insight.generatedAt, i18n.language, t("noData", { ns: "common" })) })}
+                {insight.model ? ` (${insight.model})` : ` (${t("team.insight.teachingSummary")})`}
+              </small> : null}
             </div>
-            <button type="button" className="chat-close" onClick={onClose} aria-label="關閉">✕</button>
+            <button type="button" className="chat-close" onClick={onClose} aria-label={t("actions.close", { ns: "common" })}>✕</button>
           </div>
           <div className="report-body">
             {loading ? (
-              <AiThinkingIndicator label="載入分析中" />
+              <AiThinkingIndicator label={t("team.insight.loading")} />
             ) : err ? (
-              <p className="trace-empty">{err}</p>
+              <p className="trace-empty">{t(err)}</p>
             ) : insight ? (
               /* generating 為 true 時：有內容但仍在串流 */
               <div className={generating && insight.content ? "markdown-body ai-streaming-body" : "markdown-body"}>
                 {!insight.content && generating
-                  ? <AiThinkingIndicator label="AI 正在分析" />
+                  ? <AiThinkingIndicator label={t("team.insight.analyzing")} />
                   : <ReactMarkdown remarkPlugins={[remarkGfm]}>{insight.content}</ReactMarkdown>
                 }
                 {generating && insight.content && <span className="ai-stream-cursor" />}
               </div>
             ) : (
               generating
-                ? <AiThinkingIndicator label="AI 正在分析" />
-                : <p className="trace-empty">尚未產生分析，點「重新分析」由 AI 產出。</p>
+                ? <AiThinkingIndicator label={t("team.insight.analyzing")} />
+                : <p className="trace-empty">{t("team.insight.empty")}</p>
             )}
           </div>
           <div className="report-footer">
-            <button type="button" className="btn-secondary" onClick={openHistory}>🕘 AI 歷程</button>
+            <button type="button" className="btn-secondary" onClick={openHistory}>{t("team.insight.history")}</button>
             {insight?.content && !generating ? (
               <button
                 type="button"
@@ -138,19 +145,19 @@ export function ManagerInsightModal({ scope, owner, onClose }: {
                 style={{ fontSize: 13 }}
                 onClick={() => downloadMarkdown(title, insight.content)}
               >
-                ⬇ 下載 MD
+                {t("team.insight.download")}
               </button>
             ) : null}
             <button type="button" className="btn-assess" disabled={generating} onClick={handleGenerate}>
-              {generating ? "分析中…" : "重新分析"}
+              {generating ? t("team.insight.generating") : t("team.insight.regenerate")}
             </button>
-            <button type="button" onClick={onClose}>關閉</button>
+            <button type="button" onClick={onClose}>{t("actions.close", { ns: "common" })}</button>
           </div>
         </div>
       </div>
       {historyOpen ? (
         <AiCallHistoryModal
-          title={`${title} AI 歷程`}
+          title={t("team.insight.historyTitle", { title })}
           calls={calls}
           loading={callsLoading}
           onClose={() => setHistoryOpen(false)}

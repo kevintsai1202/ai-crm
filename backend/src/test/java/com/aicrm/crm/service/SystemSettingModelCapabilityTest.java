@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.aicrm.crm.api.Dtos;
+import com.aicrm.crm.domain.AiProvider;
 import com.aicrm.crm.domain.CapabilitySource;
 import com.aicrm.crm.domain.ModelCapability;
 import com.aicrm.crm.domain.SystemSetting;
@@ -47,7 +48,7 @@ class SystemSettingModelCapabilityTest {
         providerRepository = mock(AiProviderRepository.class);
         when(providerRepository.existsById(anyLong())).thenReturn(true);
         settings = new SystemSettingService(repository, providerRepository,
-                mock(ModelCatalogClient.class), new ObjectMapper(), "");
+                mock(ModelCatalogClient.class), new ObjectMapper(), "", "", "", "", "");
     }
 
     /** OCR assignment 不得接受缺少 VISION 能力的模型。 */
@@ -173,5 +174,58 @@ class SystemSettingModelCapabilityTest {
         assertThatThrownBy(() -> settings.updateAssignments(null, "admin"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("assignment");
+    }
+
+    /** DB 未指派時，OCR 與轉錄應從各自的部署預設解析，且不得借用 Chat 預設。 */
+    @Test
+    void mediaAssignments_fallBackToPurposeSpecificEnvironmentDefaults() {
+        var repository = mock(SystemSettingRepository.class);
+        when(repository.findBySettingKey(any())).thenReturn(Optional.empty());
+        var provider = mock(AiProvider.class);
+        when(provider.getId()).thenReturn(77L);
+        when(provider.getBaseUrl()).thenReturn("https://api.example.test/v1");
+        when(provider.getApiKey()).thenReturn("secret");
+        when(provider.isApiKeySet()).thenReturn(true);
+        when(providerRepository.findByName("Environment Provider")).thenReturn(Optional.of(provider));
+        settings = new SystemSettingService(repository, providerRepository,
+                mock(ModelCatalogClient.class), new ObjectMapper(), "chat-default",
+                "Environment Provider", "vision-default",
+                "Environment Provider", "audio-default");
+        storedSettings.clear();
+        when(repository.findBySettingKey(any())).thenAnswer(invocation ->
+                Optional.ofNullable(storedSettings.get(invocation.getArgument(0, String.class))));
+        when(repository.save(any(SystemSetting.class))).thenAnswer(invocation -> {
+            var setting = invocation.getArgument(0, SystemSetting.class);
+            storedSettings.put(setting.getSettingKey(), setting);
+            return setting;
+        });
+        settings.updateAiSettings("", null, List.of(
+                new Dtos.ModelOptionItem("vision-default", 77L,
+                        Set.of(ModelCapability.VISION), CapabilitySource.MANUAL),
+                new Dtos.ModelOptionItem("audio-default", 77L,
+                        Set.of(ModelCapability.AUDIO_TRANSCRIPTION), CapabilitySource.MANUAL)
+        ), null, null, null, "admin");
+        settings.updateModelCapabilities("vision-default", 77L,
+                Set.of(ModelCapability.VISION), "admin");
+        settings.updateModelCapabilities("audio-default", 77L,
+                Set.of(ModelCapability.AUDIO_TRANSCRIPTION), "admin");
+
+        assertThat(settings.resolveOcrAssignment().model()).isEqualTo("vision-default");
+        assertThat(settings.resolveTranscriptionAssignment().model()).isEqualTo("audio-default");
+        assertThat(settings.getAiSettingsView().ocrSource()).isEqualTo("ENV");
+        assertThat(settings.getAiSettingsView().transcriptionSource()).isEqualTo("ENV");
+    }
+
+    /** 部署預設未通過 Provider、模型目錄及能力驗證時，不得宣稱已生效。 */
+    @Test
+    void mediaAssignmentSource_isUnsetWhenEnvironmentDefaultIsNotUsable() {
+        var repository = mock(SystemSettingRepository.class);
+        when(repository.findBySettingKey(any())).thenReturn(Optional.empty());
+        settings = new SystemSettingService(repository, providerRepository,
+                mock(ModelCatalogClient.class), new ObjectMapper(), "chat-default",
+                "Missing Provider", "vision-default", "", "");
+
+        assertThat(settings.getAiSettingsView().ocrSource()).isEqualTo("UNSET");
+        assertThat(settings.resolveOcrAssignment()).isNull();
     }
 }

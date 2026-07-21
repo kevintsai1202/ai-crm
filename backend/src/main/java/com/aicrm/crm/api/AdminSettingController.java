@@ -1,12 +1,17 @@
 package com.aicrm.crm.api;
 
 import com.aicrm.crm.service.AiGovernanceService;
+import com.aicrm.crm.service.AiPurposeModelTestService;
+import com.aicrm.crm.service.AiPurposeModelUnavailableException;
 import com.aicrm.crm.service.InsightService;
 import com.aicrm.crm.service.JwtService;
 import com.aicrm.crm.service.SystemSettingService;
+import com.aicrm.crm.service.transcription.TranscriptionException;
+import com.aicrm.crm.service.vision.VisionServiceException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
@@ -18,10 +23,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 系統設定 API（限 ADMIN）：目前提供 AI 對話模型設定的讀取與更新。
@@ -37,13 +44,17 @@ public class AdminSettingController {
     private final InsightService insightService;
     /** AI 治理服務（查詢評分 AI 歷程）。 */
     private final AiGovernanceService aiGovernance;
+    /** OCR／語音轉錄用途級模型測試服務。 */
+    private final ObjectProvider<AiPurposeModelTestService> purposeModelTests;
 
     public AdminSettingController(SystemSettingService systemSettings,
                                   InsightService insightService,
-                                  AiGovernanceService aiGovernance) {
+                                  AiGovernanceService aiGovernance,
+                                  ObjectProvider<AiPurposeModelTestService> purposeModelTests) {
         this.systemSettings = systemSettings;
         this.insightService = insightService;
         this.aiGovernance = aiGovernance;
+        this.purposeModelTests = purposeModelTests;
     }
 
     /**
@@ -225,6 +236,45 @@ public class AdminSettingController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
         return systemSettings.getAiSettingsView();
+    }
+
+    /** 以上傳的實際名片圖片測試目前有效的 OCR assignment，不建立任何正式資料。 */
+    @PostMapping(value = "/ai/assignments/ocr/test", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Dtos.AiPurposeModelTestResponse testOcrAssignment(@RequestPart("file") MultipartFile file) {
+        var tests = requirePurposeModelTests();
+        try {
+            return tests.testOcr(file);
+        } catch (AiPurposeModelUnavailableException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        } catch (VisionServiceException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "OCR 模型服務暫時無法使用");
+        }
+    }
+
+    /** 以上傳的實際音訊測試目前有效的 Transcription assignment，不保存逐字稿內容。 */
+    @PostMapping(value = "/ai/assignments/transcription/test", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Dtos.AiPurposeModelTestResponse testTranscriptionAssignment(@RequestPart("file") MultipartFile file) {
+        var tests = requirePurposeModelTests();
+        try {
+            return tests.testTranscription(file);
+        } catch (AiPurposeModelUnavailableException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        } catch (TranscriptionException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "語音轉錄模型服務暫時無法使用");
+        }
+    }
+
+    /** 媒體功能停用時，讓用途測試端點以明確 503 回應而非阻止應用程式啟動。 */
+    private AiPurposeModelTestService requirePurposeModelTests() {
+        var tests = purposeModelTests.getIfAvailable();
+        if (tests == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "媒體處理功能目前未啟用");
+        }
+        return tests;
     }
 
     /**

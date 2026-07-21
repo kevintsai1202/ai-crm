@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../context/AuthContext";
 import {
   fetchAiSettings, saveAiSettings, streamModelTest,
   streamModelScore, fetchModelScoreCalls,
   createAiProvider, updateAiProvider, deleteAiProvider,
   refreshAiProviderModels, saveModelCapabilities, saveAiModelAssignments,
-  logModelTest, fetchModelTestCalls,
+  testAiPurposeModel, logModelTest, fetchModelTestCalls,
 } from "../../api/index";
 import type {
   AiSettingsResponse, AiCallHistoryItem, ModelResultItem,
-  AiProviderItem, ModelOptionItem, ModelCapability,
+  AiProviderItem, ModelOptionItem, ModelCapability, AiPurposeModelTestResponse,
 } from "../../types";
 import { AiCallHistoryModal } from "../../components/common/AiCallHistoryModal";
 import { ReportModal } from "../../components/common/ReportModal";
@@ -24,6 +25,7 @@ import {
   isSameModelPair,
   modelOptionKey,
   modelPairKey,
+  purposeDeploymentDefaultLabel,
 } from "./modelCapabilities";
 
 /** 單一模型的競速測試結果。 */
@@ -41,14 +43,12 @@ interface ModelRaceResult {
   errorMsg?: string;
 }
 
-/** 固定任務說明（grounding context 由後端從真實 DB 建構，前端不需傳問題）。 */
-const TEST_TASK_LABEL = "分析全公司客戶組合，找出最需立即關注的前 3 名客戶（含風險原因 + 建議行動）";
-
 /**
  * 系統設定頁（限 ADMIN）：AI 供應商管理 + 模型設定 + 多模型競速測試。
  */
 export default function AdminSettingsPage() {
   const { user } = useAuth();
+  const { t } = useTranslation("operations");
 
   /* ── 設定區狀態 ─────────────────────────────── */
   const [settings, setSettings] = useState<AiSettingsResponse | null>(null);
@@ -68,6 +68,13 @@ export default function AdminSettingsPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [ocrModelKey, setOcrModelKey] = useState("");
   const [transcriptionModelKey, setTranscriptionModelKey] = useState("");
+  /** 用途模型測試檔案只保留在瀏覽器記憶體，不會由設定頁另行保存。 */
+  const [purposeTestFiles, setPurposeTestFiles] = useState<{ ocr: File | null; transcription: File | null }>({
+    ocr: null,
+    transcription: null,
+  });
+  const [purposeTesting, setPurposeTesting] = useState<"ocr" | "transcription" | null>(null);
+  const [purposeTestResults, setPurposeTestResults] = useState<Partial<Record<"ocr" | "transcription", AiPurposeModelTestResponse>>>({});
 
   /* ── Provider 管理狀態 ─────────────────────────────── */
   /** 已設定的 AI 供應商清單 */
@@ -136,7 +143,7 @@ export default function AdminSettingsPage() {
       setTranscriptionModelKey(modelPairKey(data.transcriptionModel, data.transcriptionProviderId));
       syncParams(data);
     } catch (e) {
-      setSettingError(e instanceof Error ? e.message : "載入失敗");
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.load"));
     } finally {
       setLoading(false);
     }
@@ -166,12 +173,12 @@ export default function AdminSettingsPage() {
       setProviders(data.providers);
       syncParams(data);
       const msg = data.currentModel
-        ? `✓ 已設定 ${data.currentModel} 為默認模型`
-        : "✓ 已清除默認模型，改用環境變數預設";
+        ? t("adminSettings.messages.defaultSet", { model: data.currentModel })
+        : t("adminSettings.messages.chatCleared");
       setActionMsg(msg);
       setTimeout(() => setActionMsg(null), 3000);
     } catch (e) {
-      setSettingError(e instanceof Error ? e.message : "儲存失敗");
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -219,9 +226,9 @@ export default function AdminSettingsPage() {
       setOptions(data.modelOptions);
       setProviders(data.providers);
       syncParams(data);
-      setActionMsg("已儲存，AI 呼叫即時生效。");
+      setActionMsg(t("adminSettings.messages.saved"));
     } catch (e) {
-      setSettingError(e instanceof Error ? e.message : "儲存失敗");
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.save"));
     } finally {
       setSaving(false);
     }
@@ -247,7 +254,7 @@ export default function AdminSettingsPage() {
       setProviderForm({ name: "", baseUrl: "", apiKey: "" });
       setEditingProviderId(null);
     } catch (e) {
-      setProviderError(e instanceof Error ? e.message : "儲存失敗");
+      setProviderError(e instanceof Error ? e.message : t("adminSettings.errors.providerSave"));
     } finally {
       setSavingProvider(false);
     }
@@ -262,7 +269,7 @@ export default function AdminSettingsPage() {
 
   /** 刪除供應商，並清除相關模型選項的 provider 關聯，同步儲存至 DB。 */
   async function handleDeleteProvider(id: number) {
-    if (!window.confirm("確定刪除此供應商？相關模型選項的 provider 關聯將清除為 null。")) return;
+    if (!window.confirm(t("adminSettings.confirmDeleteProvider"))) return;
     try {
       await deleteAiProvider(id);
       // 先計算清理後的值，再一次性更新 state，確保傳給 saveAiSettings 的是清理後的結果
@@ -274,7 +281,7 @@ export default function AdminSettingsPage() {
       // 自動同步清理後的設定至 DB，避免孤立的 providerId 留在 model_options
       await saveAiSettings(currentModel, cleanedProviderId, cleanedOptions, paramsPayload());
     } catch (e) {
-      setProviderError(e instanceof Error ? e.message : "刪除失敗");
+      setProviderError(e instanceof Error ? e.message : t("adminSettings.errors.providerDelete"));
     }
   }
 
@@ -285,9 +292,9 @@ export default function AdminSettingsPage() {
     try {
       const refreshedOptions = await refreshAiProviderModels(id);
       setOptions(refreshedOptions);
-      setActionMsg("模型目錄與能力已更新。");
+      setActionMsg(t("adminSettings.messages.catalogUpdated"));
     } catch (e) {
-      setProviderError(e instanceof Error ? e.message : "模型目錄更新失敗");
+      setProviderError(e instanceof Error ? e.message : t("adminSettings.errors.catalogRefresh"));
     } finally {
       setSavingProvider(false);
     }
@@ -305,9 +312,9 @@ export default function AdminSettingsPage() {
       const updated = await saveModelCapabilities(option.model, option.providerId, nextCapabilities);
       setOptions((current) => current.map((item) =>
         item.model === option.model && item.providerId === option.providerId ? updated : item));
-      setActionMsg(`已更新 ${option.model} 的模型能力。`);
+      setActionMsg(t("adminSettings.messages.capabilityUpdated", { model: option.model }));
     } catch (e) {
-      setSettingError(e instanceof Error ? e.message : "模型能力儲存失敗");
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.capabilitySave"));
     } finally {
       setSaving(false);
     }
@@ -329,11 +336,33 @@ export default function AdminSettingsPage() {
       setOptions(data.modelOptions);
       setOcrModelKey(modelPairKey(data.ocrModel, data.ocrProviderId));
       setTranscriptionModelKey(modelPairKey(data.transcriptionModel, data.transcriptionProviderId));
-      setActionMsg("OCR 與語音轉錄模型已儲存。");
+      setActionMsg(t("adminSettings.messages.assignmentsSaved"));
     } catch (e) {
-      setSettingError(e instanceof Error ? e.message : "用途模型儲存失敗");
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.assignmentSave"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** 以上傳實檔呼叫目前已儲存且實際生效的 OCR／語音轉錄模型。 */
+  async function runPurposeModelTest(purpose: "ocr" | "transcription") {
+    const file = purposeTestFiles[purpose];
+    if (!file) {
+      setSettingError(t(purpose === "ocr" ? "adminSettings.errors.selectCard" : "adminSettings.errors.selectAudio"));
+      return;
+    }
+    setPurposeTesting(purpose);
+    setSettingError(null);
+    setActionMsg(null);
+    try {
+      const result = await testAiPurposeModel(purpose, file);
+      setPurposeTestResults((current) => ({ ...current, [purpose]: result }));
+      const purposeName = t(purpose === "ocr" ? "adminSettings.purposes.ocrName" : "adminSettings.purposes.transcriptionName");
+      setActionMsg(t("adminSettings.messages.testSuccess", { purpose: purposeName, model: result.model, latency: result.latencyMs }));
+    } catch (e) {
+      setSettingError(e instanceof Error ? e.message : t("adminSettings.errors.purposeTest"));
+    } finally {
+      setPurposeTesting(null);
     }
   }
 
@@ -430,7 +459,7 @@ export default function AdminSettingsPage() {
         (err: any) => {
           setRaceResults((prev) => ({
             ...prev,
-            [opt.model]: { ...prev[opt.model], status: "error", errorMsg: err?.message ?? "連線失敗" }
+            [opt.model]: { ...prev[opt.model], status: "error", errorMsg: err?.message ?? t("adminSettings.errors.connection") }
           }));
           doneCount++;
           if (doneCount >= total) setRacing(false);
@@ -476,7 +505,7 @@ export default function AdminSettingsPage() {
       (err) => {
         console.error("評分失敗:", err);
         setScoreReport((prev) => prev
-          ? { ...prev, loading: false, streaming: false, markdown: "⚠️ 評分失敗，請稍後再試。" }
+          ? { ...prev, loading: false, streaming: false, markdown: t("adminSettings.errors.score") }
           : prev);
         setScoring(false);
       }
@@ -507,7 +536,7 @@ export default function AdminSettingsPage() {
   }
 
   /* ── 渲染 ─────────────────────────────── */
-  const envLabel = settings?.envDefaultModel || "未設定";
+  const envLabel = settings?.envDefaultModel || t("adminSettings.unset");
   const hasRaceResults = Object.keys(raceResults).length > 0;
   const allDone = hasRaceResults && Object.values(raceResults).every((r) => r.status === "done" || r.status === "error");
   const hasDoneResults = hasRaceResults && Object.values(raceResults).some((r) => r.status === "done");
@@ -522,9 +551,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="admin-settings-page" style={{ padding: "24px 28px", maxWidth: 900 }}>
       {/* 頁首 */}
-      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#122232", margin: "0 0 4px" }}>系統設定</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 700, color: "#122232", margin: "0 0 4px" }}>{t("adminSettings.title")}</h1>
       <p style={{ color: "#64748b", fontSize: 14, margin: "0 0 20px" }}>
-        管理 AI 供應商與對話模型；點選清單項目選用，留空則回退環境變數預設，修改後儲存即時生效。
+        {t("adminSettings.intro")}
       </p>
 
       {/* 設定通知 */}
@@ -540,14 +569,14 @@ export default function AdminSettingsPage() {
       )}
 
       {loading ? (
-        <div className="panel" style={{ color: "#64748b", fontSize: 14 }}>載入中…</div>
+        <div className="panel" style={{ color: "#64748b", fontSize: 14 }}>{t("adminSettings.loading")}</div>
       ) : (
         <>
           {/* ── Provider 管理卡片 ── */}
           <div className="panel" style={{ marginBottom: 16 }}>
             <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🔑 AI 供應商</span>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>管理 API 金鑰與 Base URL，模型選項關聯至供應商</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🔑 {t("adminSettings.providers.title")}</span>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>{t("adminSettings.providers.subtitle")}</span>
             </div>
 
             {providerError && (
@@ -560,7 +589,7 @@ export default function AdminSettingsPage() {
             {/* 供應商清單 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {providers.length === 0 && (
-                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>尚無供應商，請在下方新增。</p>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>{t("adminSettings.providers.empty")}</p>
               )}
               {providers.map(p => (
                 <div key={p.id} className="settings-responsive-row" style={{
@@ -571,27 +600,27 @@ export default function AdminSettingsPage() {
                 }}>
                   <div className="settings-row-copy">
                     <span style={{ fontWeight: 600, fontSize: 14, color: "#122232", marginRight: 8 }}>{p.name}</span>
-                    <span style={{ fontSize: 12, color: "#64748b" }}>{p.baseUrl || "預設 OpenAI URL"}</span>
+                    <span style={{ fontSize: 12, color: "#64748b" }}>{p.baseUrl || t("adminSettings.providers.defaultUrl")}</span>
                     <span style={{
                       marginLeft: 8, fontSize: 11, padding: "1px 6px", borderRadius: 4,
                       color: p.apiKeySet ? "#166534" : "#b91c1c",
                       background: p.apiKeySet ? "#dcfce7" : "#fee2e2",
                     }}>
-                      {p.apiKeySet ? "🔐 金鑰已設定" : "⚠️ 未設定金鑰"}
+                      {p.apiKeySet ? `🔐 ${t("adminSettings.providers.keySet")}` : `⚠️ ${t("adminSettings.providers.keyMissing")}`}
                     </span>
                   </div>
                   <div className="settings-inline-actions" style={{ display: "flex", gap: 6 }}>
                     <button type="button" className="btn-secondary"
-                      aria-label={`重新查詢 ${p.name} 模型`}
+                      aria-label={t("adminSettings.providers.refreshAria", { provider: p.name })}
                       disabled={savingProvider}
                       style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => handleRefreshProviderModels(p.id)}>更新模型</button>
+                      onClick={() => handleRefreshProviderModels(p.id)}>{t("adminSettings.providers.refresh")}</button>
                     <button type="button" className="btn-secondary"
                       style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => startEditProvider(p)}>編輯</button>
+                      onClick={() => startEditProvider(p)}>{t("adminSettings.providers.edit")}</button>
                     <button type="button" className="btn-danger"
                       style={{ fontSize: 12, padding: "3px 10px" }}
-                      onClick={() => handleDeleteProvider(p.id)}>刪除</button>
+                      onClick={() => handleDeleteProvider(p.id)}>{t("adminSettings.providers.delete")}</button>
                   </div>
                 </div>
               ))}
@@ -600,25 +629,25 @@ export default function AdminSettingsPage() {
             {/* 新增 / 編輯表單 */}
             <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginBottom: 10 }}>
-                {editingProviderId !== null ? "✏️ 編輯供應商" : "➕ 新增供應商"}
+                {editingProviderId !== null ? `✏️ ${t("adminSettings.providers.editTitle")}` : `➕ ${t("adminSettings.providers.addTitle")}`}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <input
                   value={providerForm.name}
-                  placeholder="供應商名稱，如 OpenAI、Anthropic"
+                  placeholder={t("adminSettings.providers.namePlaceholder")}
                   onChange={e => setProviderForm(prev => ({ ...prev, name: e.target.value }))}
                   style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
                 />
                 <input
                   value={providerForm.baseUrl}
-                  placeholder="Base URL（留空使用 OpenAI 預設：https://api.openai.com）"
+                  placeholder={t("adminSettings.providers.urlPlaceholder")}
                   onChange={e => setProviderForm(prev => ({ ...prev, baseUrl: e.target.value }))}
                   style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
                 />
                 <input
                   type="password"
                   value={providerForm.apiKey}
-                  placeholder={editingProviderId !== null ? "API Key（留空保留現有金鑰）" : "API Key"}
+                  placeholder={editingProviderId !== null ? t("adminSettings.providers.keyEditPlaceholder") : t("adminSettings.providers.keyAddPlaceholder")}
                   onChange={e => setProviderForm(prev => ({ ...prev, apiKey: e.target.value }))}
                   style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
                 />
@@ -627,7 +656,7 @@ export default function AdminSettingsPage() {
                     disabled={savingProvider || !providerForm.name.trim()}
                     onClick={saveProviderForm}
                     style={{ flex: 1, padding: "8px", fontWeight: 700 }}>
-                    {savingProvider ? "儲存中…" : editingProviderId !== null ? "更新供應商" : "新增供應商"}
+                    {savingProvider ? t("adminSettings.providers.saving") : editingProviderId !== null ? t("adminSettings.providers.update") : t("adminSettings.providers.add")}
                   </button>
                   {editingProviderId !== null && (
                     <button type="button" className="btn-secondary"
@@ -636,7 +665,7 @@ export default function AdminSettingsPage() {
                         setProviderForm({ name: "", baseUrl: "", apiKey: "" });
                         setProviderError(null);
                       }}
-                      style={{ padding: "8px 16px" }}>取消</button>
+                      style={{ padding: "8px 16px" }}>{t("adminSettings.providers.cancel")}</button>
                   )}
                 </div>
               </div>
@@ -646,16 +675,16 @@ export default function AdminSettingsPage() {
           {/* ── 模型設定卡片 ── */}
           <div className="panel" style={{ marginBottom: 16 }}>
             <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>AI 對話模型</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>{t("adminSettings.models.title")}</span>
               {currentModel
-                ? <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>系統設定</span>
-                : <span style={{ background: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>環境變數回退</span>
+                ? <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{t("adminSettings.models.system")}</span>
+                : <span style={{ background: "#f1f5f9", color: "#475569", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{t("adminSettings.models.env")}</span>
               }
             </div>
 
             {!currentModel && (
               <div style={{ padding: "10px 12px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: 8, fontSize: 13, color: "#64748b", marginBottom: 12 }}>
-                未選用模型，AI 呼叫將使用環境變數預設：
+                {t("adminSettings.models.envHint")}
                 <code style={{ background: "#e2e8f0", padding: "1px 6px", borderRadius: 4, marginLeft: 4 }}>{envLabel}</code>
               </div>
             )}
@@ -663,7 +692,7 @@ export default function AdminSettingsPage() {
             {/* 候選清單（顯示 provider badge） */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
               {options.length === 0 && (
-                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>尚無候選模型，請在下方輸入後新增。</p>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>{t("adminSettings.models.empty")}</p>
               )}
               {options.map((opt) => {
                 const isSelected = isSameModelPair(opt, currentModel, currentProviderId);
@@ -701,11 +730,11 @@ export default function AdminSettingsPage() {
                         }}
                         onClick={e => e.stopPropagation()}
                         style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }}
-                        title="勾選加入競速比較"
+                        title={t("adminSettings.models.raceToggle")}
                       />
                       <span style={{ fontFamily: "monospace", fontSize: 14, color: "#122232" }}>{opt.model}</span>
                       {isSelected && (
-                        <span style={{ fontSize: 11, color: "#166534", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>使用中</span>
+                        <span style={{ fontSize: 11, color: "#166534", background: "#dcfce7", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>{t("adminSettings.models.active")}</span>
                       )}
                       {/* 供應商 badge */}
                       {providerName && (
@@ -715,10 +744,10 @@ export default function AdminSettingsPage() {
                         </span>
                       )}
                       {hasCapability(opt, "VISION") && (
-                        <span title="支援圖片輸入" aria-label="Vision capability">👁</span>
+                        <span title={t("adminSettings.models.visionTitle")} aria-label="Vision capability">👁</span>
                       )}
                       {hasCapability(opt, "AUDIO_TRANSCRIPTION") && (
-                        <span title="支援語音轉錄" aria-label="Audio transcription capability">👂</span>
+                        <span title={t("adminSettings.models.audioTitle")} aria-label="Audio transcription capability">👂</span>
                       )}
                       <span data-testid={`capability-source-${opt.model}`} style={{
                         fontSize: 10, color: opt.capabilitySource === "UNKNOWN" ? "#b45309" : "#475569",
@@ -758,7 +787,7 @@ export default function AdminSettingsPage() {
                       style={{ padding: "3px 10px", fontSize: 12 }}
                       onClick={(e) => { e.stopPropagation(); removeModel(opt); }}
                     >
-                      刪除
+                      {t("adminSettings.models.delete")}
                     </button>
                   </div>
                 );
@@ -773,62 +802,132 @@ export default function AdminSettingsPage() {
                 onChange={e => setNewModelProviderId(e.target.value ? Number(e.target.value) : null)}
                 style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none", minWidth: 140 }}
               >
-                <option value="">選擇供應商</option>
+                <option value="">{t("adminSettings.models.chooseProvider")}</option>
                 {providers.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
               <input
                 value={newModel}
-                placeholder="輸入模型名，如 claude-sonnet-4-6"
+                placeholder={t("adminSettings.models.namePlaceholder")}
                 onChange={(e) => setNewModel(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addModel(); } }}
                 style={{ flex: 1, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, outline: "none" }}
               />
               <button type="button" className="btn-secondary" style={{ whiteSpace: "nowrap", padding: "8px 16px" }} onClick={addModel}>
-                + 新增
+                + {t("adminSettings.models.add")}
               </button>
             </div>
 
-            {/* OCR／語音轉錄用途模型只顯示已確認相容的候選。 */}
+            {/* 三個用途共用模型目錄，但各自顯示獨立指派與部署預設。 */}
             <div data-testid="model-assignments" style={{ paddingTop: 12, borderTop: "1px solid #f1f5f9", marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>AI 用途模型</div>
-              <div className="settings-form-row" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-                <label className="settings-form-field" style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
-                  OCR（僅 👁 Vision）
-                  <select className="settings-fluid-select" data-testid="ocr-model-select" value={ocrModelKey} onChange={(event) => setOcrModelKey(event.target.value)}
-                    style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
-                    <option value="">未設定</option>
-                    {visionOptions.map((option) => {
-                      const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
-                      return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
-                        {option.model}{providerName ? ` — ${providerName}` : ""}
-                      </option>;
-                    })}
-                  </select>
-                </label>
-                <label className="settings-form-field" style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#64748b" }}>
-                  Transcription（僅 👂 Audio）
-                  <select className="settings-fluid-select" data-testid="transcription-model-select" value={transcriptionModelKey}
-                    onChange={(event) => setTranscriptionModelKey(event.target.value)}
-                    style={{ minWidth: 220, padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8 }}>
-                    <option value="">未設定</option>
-                    {transcriptionOptions.map((option) => {
-                      const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
-                      return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
-                        {option.model}{providerName ? ` — ${providerName}` : ""}
-                      </option>;
-                    })}
-                  </select>
-                </label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#122232" }}>{t("adminSettings.purposes.title")}</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{t("adminSettings.purposes.hint")}</div>
+                </div>
                 <button type="button" className="btn-assess" data-testid="save-model-assignments"
-                  disabled={saving || hasInvalidAssignment} onClick={saveAssignments} style={{ padding: "9px 18px" }}>
-                  儲存用途模型
+                  disabled={saving || hasInvalidAssignment} onClick={saveAssignments} style={{ padding: "9px 18px", whiteSpace: "nowrap" }}>
+                  {saving ? t("adminSettings.purposes.saving") : t("adminSettings.purposes.save")}
                 </button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+                <section data-testid="chat-purpose-card" style={{ padding: 12, border: "1px solid #dbeafe", borderRadius: 10, background: "#f8fbff" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                    <strong style={{ color: "#122232", fontSize: 13 }}>💬 {t("adminSettings.purposes.chat")}</strong>
+                    <span style={{ fontSize: 10, color: currentModel ? "#166534" : "#475569", background: currentModel ? "#dcfce7" : "#e2e8f0", padding: "2px 6px", borderRadius: 4 }}>
+                      {currentModel ? t("adminSettings.purposes.admin") : t("adminSettings.purposes.deployment")}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: "monospace", fontSize: 12, color: "#334155", overflowWrap: "anywhere" }}>
+                    {currentModel || envLabel}
+                  </div>
+                  <p style={{ fontSize: 11, color: "#64748b", margin: "8px 0 0" }}>{t("adminSettings.purposes.chatHint")}</p>
+                </section>
+
+                <section data-testid="ocr-purpose-card" style={{ padding: 12, border: "1px solid #d1fae5", borderRadius: 10, background: "#f8fffb" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                    <strong style={{ color: "#122232", fontSize: 13 }}>🪪 {t("adminSettings.purposes.ocrName")}</strong>
+                    <span style={{ fontSize: 10, color: settings?.ocrSource === "UNSET" ? "#b45309" : "#166534", background: settings?.ocrSource === "UNSET" ? "#fef3c7" : "#dcfce7", padding: "2px 6px", borderRadius: 4 }}>
+                      {settings?.ocrSource === "DB" ? t("adminSettings.purposes.admin") : settings?.ocrSource === "ENV" ? t("adminSettings.purposes.deployment") : t("adminSettings.purposes.unset")}
+                    </span>
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#64748b" }}>
+                    {t("adminSettings.purposes.visionModel")}
+                    <select className="settings-fluid-select" data-testid="ocr-model-select" value={ocrModelKey} onChange={(event) => setOcrModelKey(event.target.value)}
+                      style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1e0db", borderRadius: 8 }}>
+                      <option value="">{settings?.envDefaultOcrProviderName && settings.envDefaultOcrModel ? t("adminSettings.purposes.useDefault") : t("adminSettings.purposes.unset")}</option>
+                      {visionOptions.map((option) => {
+                        const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
+                        return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
+                          {option.model}{providerName ? ` — ${providerName}` : ""}
+                        </option>;
+                      })}
+                    </select>
+                  </label>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 6, overflowWrap: "anywhere" }}>
+                    {t("adminSettings.purposes.defaultPrefix")}{purposeDeploymentDefaultLabel(settings, "ocr", t("adminSettings.purposes.unset"))}
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#64748b", marginTop: 10 }}>
+                    {t("adminSettings.purposes.cardFile")}
+                    <input data-testid="ocr-test-file" type="file" accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) => setPurposeTestFiles((current) => ({ ...current, ocr: event.target.files?.[0] ?? null }))} />
+                  </label>
+                  <button type="button" className="btn-secondary" data-testid="ocr-test-button"
+                    disabled={!purposeTestFiles.ocr || purposeTesting !== null}
+                    onClick={() => void runPurposeModelTest("ocr")}
+                    style={{ width: "100%", marginTop: 8, padding: "7px 10px" }}>
+                    {purposeTesting === "ocr" ? t("adminSettings.purposes.testing") : t("adminSettings.purposes.testEffective")}
+                  </button>
+                  {purposeTestResults.ocr && <p style={{ fontSize: 11, color: "#166534", margin: "7px 0 0" }}>
+                    ✓ {purposeTestResults.ocr.summary}（{purposeTestResults.ocr.latencyMs} ms）
+                  </p>}
+                </section>
+
+                <section data-testid="transcription-purpose-card" style={{ padding: 12, border: "1px solid #ede9fe", borderRadius: 10, background: "#fbfaff" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+                    <strong style={{ color: "#122232", fontSize: 13 }}>🎙️ {t("adminSettings.purposes.transcriptionName")}</strong>
+                    <span style={{ fontSize: 10, color: settings?.transcriptionSource === "UNSET" ? "#b45309" : "#166534", background: settings?.transcriptionSource === "UNSET" ? "#fef3c7" : "#dcfce7", padding: "2px 6px", borderRadius: 4 }}>
+                      {settings?.transcriptionSource === "DB" ? t("adminSettings.purposes.admin") : settings?.transcriptionSource === "ENV" ? t("adminSettings.purposes.deployment") : t("adminSettings.purposes.unset")}
+                    </span>
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#64748b" }}>
+                    {t("adminSettings.purposes.audioModel")}
+                    <select className="settings-fluid-select" data-testid="transcription-model-select" value={transcriptionModelKey}
+                      onChange={(event) => setTranscriptionModelKey(event.target.value)}
+                      style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1e0db", borderRadius: 8 }}>
+                      <option value="">{settings?.envDefaultTranscriptionProviderName && settings.envDefaultTranscriptionModel ? t("adminSettings.purposes.useDefault") : t("adminSettings.purposes.unset")}</option>
+                      {transcriptionOptions.map((option) => {
+                        const providerName = providers.find((provider) => provider.id === option.providerId)?.name;
+                        return <option key={modelOptionKey(option)} value={modelOptionKey(option)}>
+                          {option.model}{providerName ? ` — ${providerName}` : ""}
+                        </option>;
+                      })}
+                    </select>
+                  </label>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 6, overflowWrap: "anywhere" }}>
+                    {t("adminSettings.purposes.defaultPrefix")}{purposeDeploymentDefaultLabel(settings, "transcription", t("adminSettings.purposes.unset"))}
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#64748b", marginTop: 10 }}>
+                    {t("adminSettings.purposes.audioFile")}
+                    <input data-testid="transcription-test-file" type="file" accept="audio/mpeg,audio/mp4,audio/wav,.mp3,.m4a,.wav"
+                      onChange={(event) => setPurposeTestFiles((current) => ({ ...current, transcription: event.target.files?.[0] ?? null }))} />
+                  </label>
+                  <button type="button" className="btn-secondary" data-testid="transcription-test-button"
+                    disabled={!purposeTestFiles.transcription || purposeTesting !== null}
+                    onClick={() => void runPurposeModelTest("transcription")}
+                    style={{ width: "100%", marginTop: 8, padding: "7px 10px" }}>
+                    {purposeTesting === "transcription" ? t("adminSettings.purposes.testing") : t("adminSettings.purposes.testEffective")}
+                  </button>
+                  {purposeTestResults.transcription && <p style={{ fontSize: 11, color: "#166534", margin: "7px 0 0" }}>
+                    ✓ {purposeTestResults.transcription.summary}（{purposeTestResults.transcription.latencyMs} ms）
+                  </p>}
+                </section>
               </div>
               {hasInvalidAssignment && (
                 <p role="alert" style={{ color: "#b91c1c", fontSize: 12, margin: "8px 0 0" }}>
-                  已指派模型不再具備所需能力，請先清除或改選相容模型。
+                  {t("adminSettings.purposes.invalid")}
                 </p>
               )}
             </div>
@@ -836,26 +935,26 @@ export default function AdminSettingsPage() {
             {/* 模型參數（留空＝用預設；套用於 AI 呼叫與模型測試） */}
             <div style={{ paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#122232", marginBottom: 8 }}>
-                模型參數 <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>（留空＝用預設；套用於 AI 呼叫與模型測試）</span>
+                {t("adminSettings.params.title")} <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>{t("adminSettings.params.hint")}</span>
               </div>
               <div className="settings-form-row" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
                 <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
                   Temperature (0~2)
-                  <input type="number" step="0.1" min="0" max="2" value={temperature} placeholder="預設"
+                  <input type="number" step="0.1" min="0" max="2" value={temperature} placeholder={t("adminSettings.params.default")}
                     onChange={e => setTemperature(e.target.value)}
                     style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, width: 110 }} />
                 </label>
                 <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
                   Max Completion Tokens
-                  <input type="number" min="1" value={maxCompletionTokens} placeholder="如 8000"
+                  <input type="number" min="1" value={maxCompletionTokens} placeholder={t("adminSettings.params.tokensPlaceholder")}
                     onChange={e => setMaxCompletionTokens(e.target.value)}
                     style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, width: 150 }} />
                 </label>
                 <label style={{ fontSize: 12, color: "#64748b", display: "flex", flexDirection: "column", gap: 4 }}>
-                  Reasoning Effort（推理模型）
+                  {t("adminSettings.params.reasoning")}
                   <select value={reasoningEffort} onChange={e => setReasoningEffort(e.target.value)}
                     style={{ padding: "8px 12px", border: "1px solid #d1e0db", borderRadius: 8, fontSize: 14, minWidth: 120 }}>
-                    <option value="">預設</option>
+                    <option value="">{t("adminSettings.params.default")}</option>
                     <option value="minimal">minimal</option>
                     <option value="low">low</option>
                     <option value="medium">medium</option>
@@ -864,11 +963,11 @@ export default function AdminSettingsPage() {
                 </label>
                 <button type="button" className="btn-assess" disabled={saving} onClick={save}
                   style={{ padding: "9px 18px", borderRadius: 8, fontWeight: 700 }}>
-                  {saving ? "儲存中…" : "儲存參數"}
+                  {saving ? t("adminSettings.params.saving") : t("adminSettings.params.save")}
                 </button>
               </div>
               <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, marginBottom: 0 }}>
-                提示：推理型模型（gpt-5 系）reasoning_effort 設 low/minimal 可大幅減少思考 token 與延遲；max tokens 太低會導致空輸出。
+                {t("adminSettings.params.tip")}
               </p>
             </div>
 
@@ -877,12 +976,12 @@ export default function AdminSettingsPage() {
           {/* ── 多模型競速測試卡片 ── */}
           <div className="panel">
             <div className="settings-section-heading" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🏁 多模型競速測試</span>
-              <span style={{ fontSize: 12, color: "#94a3b8" }}>同時呼叫所有候選模型，比較回應速度與品質</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#122232" }}>🏁 {t("adminSettings.race.title")}</span>
+              <span style={{ fontSize: 12, color: "#94a3b8" }}>{t("adminSettings.race.subtitle")}</span>
             </div>
 
             {options.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#94a3b8" }}>請先在上方新增候選模型才能執行測試。</p>
+              <p style={{ fontSize: 13, color: "#94a3b8" }}>{t("adminSettings.race.empty")}</p>
             ) : (
               <>
                 {/* 固定任務說明 + 啟動按鈕 */}
@@ -893,9 +992,9 @@ export default function AdminSettingsPage() {
                 }}>
                   <div>
                     <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginBottom: 3 }}>
-                      📊 測試任務（使用真實 CRM 資料）
+                      📊 {t("adminSettings.race.taskTitle")}
                     </div>
-                    <div style={{ fontSize: 13, color: "#334155" }}>{TEST_TASK_LABEL}</div>
+                    <div style={{ fontSize: 13, color: "#334155" }}>{t("adminSettings.race.task")}</div>
                   </div>
                   <button
                     type="button"
@@ -904,7 +1003,7 @@ export default function AdminSettingsPage() {
                     onClick={startRace}
                     style={{ whiteSpace: "nowrap", padding: "9px 18px", borderRadius: 8, fontWeight: 700, flexShrink: 0 }}
                   >
-                    {racing ? "測試中…" : "▶ 開始比較"}
+                    {racing ? t("adminSettings.race.testing") : `▶ ${t("adminSettings.race.start")}`}
                   </button>
                 </div>
 
@@ -921,7 +1020,7 @@ export default function AdminSettingsPage() {
                         const r = raceResults[opt.model];
                         if (!r) return null;
                         const statusColor = { idle: "#94a3b8", waiting: "#f59e0b", streaming: "#3b82f6", done: "#16a34a", error: "#dc2626" }[r.status];
-                        const statusLabel = { idle: "–", waiting: "等待中", streaming: "生成中", done: "完成", error: "失敗" }[r.status];
+                        const statusLabel = t(`adminSettings.race.status.${r.status}`);
                         /** 競速結果卡片的供應商名稱 */
                         const providerName = providers.find(p => p.id === opt.providerId)?.name;
 
@@ -945,21 +1044,21 @@ export default function AdminSettingsPage() {
                               {/* 速度 + Token 統計列 */}
                               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                                 {r.firstTokenMs !== null && (
-                                  <span style={{ fontSize: 11, color: "#64748b" }}>⚡ 首字 {r.firstTokenMs}ms</span>
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>⚡ {t("adminSettings.race.firstToken")} {r.firstTokenMs}ms</span>
                                 )}
                                 {r.totalMs !== null && (
-                                  <span style={{ fontSize: 11, color: "#64748b" }}>⏱ 總計 {(r.totalMs / 1000).toFixed(1)}s</span>
+                                  <span style={{ fontSize: 11, color: "#64748b" }}>⏱ {t("adminSettings.race.total")} {(r.totalMs / 1000).toFixed(1)}s</span>
                                 )}
                                 {r.promptTokens !== null && (
                                   <span style={{ fontSize: 11, color: "#8b5cf6" }}>
                                     🔢 {r.promptTokens ?? "–"} in / {r.completionTokens ?? "–"} out
-                                    {r.reasoningTokens ? `（可見 ${r.visibleOutputTokens ?? "–"} + 推理 ${r.reasoningTokens}）` : ""}
+                                    {r.reasoningTokens ? ` (${t("adminSettings.race.visibleReasoning", { visible: r.visibleOutputTokens ?? "–", reasoning: r.reasoningTokens })})` : ""}
                                   </span>
                                 )}
                                 {/* 只在真正異常時標示：LENGTH=被 max tokens 截斷、CONTENT_FILTER=內容過濾；
                                     _UNKNOWN/STOP 等（gateway 未回標準 finish_reason）有內容即正常，不標示避免誤解 */}
                                 {r.finishReason && /LENGTH|CONTENT_FILTER/i.test(r.finishReason) && (
-                                  <span style={{ fontSize: 11, color: "#d97706" }} title="回應因此原因結束">⚑ {r.finishReason}</span>
+                                  <span style={{ fontSize: 11, color: "#d97706" }} title={t("adminSettings.race.finishTitle")}>⚑ {r.finishReason}</span>
                                 )}
                               </div>
                             </div>
@@ -968,7 +1067,7 @@ export default function AdminSettingsPage() {
                               className={r.status === "streaming" ? "ai-streaming-body" : ""}
                               style={{ padding: "10px 12px", minHeight: 120, maxHeight: 280, overflowY: "auto", fontSize: 13, lineHeight: 1.6, color: r.status === "error" ? "#dc2626" : "#334155", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
                             >
-                              {r.status === "waiting" && <AiThinkingIndicator label="等待回應" />}
+                              {r.status === "waiting" && <AiThinkingIndicator label={t("adminSettings.race.waitingResponse")} />}
                               {r.status === "error" && <span>⚠️ {r.errorMsg}</span>}
                               {r.content}
                               {r.status === "streaming" && <span className="ai-stream-cursor" />}
@@ -983,15 +1082,15 @@ export default function AdminSettingsPage() {
                                   style={{ fontSize: 12, padding: "3px 10px" }}
                                   onClick={() => openModelHistory(opt.model)}
                                 >
-                                  🕘 歷程
+                                  🕘 {t("adminSettings.race.history")}
                                 </button>
                                 <button
                                   type="button"
                                   className="btn-secondary"
                                   style={{ fontSize: 12, padding: "3px 10px" }}
-                                  onClick={() => downloadMarkdown(`${opt.model}-回答`, r.content)}
+                                  onClick={() => downloadMarkdown(`${opt.model}-${t("adminSettings.race.answerFile")}`, r.content)}
                                 >
-                                  ⬇ 下載 MD
+                                  ⬇ {t("adminSettings.race.download")}
                                 </button>
                               </div>
                             )}
@@ -1004,7 +1103,7 @@ export default function AdminSettingsPage() {
                     {scoreReport && scoring && !scoreReport.markdown && (
                       <div style={{ marginTop: 12, padding: "12px 14px", background: "#fafafa", border: "1px solid #e2e8f0", borderRadius: 10 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#122232", marginBottom: 8 }}>
-                          🏆 評分報告 <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>（claude-opus-4-8）</span>
+                          🏆 {t("adminSettings.race.scoreReport")} <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>（claude-opus-4-8）</span>
                           {scoreReport.streaming && <AiThinkingIndicator label="" />}
                         </div>
                       </div>
@@ -1016,7 +1115,7 @@ export default function AdminSettingsPage() {
                 {options.length > 0 && (
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end",
                     paddingTop: 8, borderTop: "1px solid #f1f5f9", flexWrap: "wrap", marginTop: 8 }}>
-                    <button type="button" className="btn-secondary" onClick={openScoreHistory}>📊 評分歷程</button>
+                    <button type="button" className="btn-secondary" onClick={openScoreHistory}>📊 {t("adminSettings.race.scoreHistory")}</button>
                     <button
                       type="button"
                       className="btn-secondary"
@@ -1030,11 +1129,11 @@ export default function AdminSettingsPage() {
                             files[`${safeName}.md`] = r.content;
                           }
                         });
-                        if (scoreReport?.markdown) files["00_評分報告.md"] = scoreReport.markdown;
-                        downloadZip(`競速測試_${ts}`, files);
+                        if (scoreReport?.markdown) files[t("adminSettings.race.scoreFile")] = scoreReport.markdown;
+                        downloadZip(t("adminSettings.race.zipName", { timestamp: ts }), files);
                       }}
                     >
-                      📦 下載全部 ZIP
+                      📦 {t("adminSettings.race.downloadZip")}
                     </button>
                     <button
                       type="button"
@@ -1043,7 +1142,7 @@ export default function AdminSettingsPage() {
                       onClick={startScore}
                       style={{ fontWeight: 700, padding: "9px 20px", borderRadius: 8 }}
                     >
-                      {scoring ? "評分中…" : "🏆 claude-opus-4-8 評分"}
+                      {scoring ? t("adminSettings.race.scoring") : `🏆 ${t("adminSettings.race.score")}`}
                     </button>
                   </div>
                 )}
@@ -1056,7 +1155,7 @@ export default function AdminSettingsPage() {
       {/* 評分報告 Modal */}
       {scoreReport?.open && (
         <ReportModal
-          report={{ title: "🏆 多模型競速評分報告", loading: scoreReport.loading, streaming: scoreReport.streaming, markdown: scoreReport.markdown, callId: scoreReport.callId }}
+          report={{ title: `🏆 ${t("adminSettings.race.reportTitle")}`, loading: scoreReport.loading, streaming: scoreReport.streaming, markdown: scoreReport.markdown, callId: scoreReport.callId }}
           onClose={() => setScoreReport((prev) => prev ? { ...prev, open: false } : null)}
         />
       )}
@@ -1064,7 +1163,7 @@ export default function AdminSettingsPage() {
       {/* 評分歷程 Modal */}
       {scoreHistoryOpen && (
         <AiCallHistoryModal
-          title="評分 AI 歷程（claude-opus-4-8）"
+          title={t("adminSettings.race.historyTitle")}
           calls={scoreCalls}
           loading={scoreCallsLoading}
           onClose={() => setScoreHistoryOpen(false)}
@@ -1074,7 +1173,7 @@ export default function AdminSettingsPage() {
       {/* 個別模型歷程 Modal */}
       {modelHistoryState?.open && (
         <AiCallHistoryModal
-          title={`${modelHistoryState.model} 測試歷程`}
+          title={t("adminSettings.race.modelHistoryTitle", { model: modelHistoryState.model })}
           calls={modelHistoryState.calls}
           loading={modelHistoryState.loading}
           onClose={() => setModelHistoryState(null)}

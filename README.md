@@ -67,6 +67,10 @@ Create a project-root `.env` file for local secrets and never commit it.
 | `OPENAI_API_KEY` | No | Enables a real OpenAI-compatible LLM; absence uses deterministic teaching fallbacks. |
 | `BASE_URL` | No | OpenAI-compatible gateway URL, including `/v1`; blank values normalize to the OpenAI default. |
 | `VOYAGE_API_KEY` | No | Enables Voyage embeddings; absence uses deterministic embeddings. |
+| `AI_OCR_PROVIDER_NAME` / `AI_OCR_MODEL` | No | Deployment default for business-card OCR. The provider and model must exist in the Admin model catalog with `VISION`. |
+| `AI_TRANSCRIPTION_PROVIDER_NAME` / `AI_TRANSCRIPTION_MODEL` | No | Deployment default for meeting transcription. The provider and model must exist in the Admin model catalog with `AUDIO_TRANSCRIPTION`. |
+
+Admin assignments override these deployment defaults independently. A missing media-purpose assignment never reuses the Chat model implicitly.
 
 The default datasource is `jdbc:postgresql://127.0.0.1:15432/aicrm`. Flyway applies migrations on startup and Hibernate validates the resulting schema. Use the `local` profile for additional development logging and the `prod` profile to disable demo cleanup/development endpoints.
 

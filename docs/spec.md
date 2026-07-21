@@ -12,6 +12,8 @@
 - Provider metadata is authoritative only when it contains reliable input modalities; model names are never used for capability inference.
 - The Admin UI displays `👁`/`👂` capability markers and the provenance badge. `UNKNOWN` and `MANUAL` entries can be governed with checkboxes; `AUTO` entries remain read-only.
 - OCR selectors contain only `VISION` models and transcription selectors contain only `AUDIO_TRANSCRIPTION` models. Both frontend and backend reject stale or incompatible assignments.
+- Chat, business-card OCR, and meeting transcription share one governed model catalog but have independent assignments. OCR and transcription each support a deployment default (`provider-name` + `model`); a complete database assignment takes precedence, while partial or stale settings fail closed.
+- The Admin UI shows the effective source (`DB`, `ENV`, or `UNSET`) for each media purpose and can validate the saved assignment with an actual card image or meeting-audio file. Test responses expose only a safe summary and latency, never OCR fields or transcript text.
 - V21 migrates legacy model options to empty capabilities with `UNKNOWN`, preserving existing values where valid.
 
 ### V22 CRM task/activity
