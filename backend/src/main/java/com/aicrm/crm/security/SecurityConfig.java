@@ -98,7 +98,9 @@ public class SecurityConfig {
         // 來源樣式由設定注入（app.cors.allowed-origins / 環境變數 APP_CORS_ALLOWED_ORIGINS）
         config.setAllowedOriginPatterns(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Idempotency-Key 為名片建檔/跟進信/會議 Copilot 確認端點的必要自訂標頭,
+        // 未放行會使跨域部署(前後端不同網域)的 preflight 被擋而回 Network Error
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
         // Caddy 代理後前端同域請求仍帶 Origin，需 allowCredentials 讓 cookie 隨請求回傳
         config.setAllowCredentials(true);
         var source = new UrlBasedCorsConfigurationSource();
