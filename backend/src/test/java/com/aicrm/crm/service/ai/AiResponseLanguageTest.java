@@ -19,11 +19,20 @@ class AiResponseLanguageTest {
         assertThat(AiResponseLanguage.directive("en-US")).contains("English");
     }
 
-    /** 繁中與 null 應回傳空字串（維持既有以繁體中文為預設的行為，prompt 不變）。 */
+    /** 繁中與 null 的 user 尾端輔助指示應為空字串（英文才需額外強調）。 */
     @Test
     void chineseOrNull_producesEmpty() {
         assertThat(AiResponseLanguage.directive("zh-TW")).isEmpty();
         assertThat(AiResponseLanguage.directive(null)).isEmpty();
         assertThat(AiResponseLanguage.directive("  ")).isEmpty();
+    }
+
+    /** systemLanguage 為主要語言約束：英文回英文指示、繁中/null 回繁中指示，皆非空。 */
+    @Test
+    void systemLanguage_bindsResponseLanguage() {
+        assertThat(AiResponseLanguage.systemLanguage("en")).contains("English").contains("ONLY");
+        assertThat(AiResponseLanguage.systemLanguage("en-US")).contains("English");
+        assertThat(AiResponseLanguage.systemLanguage("zh-TW")).contains("繁體中文");
+        assertThat(AiResponseLanguage.systemLanguage(null)).contains("繁體中文");
     }
 }

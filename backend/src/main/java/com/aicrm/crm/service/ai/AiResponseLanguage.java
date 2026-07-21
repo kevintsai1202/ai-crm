@@ -1,12 +1,13 @@
 package com.aicrm.crm.service.ai;
 
 /**
- * 依前端傳入的語系碼，產生要 append 到 LLM user prompt 尾端的「輸出語言指示」。
+ * 依前端傳入的語系碼，統一產生 LLM 回覆語言指示。
  *
- * <p>設計取捨：不改動各服務既有的 system prompt 常數（其內已含繁體中文語氣約束），
- * 僅在動態組出的 user prompt 尾端附加一段語言指示；繁中或未指定時回傳空字串，
- * 使既有以繁體中文為預設的行為完全不變。英文時回傳「強指示」，明確覆蓋 grounding
- * 與 system prompt 中殘留的繁中要求，確保整段回覆（含 JSON 文字欄位）皆為英文。</p>
+ * <p>設計：語言控制以 {@link #systemLanguage(String)} 放在 <b>system prompt 尾端</b>為主
+ * （system 層級指令對回覆語言最具約束力）；各服務的 {@code SYSTEM_PROMPT} 常數不再寫死
+ * 「使用繁體中文」，改由本工具依語系補上，確保繁中預設行為不變、英文時能真正切換。
+ * {@link #directive(String)} 為輔助，接在動態 user prompt 尾端再次強調（僅英文時非空），
+ * 對「JSON 文字欄位」等易漂移情境多一層保險。</p>
  */
 public final class AiResponseLanguage {
 
@@ -20,10 +21,25 @@ public final class AiResponseLanguage {
     }
 
     /**
-     * 產生要接到 user prompt 尾端的語言指示。
+     * system prompt 尾端的語言指示（中英皆非空，為回覆語言的主要約束）。
      *
      * @param lang 前端語系碼（如 "en"、"zh-TW"，可為 null）
-     * @return 英文時為強制英文的指示字串；繁中或未指定時為空字串（維持繁中預設）
+     * @return 英文時為強制英文指示；繁中或未指定時為繁中指示
+     */
+    public static String systemLanguage(String lang) {
+        if (isEnglish(lang)) {
+            return "\n\nIMPORTANT: Respond ONLY in English. Even though the customer data, "
+                    + "knowledge base and other context may be written in Chinese, your entire "
+                    + "reply — including every field, heading and bullet — must be written in English.";
+        }
+        return "\n\n請務必全程使用繁體中文回答。";
+    }
+
+    /**
+     * user prompt 尾端的輔助語言指示（僅英文時非空，多一層強調）。
+     *
+     * @param lang 前端語系碼（如 "en"、"zh-TW"，可為 null）
+     * @return 英文時為強制英文的指示字串；繁中或未指定時為空字串
      */
     public static String directive(String lang) {
         if (isEnglish(lang)) {

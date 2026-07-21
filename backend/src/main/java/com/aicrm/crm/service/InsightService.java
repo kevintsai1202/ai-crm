@@ -10,6 +10,7 @@ import com.aicrm.crm.domain.OpportunityStage;
 import com.aicrm.crm.service.ai.AiGroundingService;
 import com.aicrm.crm.service.ai.RagCitationService;
 import static com.aicrm.crm.service.ai.AiResponseLanguage.directive;
+import static com.aicrm.crm.service.ai.AiResponseLanguage.systemLanguage;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,7 +51,7 @@ public class InsightService {
      */
     private static final String SYSTEM_PROMPT = """
             你是一位專業的 B2B CRM 業務助理。請僅根據提供的「客戶資料」「風險評分」「知識庫引用」回答，
-            不得自行編造價格、折扣或任何未經確認的承諾。回答需簡潔、條理清楚、可執行，並使用繁體中文。
+            不得自行編造價格、折扣或任何未經確認的承諾。回答需簡潔、條理清楚、可執行。
             若資料不足，請明確指出需要補齊哪些資訊，而非臆測。""";
 
     /**
@@ -204,7 +205,7 @@ public class InsightService {
                 answer -> {
                     chatMemory.save(customerId, ChatRole.USER, userMessage);
                     chatMemory.save(customerId, ChatRole.ASSISTANT, answer);
-                });
+                }, request.lang());
         return emitter;
     }
 
@@ -230,7 +231,7 @@ public class InsightService {
         var prompt = grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION + directive(lang);
 
         // 評估非對話，不寫對話記憶 → onFinalAnswer 傳 null
-        streamAnswer(emitter, AiCallType.ASSESSMENT, customerId, chatModel, prompt, citations, risk, fallbackAnswer, null);
+        streamAnswer(emitter, AiCallType.ASSESSMENT, customerId, chatModel, prompt, citations, risk, fallbackAnswer, null, lang);
         return emitter;
     }
 
@@ -255,7 +256,7 @@ public class InsightService {
      */
     private void streamAnswer(SseEmitter emitter, AiCallType type, Long customerId, ChatModel chatModel,
                              String userPrompt, List<Dtos.CitationResponse> citations, Dtos.RiskResponse risk,
-                             String fallbackAnswer, java.util.function.Consumer<String> onFinalAnswer) {
+                             String fallbackAnswer, java.util.function.Consumer<String> onFinalAnswer, String lang) {
         // 無金鑰：直接 deterministic fallback，一次送出完整回答後結束
         if (chatModel == null) {
             finalizeFallback(emitter, type, customerId, citations, risk, fallbackAnswer, onFinalAnswer);
@@ -265,7 +266,7 @@ public class InsightService {
         var fullAnswer = new StringBuilder();
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
 
-        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(userPrompt);
         var streamOpts = systemSettings.resolveChatOptions();
         if (streamOpts != null) streamSpec = streamSpec.options(streamOpts);
         streamSpec.stream().chatResponse()
@@ -383,7 +384,7 @@ public class InsightService {
         var customer = customers.findDetail(customerId);
         var risk = calculateOpportunityRisk(customer);
         var citations = ragCitations.loadCitations(customer.getName() + " " + customer.getIndustry() + " 續約 風險 評估");
-        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION + directive(lang));
+        var result = callLlm(AiCallType.ASSESSMENT, customer, risk, grounding.buildGroundingContext(customer, risk, citations, "") + ASSESSMENT_INSTRUCTION + directive(lang), lang);
         return new Dtos.ChatResponse(result.answer(), citations, risk, result.callId());
     }
 
@@ -427,14 +428,14 @@ public class InsightService {
      * @param userPrompt 完整使用者提示詞
      * @return 回答文字
      */
-    private LlmResult callLlm(AiCallType type, Customer customer, Dtos.RiskResponse risk, String userPrompt) {
+    private LlmResult callLlm(AiCallType type, Customer customer, Dtos.RiskResponse risk, String userPrompt, String lang) {
         // 未設定 api-key 時直接走 fallback，避免發出註定失敗的 API 請求
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
         if (chatModel == null) {
             return recordFallback(type, customer, risk);
         }
         try {
-            var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+            var spec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(userPrompt);
             var opts = systemSettings.resolveChatOptions();
             if (opts != null) spec = spec.options(opts);
             var chatResponse = spec.call().chatResponse();
@@ -485,7 +486,7 @@ public class InsightService {
      */
     private LlmResult buildAnswer(AiCallType type, Customer customer, Dtos.RiskResponse risk, List<Dtos.CitationResponse> citations, String memory, String userMessage, String lang) {
         var prompt = grounding.buildGroundingContext(customer, risk, citations, memory) + "\n# 業務提問\n" + userMessage + "\n" + directive(lang);
-        return callLlm(type, customer, risk, prompt);
+        return callLlm(type, customer, risk, prompt, lang);
     }
 
     /**
@@ -524,7 +525,7 @@ public class InsightService {
                     """.formatted(count, highRisk, pipeline, activeOpportunities,
                             // PII 遮罩只作用在送 LLM 的 grounding context
                             PiiMasker.mask(String.join("\n", rows))) + directive(lang);
-            var portfolioSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+            var portfolioSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(prompt);
             var portfolioOpts = systemSettings.resolveChatOptions();
             if (portfolioOpts != null) portfolioSpec = portfolioSpec.options(portfolioOpts);
             var chatResponse = portfolioSpec.call().chatResponse();
@@ -1065,7 +1066,7 @@ public class InsightService {
         var fullAnswer = new StringBuilder();
         var lastResponse = new java.util.concurrent.atomic.AtomicReference<org.springframework.ai.chat.model.ChatResponse>();
 
-        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(prompt);
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(prompt);
         var streamOpts = systemSettings.resolveChatOptions();
         if (streamOpts != null) streamSpec = streamSpec.options(streamOpts);
         streamSpec.stream().chatResponse()

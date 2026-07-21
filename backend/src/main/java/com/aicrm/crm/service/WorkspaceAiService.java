@@ -8,6 +8,7 @@ import com.aicrm.crm.domain.Role;
 import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import static com.aicrm.crm.service.ai.AiResponseLanguage.directive;
+import static com.aicrm.crm.service.ai.AiResponseLanguage.systemLanguage;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +42,8 @@ public class WorkspaceAiService {
 
     /** 工作檯 AI 系統提示：強調接地、不可竄改數字。 */
     private static final String SYSTEM_PROMPT =
-            "你是專業的 CRM 業務助理，協助業務規劃每日工作。回答務必使用繁體中文，"
-            + "且只能根據提供的資料庫事實作答，不可編造未提供的客戶、數字或商機。";
+            "你是專業的 CRM 業務助理，協助業務規劃每日工作。"
+            + "只能根據提供的資料庫事實作答，不可編造未提供的客戶、數字或商機。";
 
     /** 客戶資料存取。 */
     private final CustomerRepository customerRepository;
@@ -267,7 +268,7 @@ public class WorkspaceAiService {
                 + "不要輸出清單以外的客戶，不要捏造 customerId。");
         sb.append(directive(lang));
         try {
-            var draftSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(sb.toString());
+            var draftSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(sb.toString());
             var draftOpts = systemSettings.resolveChatOptions();
             if (draftOpts != null) draftSpec = draftSpec.options(draftOpts);
             var raw = draftSpec
@@ -349,7 +350,7 @@ public class WorkspaceAiService {
             return emitter;
         }
 
-        streamLlmText(emitter, AiCallType.WORKSPACE_RECOMMENDATION, subject, userPrompt, fallback, chatModel);
+        streamLlmText(emitter, AiCallType.WORKSPACE_RECOMMENDATION, subject, userPrompt, fallback, chatModel, lang);
         return emitter;
     }
 
@@ -365,7 +366,7 @@ public class WorkspaceAiService {
      * @param chatModel ChatModel（null 表無金鑰，直接 fallback）
      */
     private void streamLlmText(SseEmitter emitter, AiCallType type, String subject,
-                               String userPrompt, String fallback, ChatModel chatModel) {
+                               String userPrompt, String fallback, ChatModel chatModel, String lang) {
         if (chatModel == null) {
             var saved = aiGovernance.record(type, null, subject, null, 0, 0, 0, false, false, fallback);
             SseHelper.sendContent(emitter, fallback);
@@ -374,7 +375,7 @@ public class WorkspaceAiService {
         }
         var fullAnswer = new StringBuilder();
         var lastResponse = new AtomicReference<ChatResponse>();
-        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT).user(userPrompt);
+        var streamSpec = ChatClient.create(chatModel).prompt().system(SYSTEM_PROMPT + systemLanguage(lang)).user(userPrompt);
         var opts = systemSettings.resolveChatOptions();
         if (opts != null) {
             streamSpec = streamSpec.options(opts);
@@ -456,7 +457,7 @@ public class WorkspaceAiService {
         final String userPrompt = buildPortfolioPrompt(principal, customers, req.message(), req.lang());
         final String fallback = deterministicPortfolioAnswer(customers);
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
-        streamLlmText(emitter, AiCallType.WORKSPACE_CHAT, subject, userPrompt, fallback, chatModel);
+        streamLlmText(emitter, AiCallType.WORKSPACE_CHAT, subject, userPrompt, fallback, chatModel, req.lang());
         return emitter;
     }
 
