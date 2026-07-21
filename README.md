@@ -28,6 +28,28 @@ The repository is a monorepo:
 - AI business-card intake: upload a card image, review AI-recognized fields, resolve duplicate customers, and confirm to atomically create a customer, contact, opportunity, and phone-call task; the source image is deleted after confirmation.
 - Rule-based workspace recommendations remain suggestions; persistent task status always comes from `/api/tasks`.
 
+## Built with GPT-5.6 and Codex
+
+This project was built for the OpenAI Build Week Hackathon, and both **GPT-5.6** and **Codex** are core — not auxiliary — to how it works and how it was made.
+
+### How GPT-5.6 is integrated
+
+The backend talks to GPT-5.6 through Spring AI 2.0 (`spring-ai-starter-model-openai`) pointed at an OpenAI-compatible gateway. The active deployment model is `gpt-5.6-sol` (vision-enabled), configured through the Admin model-capability catalog. GPT-5.6 powers the following features:
+
+- **Governed AI sales chat and customer insight** (`InsightService`): retrieval-grounded Q&A about a customer, with PII masking and per-call governance logging.
+- **Workspace recommendations and opportunity drafting** (`WorkspaceAiService`): GPT-5.6 streams a prioritized daily work summary over SSE and proposes concrete new opportunities. Candidate customers, IDs, and risk facts are computed in Java/DB first and passed as grounding context; the model's output is then validated — `customerId` must fall inside the caller's authorized scope or the suggestion is dropped, the deal stage is normalized to a legal enum, and the customer name always comes from the database rather than the model. This is our anti-hallucination boundary.
+- **Business-card vision OCR** (`OpenAiBusinessCardRecognitionClient`): the same GPT-5.6 vision model reads an uploaded card image and returns a strict JSON schema. The system prompt treats the image and its text as untrusted input and refuses to follow instructions embedded in it, defending against prompt injection.
+- **Locale-aware responses**: reply-language control is enforced at the system-prompt level so AI output follows the user's UI locale.
+
+Every GPT-5.6 call is recorded (type, model, token usage) for audit. When no API key is present, each feature degrades to a deterministic rule-based fallback so the teaching build stays demonstrable without an external key.
+
+### How Codex was used
+
+- **Where Codex accelerated the workflow**: Codex generated Flyway migrations and Testcontainers-backed integration-test scaffolding, batch-completed the frontend i18n string set across the app, produced the Playwright real-browser E2E specs (V21 model capability, V22 tasks, V23 business-card, V24 meeting copilot), and refactored cross-cutting details such as allowing the `Idempotency-Key` header through CORS for the cross-origin confirm endpoints.
+- **Key product / engineering / design decisions I made**: I defined the grounding-first anti-hallucination boundary — risk facts, todos, and customer IDs are computed in Java/DB and passed to the model as grounding, and the model's output is re-validated against the caller's authorized scope before use. I lifted reply-language control to the system-prompt level so AI output follows the UI locale, and I kept the Chat, Vision, and Audio-transcription model capabilities separate so a media purpose never implicitly reuses the Chat model.
+- **How GPT-5.6 and Codex contributed to the final result**: GPT-5.6 powers the product's runtime intelligence — grounded sales chat and customer insight, streaming workspace recommendations and opportunity drafting, and vision OCR for business-card intake. Codex was the primary engineering collaborator that built and verified that surface, from database migrations and services through to real-browser E2E coverage. Together they let a single developer ship a production-shaped, governed AI CRM with deterministic fallbacks and full audit logging.
+- **Codex Session ID** (core-functionality thread, obtained via the `/feedback` command): `019f7509-b074-7f62-b557-94b3c5bd3f00`
+
 ## Quick start
 
 Requirements: Java 21, Maven, Node.js with pnpm, Docker Desktop, and PowerShell 7+.
@@ -71,6 +93,28 @@ Create a project-root `.env` file for local secrets and never commit it.
 | `AI_TRANSCRIPTION_PROVIDER_NAME` / `AI_TRANSCRIPTION_MODEL` | No | Deployment default for meeting transcription. The provider and model must exist in the Admin model catalog with `AUDIO_TRANSCRIPTION`. |
 
 Admin assignments override these deployment defaults independently. A missing media-purpose assignment never reuses the Chat model implicitly.
+
+### Configuring per-purpose AI models (Chat, Vision OCR, Audio transcription)
+
+AI CRM treats the LLM not as a single default but as three independent roles, each resolved and governed separately:
+
+| Role | Capability required | Used by |
+| --- | --- | --- |
+| Chat / reasoning | — (chat model) | Sales chat, customer insight, workspace recommendations, opportunity drafting |
+| Vision OCR | `VISION` | Business-card intake (image → structured fields) |
+| Audio transcription | `AUDIO_TRANSCRIPTION` | Meeting copilot (audio → transcript) |
+
+**Step 1 — Register a model and declare its capabilities.** In the Admin settings page, add a provider and its models, then mark each model with the capabilities it actually supports (Vision and/or Audio). A model that is not flagged `VISION` can never be assigned as the OCR model, and a model not flagged `AUDIO_TRANSCRIPTION` can never be assigned as the transcription model — the backend re-validates this on every call and refuses a mismatched pair.
+
+**Step 2 — Assign a model per purpose.** For the business-card OCR model and the audio transcription model, pick a provider + model pair from the capability-filtered options. These Admin assignments are stored in the database and take priority.
+
+**Resolution order (per media purpose).** The backend resolves each media purpose independently:
+
+1. **Database assignment** (set in the Admin UI) — used first when present.
+2. **Deployment default** (`AI_OCR_*` / `AI_TRANSCRIPTION_*` environment variables) — used when no database assignment exists.
+3. **Fail closed** — if neither a valid assignment nor a complete deployment default (provider, model, capability, and API key) is available, that feature reports "unavailable" rather than silently borrowing the Chat model.
+
+This keeps the roles decoupled: you can point OCR and transcription at different providers or models from the Chat model, change one without affecting the others, and audit each independently. Every OCR and transcription call is recorded through the same AI governance log as chat.
 
 The default datasource is `jdbc:postgresql://127.0.0.1:15432/aicrm`. Flyway applies migrations on startup and Hibernate validates the resulting schema. Use the `local` profile for additional development logging and the `prod` profile to disable demo cleanup/development endpoints.
 
@@ -182,40 +226,3 @@ The dashboard includes a sales funnel, monthly revenue forecast, revenue by indu
 - Frontend cannot reach APIs: confirm backend health at `/api/health` and the Vite `/api` proxy target `127.0.0.1:18080`.
 - AI calls use fallback unexpectedly: verify `OPENAI_API_KEY`, the gateway `BASE_URL` including `/v1`, and provider/model settings in the ADMIN UI.
 - Task mutation returns `409`: another update won the optimistic lock; reload the task list and retry using the latest version.
-
----
-
-## 中文摘要
-
-AI CRM 是一套教學／示範用的全端智慧業務助理，後端採 Spring Boot 4.1、Java 21、PostgreSQL、Flyway 與 pgvector，前端採 React 19、TypeScript、Vite、Vitest 與 Playwright。系統包含客戶、聯絡人、互動、商機、儀表板、RFM、情緒意圖、RAG、PII 遮罩、AI 治理與模型能力設定。
-
-V22 新增正式 CRM 任務：可從客戶工作台或「我的工作檯」安排電話追蹤、延期、完成與下載 `.ics`。正式狀態只以 `/api/tasks` 為準；既有 AI／規則式工作建議仍是建議，不會冒充已持久化任務。任務更新使用 `version` 樂觀鎖，發生 `409` 時前端會提示並重新載入。
-
-Dashboard 包含銷售漏斗、月度營收 Forecast、產業營收分布、客戶風險結構、續約到期預測與業務排行榜，資料由 `V4__add_promo_report_seed_data.sql` migration 提供。
-
-### 中文快速啟動
-
-```powershell
-pwsh .\check-env.ps1
-docker compose up -d postgres
-$env:JAVA_HOME = "D:\java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;D:\nodejs;$env:Path"
-$env:APP_SECURITY_JWT_SECRET = "請替換為至少32字元的隨機字串"
-mvn -pl backend spring-boot:run
-```
-
-另開終端機執行：
-
-```powershell
-Set-Location .\frontend
-pnpm install
-pnpm run dev
-```
-
-本機 PostgreSQL 固定使用 `15432`，後端使用 `18080`，Vite 預設使用 `5173`。完整 V22 驗收使用：
-
-```powershell
-pwsh .\scripts\verify-phase-gate.ps1 -Phase V22 -E2ESpec frontend/e2e/v22-tasks.spec.ts
-```
-
-詳細規格、API 與進度請見 `docs/spec.md`、`docs/api.md`、`docs/roadmap-progress.md`。
