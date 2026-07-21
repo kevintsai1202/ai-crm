@@ -50,8 +50,9 @@ public class WorkspaceController {
      */
     @GetMapping("/recommendation")
     public Dtos.WorkspaceRecommendationResponse getRecommendation(@AuthenticationPrincipal AuthPrincipal principal,
-                                                                  @RequestParam(defaultValue = "self") String scope) {
-        return workspaceAiService.getRecommendation(principal, scope);
+                                                                  @RequestParam(defaultValue = "self") String scope,
+                                                                  @RequestParam(required = false) String lang) {
+        return workspaceAiService.getRecommendation(principal, scope, lang);
     }
 
     /**

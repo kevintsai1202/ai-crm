@@ -56,7 +56,7 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
     @Test
     void computeTodos_salesScope_onlyOwnCustomers() {
         // SALES 即使帶 scope=all 仍被強制只看自己
-        var todos = workspaceAiService.computeTodos(sales, "all");
+        var todos = workspaceAiService.computeTodos(sales, "all", "zh-TW");
 
         assertThat(todos).extracting(Dtos.WorkspaceTodoItem::customerName)
                 .doesNotContain("他人高風險客");
@@ -67,11 +67,20 @@ class WorkspaceAiServiceTest extends com.aicrm.crm.support.PostgresTestBase {
 
     @Test
     void recommendationFallback_containsTodoCustomers() {
-        var todos = workspaceAiService.computeTodos(sales, "self");
-        String fallback = workspaceAiService.deterministicRecommendation(sales, todos);
+        var todos = workspaceAiService.computeTodos(sales, "self", "zh-TW");
+        String fallback = workspaceAiService.deterministicRecommendation(sales, todos, "zh-TW");
         // 接地：fallback 文字應列出待辦客戶，且提到「待辦」
         assertThat(fallback).contains("艾美高風險客");
         assertThat(fallback).contains("待辦");
+    }
+
+    @Test
+    void computeTodos_english_producesEnglishReason() {
+        // lang=en 時待辦描述應為英文（不含中文語系關鍵字），客戶名仍為 DB 原值
+        var todos = workspaceAiService.computeTodos(sales, "self", "en");
+        assertThat(todos).isNotEmpty();
+        assertThat(todos).allMatch(t -> !t.reason().contains("風險")
+                && !t.reason().contains("續約") && !t.reason().contains("商機"));
     }
 
     @Test

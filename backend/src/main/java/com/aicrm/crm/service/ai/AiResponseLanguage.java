@@ -16,7 +16,7 @@ public final class AiResponseLanguage {
     }
 
     /** 英文語系判定：以 "en" 開頭（如 en、en-US）視為英文；其餘（含 null）視為繁中預設。 */
-    private static boolean isEnglish(String lang) {
+    public static boolean isEnglish(String lang) {
         return lang != null && lang.trim().toLowerCase().startsWith("en");
     }
 

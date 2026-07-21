@@ -932,7 +932,7 @@ export async function streamOwnerInsight(
  */
 export async function fetchWorkspaceRecommendation(scope: string) {
   const { data } = await apiClient.get<import("../types").WorkspaceRecommendation>(
-    "/workspace/recommendation", { params: { scope } });
+    "/workspace/recommendation", { params: { scope, lang: currentLang() } });
   return data;
 }
 

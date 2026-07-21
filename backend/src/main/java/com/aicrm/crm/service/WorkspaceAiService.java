@@ -9,6 +9,7 @@ import com.aicrm.crm.repository.CustomerRepository;
 import com.aicrm.crm.service.JwtService.AuthPrincipal;
 import static com.aicrm.crm.service.ai.AiResponseLanguage.directive;
 import static com.aicrm.crm.service.ai.AiResponseLanguage.systemLanguage;
+import static com.aicrm.crm.service.ai.AiResponseLanguage.isEnglish;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,8 +100,8 @@ public class WorkspaceAiService {
      * @param scope 請求範圍（SALES 會被強制為自己）
      * @return 待辦清單
      */
-    public List<Dtos.WorkspaceTodoItem> computeTodos(AuthPrincipal principal, String scope) {
-        return computeTodosFrom(loadScopedCustomers(principal, scope));
+    public List<Dtos.WorkspaceTodoItem> computeTodos(AuthPrincipal principal, String scope, String lang) {
+        return computeTodosFrom(loadScopedCustomers(principal, scope), lang);
     }
 
     /**
@@ -109,20 +110,23 @@ public class WorkspaceAiService {
      * @param customers 已載入的客戶清單
      * @return 待辦清單
      */
-    List<Dtos.WorkspaceTodoItem> computeTodosFrom(List<Customer> customers) {
+    List<Dtos.WorkspaceTodoItem> computeTodosFrom(List<Customer> customers, String lang) {
+        boolean en = isEnglish(lang); // 待辦描述依語系產生（前端直接顯示 reason）
         var today = LocalDate.now();
         var todos = new ArrayList<Dtos.WorkspaceTodoItem>();
         for (var c : customers) {
             // 高風險客戶
             if ("HIGH".equalsIgnoreCase(c.getRiskLevel())) {
                 todos.add(new Dtos.WorkspaceTodoItem("HIGH_RISK", c.getId(), c.getName(),
-                        "客戶風險等級為高，建議優先聯繫關懷", "HIGH"));
+                        en ? "Customer risk level is HIGH — prioritize a proactive check-in."
+                           : "客戶風險等級為高，建議優先聯繫關懷", "HIGH"));
             }
             // 即將續約（今日起 14 天內）
             var due = c.getRenewalDueDate();
             if (due != null && !due.isBefore(today) && !due.isAfter(today.plusDays(RENEWAL_DUE_DAYS))) {
                 todos.add(new Dtos.WorkspaceTodoItem("RENEWAL_DUE", c.getId(), c.getName(),
-                        "續約日 " + due + " 即將到期，建議啟動續約", "MEDIUM"));
+                        en ? "Renewal due on " + due + " — start the renewal process."
+                           : "續約日 " + due + " 即將到期，建議啟動續約", "MEDIUM"));
             }
             // 逾期未結商機（開放中且預計成交日早於今日）
             for (var o : c.getOpportunities()) {
@@ -130,7 +134,9 @@ public class WorkspaceAiService {
                         && o.getStage() != OpportunityStage.CLOSED_LOST;
                 if (open && o.getExpectedCloseDate() != null && o.getExpectedCloseDate().isBefore(today)) {
                     todos.add(new Dtos.WorkspaceTodoItem("STALE_OPPORTUNITY", c.getId(), c.getName(),
-                            "商機「" + o.getName() + "」預計成交日已過（" + o.getExpectedCloseDate() + "），需推進或結案", "MEDIUM"));
+                            en ? "Opportunity \"" + o.getName() + "\" is past its expected close date ("
+                                    + o.getExpectedCloseDate() + ") — advance or close it."
+                               : "商機「" + o.getName() + "」預計成交日已過（" + o.getExpectedCloseDate() + "），需推進或結案", "MEDIUM"));
                 }
             }
         }
@@ -168,15 +174,18 @@ public class WorkspaceAiService {
      * @param todos 已算好的待辦
      * @return 保底建議文字
      */
-    public String deterministicRecommendation(AuthPrincipal principal, List<Dtos.WorkspaceTodoItem> todos) {
+    public String deterministicRecommendation(AuthPrincipal principal, List<Dtos.WorkspaceTodoItem> todos, String lang) {
+        boolean en = isEnglish(lang);
         if (todos.isEmpty()) {
-            return "根據 CRM 資料庫，您目前沒有待辦事項，維持既有跟進節奏即可。";
+            return en ? "You have no pending tasks in the CRM database; keep your current follow-up cadence."
+                      : "根據 CRM 資料庫，您目前沒有待辦事項，維持既有跟進節奏即可。";
         }
-        var sb = new StringBuilder("根據 CRM 資料庫，您有 ").append(todos.size()).append(" 項待辦需處理：\n");
+        var sb = new StringBuilder(en ? "Based on the CRM database, you have " + todos.size() + " task(s) to handle:\n"
+                                      : "根據 CRM 資料庫，您有 " + todos.size() + " 項待辦需處理：\n");
         for (var t : todos) {
-            sb.append("• ").append(t.customerName()).append("：").append(t.reason()).append("\n");
+            sb.append("• ").append(t.customerName()).append(en ? " — " : "：").append(t.reason()).append("\n");
         }
-        sb.append("建議優先處理標記為高的項目。");
+        sb.append(en ? "Prioritize the items marked High." : "建議優先處理標記為高的項目。");
         return sb.toString();
     }
 
@@ -326,8 +335,8 @@ public class WorkspaceAiService {
 
         // 交易內先載入客戶一次，算好純值（待辦、規則式 fallback、提示詞）
         var customers = loadScopedCustomers(principal, scope);
-        var todos = computeTodosFrom(customers);
-        final String fallback = deterministicRecommendation(principal, todos);
+        var todos = computeTodosFrom(customers, lang);
+        final String fallback = deterministicRecommendation(principal, todos, lang);
         final String userPrompt = buildRecommendationPrompt(principal, todos, lang);
         final String subject = principal.username();
         var chatModel = aiEnabled ? chatModelProvider.getIfAvailable() : null;
@@ -489,8 +498,8 @@ public class WorkspaceAiService {
      * @param scope 請求範圍
      * @return 工作推薦回應
      */
-    public Dtos.WorkspaceRecommendationResponse getRecommendation(AuthPrincipal principal, String scope) {
-        var todos = computeTodos(principal, scope);
+    public Dtos.WorkspaceRecommendationResponse getRecommendation(AuthPrincipal principal, String scope, String lang) {
+        var todos = computeTodos(principal, scope, lang);
         var history = aiGovernance.workspaceHistory(principal.username());
         var last = history.stream()
                 .filter(h -> AiCallType.WORKSPACE_RECOMMENDATION.name().equals(h.callType()))
